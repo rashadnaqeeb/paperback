@@ -11,6 +11,7 @@ use scraper::Html;
 use zip::ZipArchive;
 
 use super::{
+	fork_toc::{self, ChapterTitle, TitleRole},
 	href::{resolve_href, split_href},
 	package::ManifestItem,
 };
@@ -54,6 +55,7 @@ struct SectionContent {
 	image_source: String,
 	/// Why the section was read as HTML rather than XML, for the one summary line a book gets: an EPUB whose XHTML is not well-formed usually has every section like that.
 	xml_error: Option<String>,
+	title_ids: Vec<(TitleRole, String)>,
 }
 
 impl ConverterOutput for SectionContent {
@@ -106,6 +108,7 @@ pub(super) struct SpineConversionResult {
 	pub(super) id_positions: HashMap<String, usize>,
 	pub(super) sections: Vec<SectionMeta>,
 	pub(super) conversion_errors: Vec<String>,
+	pub(super) titles: Vec<ChapterTitle>,
 }
 
 /// Reads and converts every spine item to text. Each rayon worker opens its own independent
@@ -198,6 +201,7 @@ pub(super) fn convert_spine_items(
 	let (mut buffer, spans) = DocumentBuffer::from_parts(texts);
 	let mut id_positions = HashMap::new();
 	let mut sections = Vec::new();
+	let mut titles = Vec::new();
 	for (((entry, span), is_image), was_replaced) in ok_entries.iter().zip(&spans).zip(&image_sections).zip(&replaced) {
 		let (idx, item, section) = entry;
 		let section_start = span.start;
@@ -229,6 +233,12 @@ pub(super) fn convert_spine_items(
 				id_positions.entry(id.clone()).or_insert(absolute);
 				id_positions.insert(format!("{}#{id}", item.path), absolute);
 			}
+			for (role, id) in &section.title_ids {
+				if let Some(relative) = section.id_positions.get(id) {
+					let reference = format!("{}#{id}", item.path);
+					titles.push(ChapterTitle { role: *role, offset: section_start + relative, reference });
+				}
+			}
 			add_converter_markers_excluding_links(&mut buffer, section, section_start, &|source| {
 				split_href(&resolve_href(&item.path, source)).0
 			});
@@ -243,7 +253,7 @@ pub(super) fn convert_spine_items(
 		}
 		sections.push(SectionMeta { path: item.path.clone(), start: section_start, end: span.end });
 	}
-	SpineConversionResult { buffer, id_positions, sections, conversion_errors }
+	SpineConversionResult { buffer, id_positions, sections, conversion_errors, titles }
 }
 
 /// Whether a spine item is a page the reader meets as a picture rather than as text.
@@ -308,6 +318,7 @@ fn convert_section(content: &str, render_tables_inline: bool) -> Result<SectionC
 			id_positions: xml_converter.get_id_positions().clone(),
 			has_image_markup: content_has_image_markup(content),
 			xml_error: None,
+			title_ids: fork_toc::title_ids(content),
 		});
 	}
 	let mut html_converter = HtmlToText::with_render_tables_inline(render_tables_inline);
@@ -331,6 +342,7 @@ fn convert_section(content: &str, render_tables_inline: bool) -> Result<SectionC
 			id_positions: html_converter.get_id_positions().clone(),
 			has_image_markup: content_has_image_markup(content),
 			xml_error,
+			title_ids: fork_toc::title_ids(content),
 		});
 	}
 	// currently unreachable, HtmlToText::convert always returns true today

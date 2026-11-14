@@ -11,6 +11,7 @@ use crate::{
 	util::zip::read_zip_entry_by_name,
 };
 
+mod fork_toc;
 mod href;
 mod package;
 mod pages;
@@ -73,6 +74,14 @@ impl Parser for EpubParser {
 			ncx_path.as_deref(),
 			&conversion.sections,
 			&conversion.id_positions,
+		);
+		let toc_items = fork_toc::repair_toc(
+			&mut archive,
+			&conversion.buffer,
+			&conversion.sections,
+			&conversion.id_positions,
+			&conversion.titles,
+			toc_items,
 		);
 		let page_items = build_epub_pages(
 			&mut archive,
