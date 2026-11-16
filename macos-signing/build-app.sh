@@ -12,12 +12,12 @@ xcodebuild -project macos-signing/PaperbackSigning.xcodeproj -scheme PaperbackSi
 	-derivedDataPath target/macos-signing -allowProvisioningUpdates -allowProvisioningDeviceRegistration -quiet build
 stand_in=target/macos-signing/Build/Products/Debug/PaperbackSigning.app
 app=target/release/Paperback.app
-cp target/release/paperback target/release/pb target/release/libpdfium.dylib "$app/Contents/MacOS/"
+cp target/release/paperback target/release/pb "$app/Contents/MacOS/"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.rashadnaqeeb.paperback.mac" "$app/Contents/Info.plist"
 cp "$stand_in/Contents/embedded.provisionprofile" "$app/Contents/"
 identity=$(codesign -dvv "$stand_in" 2>&1 | sed -n 's/^Authority=\(Apple Development.*\)$/\1/p' | head -1)
 codesign -d --entitlements - --xml "$stand_in" > target/macos-signing/entitlements.plist
-codesign --force --sign "$identity" "$app/Contents/MacOS/libpdfium.dylib" "$app/Contents/MacOS/pb"
+codesign --force --sign "$identity" "$app/Contents/MacOS/pb"
 codesign --force --sign "$identity" --entitlements target/macos-signing/entitlements.plist "$app"
 codesign --verify --deep --strict "$app"
 echo "Built and signed $app"
