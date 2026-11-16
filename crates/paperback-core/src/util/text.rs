@@ -3,52 +3,51 @@ use std::sync::LazyLock;
 use regex::Regex;
 use roman::to;
 
-/// A run of dot leaders before a page number at the end of a line: `Getting Started.......12`.
 static LEADERS: LazyLock<Regex> = LazyLock::new(|| {
 	Regex::new(r"(?m)[ \t]*(?:[.\u{2026}\u{00B7}][ \t]?){4,}[ \t]*(\d+|[ivxlcdmIVXLCDM]+)[ \t]*$")
 		.expect("leader pattern is valid")
 });
 
-/// Collapses table-of-contents dot leaders into a single space, so a contents line reads
-/// "Getting Started 12" rather than every dot being spoken. Only runs of four or more dots,
-/// ellipses or middle dots followed by a page number at the end of a line count, which leaves
-/// ellipses and fill-in blanks (`Name: ______`) alone.
+/// So every dot of a contents line isn't spoken; requiring four or more and a trailing page number leaves ellipses and fill-in blanks alone.
 #[must_use]
 pub fn collapse_leaders(input: &str) -> String {
 	LEADERS.replace_all(input, " $1").into_owned()
 }
 
+/// In place, so a whole text file is not copied to find it has none.
 #[must_use]
-pub fn remove_soft_hyphens(input: &str) -> String {
-	input.replace("\u{00AD}", "")
+pub fn remove_soft_hyphens(mut text: String) -> String {
+	if text.contains('\u{00AD}') {
+		text.retain(|c| c != '\u{00AD}');
+	}
+	text
 }
 
-/// Normalizes `\r\n` and bare `\r` line endings to `\n`, matching every other parser's output
-/// (RTF, HTML, XML, Markdown all only ever emit bare `\n`). A GUI text control's own line-ending
-/// handling doesn't necessarily count an embedded `\r` as a position the same way `DocumentBuffer`
-/// does, so leaving raw `\r`s in a document's content drifts its stored positions (markers, Find
-/// results, ...) out of sync with the control by roughly one unit per line - worse the further
-/// into the document you go. Plain text files are the one format whose source can contain `\r` at
-/// all, since every other parser builds its output text itself rather than passing source bytes
-/// through.
+/// A text control may not count a raw `\r` as a position the way the buffer does, so stored positions drift by about one per line.
 #[must_use]
-pub fn normalize_line_endings(input: &str) -> String {
-	if !input.contains('\r') {
-		return input.to_string();
+pub fn normalize_line_endings(text: String) -> String {
+	if !text.contains('\r') {
+		return text;
 	}
-	let mut result = String::with_capacity(input.len());
-	let mut chars = input.chars().peekable();
-	while let Some(ch) = chars.next() {
-		if ch == '\r' {
-			if chars.peek() == Some(&'\n') {
-				chars.next();
-			}
-			result.push('\n');
-		} else {
-			result.push(ch);
+	// In place on the bytes, as a whole text file comes through here; `\r` and `\n` are ASCII, so the text stays valid UTF-8.
+	let mut bytes = text.into_bytes();
+	let mut write = 0;
+	let mut read = 0;
+	while let Some(found) = memchr::memchr(b'\r', &bytes[read..]) {
+		let at = read + found;
+		bytes.copy_within(read..at, write);
+		write += at - read;
+		bytes[write] = b'\n';
+		write += 1;
+		read = at + 1;
+		if bytes.get(read) == Some(&b'\n') {
+			read += 1;
 		}
 	}
-	result
+	let end = bytes.len();
+	bytes.copy_within(read..end, write);
+	bytes.truncate(write + end - read);
+	String::from_utf8(bytes).expect("only ASCII bytes were moved, which keeps UTF-8 valid")
 }
 
 #[must_use]
@@ -58,51 +57,93 @@ pub fn url_decode(input: &str) -> String {
 
 #[must_use]
 pub fn collapse_whitespace(input: &str) -> String {
-	if input.is_empty() {
-		return String::new();
+	// Between braille cells a zero-width space only marks where a line may break, as DAISY Pipeline writes one after a hyphen in eBraille, so it is no space.
+	if input.contains('\u{200B}') {
+		let kept = without_breaks_between_cells(input);
+		if kept.len() != input.len() {
+			return collapse(&kept);
+		}
 	}
+	collapse(input)
+}
+
+fn without_breaks_between_cells(input: &str) -> String {
+	let is_cell = |ch: Option<char>| ch.is_some_and(|ch| ('\u{2800}'..='\u{28FF}').contains(&ch));
+	let chars: Vec<char> = input.chars().collect();
+	chars
+		.iter()
+		.enumerate()
+		.filter(|&(index, &ch)| {
+			ch != '\u{200B}'
+				|| !(is_cell(index.checked_sub(1).map(|before| chars[before]))
+					&& is_cell(chars.get(index + 1).copied()))
+		})
+		.map(|(_, &ch)| ch)
+		.collect()
+}
+
+fn collapse(input: &str) -> String {
 	let mut result = String::with_capacity(input.len());
 	let mut in_leading = true;
 	let mut pending_space = false;
-	for ch in input.chars() {
-		if is_space_like(ch) {
-			if in_leading {
-				result.push(' ');
-			} else {
+	// Text between spaces is copied a run at a time, which is where a book's conversion spent most of its time.
+	let mut run_start = 0;
+	let mut from = 0;
+	while let Some((index, len)) = next_space_like(input, from) {
+		if in_leading {
+			if index > run_start {
+				in_leading = false;
+				result.push_str(&input[run_start..index]);
 				pending_space = true;
+			} else {
+				result.push(' ');
 			}
-		} else {
-			in_leading = false;
+		} else if index > run_start {
 			if pending_space {
 				result.push(' ');
-				pending_space = false;
 			}
-			result.push(ch);
+			result.push_str(&input[run_start..index]);
+			pending_space = true;
+		} else {
+			pending_space = true;
 		}
+		from = index + len;
+		run_start = from;
 	}
-	if pending_space {
+	if run_start < input.len() {
+		if pending_space {
+			result.push(' ');
+		}
+		result.push_str(&input[run_start..]);
+	} else if pending_space {
 		result.push(' ');
 	}
 	result
 }
 
+/// Where the next space-like char at or after `from` starts, and its length in bytes. Only the bytes that can begin one are decoded, which every space-like char outside ASCII begins with.
+pub(crate) fn next_space_like(input: &str, from: usize) -> Option<(usize, usize)> {
+	let bytes = input.as_bytes();
+	let mut index = from;
+	while let Some(&byte) = bytes.get(index) {
+		match byte {
+			b' ' | b'\t' | b'\n' | 0x0B | 0x0C | b'\r' => return Some((index, 1)),
+			0xC2 | 0xE1 | 0xE2 | 0xE3 => {
+				let ch = input[index..].chars().next()?;
+				if is_space_like(ch) {
+					return Some((index, ch.len_utf8()));
+				}
+				index += ch.len_utf8();
+			}
+			_ => index += 1,
+		}
+	}
+	None
+}
+
 #[must_use]
 pub fn trim_string(s: &str) -> String {
 	s.trim_matches(is_space_like).to_string()
-}
-
-/// Display units match the index space of the platform text control that the
-/// document text is loaded into: UTF-16 code units on Windows (Win32 edit
-/// control) and macOS (`NSTextView`'s `NSRange`, which wxWidgets passes through
-/// unconverted); Unicode characters on GTK (`GtkTextIter` offsets).
-#[must_use]
-pub fn display_len(s: &str) -> usize {
-	if cfg!(any(windows, target_os = "macos")) { s.encode_utf16().count() } else { s.chars().count() }
-}
-
-#[must_use]
-pub const fn ch_width(ch: char) -> usize {
-	if cfg!(any(windows, target_os = "macos")) { ch.len_utf16() } else { 1 }
 }
 
 #[must_use]
@@ -147,7 +188,7 @@ mod tests {
 	#[case("no hyphens", "no hyphens")]
 	#[case("mul\u{00AD}ti\u{00AD}ple", "multiple")]
 	fn test_remove_soft_hyphens(#[case] input: &str, #[case] expected: &str) {
-		assert_eq!(remove_soft_hyphens(input), expected);
+		assert_eq!(remove_soft_hyphens(input.to_string()), expected);
 	}
 
 	#[rstest]
@@ -157,8 +198,12 @@ mod tests {
 	#[case("mixed\r\nline\rother\nline", "mixed\nline\nother\nline")]
 	#[case("no newlines at all", "no newlines at all")]
 	#[case("", "")]
+	#[case("\r", "\n")]
+	#[case("ends with cr\r", "ends with cr\n")]
+	#[case("\r\n\r\nafter two\r\n\r", "\n\nafter two\n\n")]
+	#[case("caf\u{00E9}\r\n\u{65E5}\u{672C}\r\u{1F600}", "caf\u{00E9}\n\u{65E5}\u{672C}\n\u{1F600}")]
 	fn test_normalize_line_endings(#[case] input: &str, #[case] expected: &str) {
-		assert_eq!(normalize_line_endings(input), expected);
+		assert_eq!(normalize_line_endings(input.to_string()), expected);
 	}
 
 	#[rstest]
@@ -167,7 +212,6 @@ mod tests {
 	#[case("Preface . . . . . . . . . . vii", "Preface vii")]
 	#[case("Index\u{2026}\u{2026}\u{2026}\u{2026}212", "Index 212")]
 	#[case("Line one.......1\nLine two.......2", "Line one 1\nLine two 2")]
-	// Left alone: an ellipsis, a fill-in blank, and leaders not ending in a page number.
 	#[case("Wait for it... then go", "Wait for it... then go")]
 	#[case("Name: ______________", "Name: ______________")]
 	#[case("Loading........ please wait", "Loading........ please wait")]
@@ -193,6 +237,11 @@ mod tests {
 	#[case("  spaces  ", "  spaces ")]
 	#[case("hello\u{00A0}\u{00A0}world", "hello world")]
 	#[case("hello\u{200B}\u{200B}world", "hello world")]
+	#[case(
+		"\u{2817}\u{2811}\u{2824}\u{200B}\u{2825}\u{280E}\u{2811}",
+		"\u{2817}\u{2811}\u{2824}\u{2825}\u{280E}\u{2811}"
+	)]
+	#[case("\u{2824}\u{200B} \u{2825}", "\u{2824} \u{2825}")]
 	#[case("\u{00A0}\u{200B}alpha\t \n beta\u{00A0}", "  alpha beta ")]
 	fn test_collapse_whitespace(#[case] input: &str, #[case] expected: &str) {
 		assert_eq!(collapse_whitespace(input), expected);
@@ -207,22 +256,6 @@ mod tests {
 	#[case("\u{200B}\u{00A0}  hello  \u{00A0}\u{200B}", "hello")]
 	fn test_trim_string(#[case] input: &str, #[case] expected: &str) {
 		assert_eq!(trim_string(input), expected);
-	}
-
-	#[cfg(any(windows, target_os = "macos"))]
-	#[test]
-	fn test_display_len_utf16_platforms() {
-		assert_eq!(display_len("abc"), 3);
-		assert_eq!(display_len("💖"), 2);
-		assert_eq!(display_len("line\nwrap"), 9);
-	}
-
-	#[cfg(not(any(windows, target_os = "macos")))]
-	#[test]
-	fn test_display_len_char_platforms() {
-		assert_eq!(display_len("abc"), 3);
-		assert_eq!(display_len("💖"), 1);
-		assert_eq!(display_len("line\nwrap"), 9);
 	}
 
 	#[rstest]
@@ -262,6 +295,73 @@ mod tests {
 	}
 
 	#[test]
+	fn next_space_like_agrees_with_is_space_like_for_every_char() {
+		for ch in (0..=0x10_FFFF).filter_map(char::from_u32) {
+			let text = format!("a{ch}b");
+			let found = next_space_like(&text, 0);
+			if is_space_like(ch) {
+				assert_eq!(found, Some((1, ch.len_utf8())), "{:04X}", u32::from(ch));
+			} else {
+				assert_eq!(found, None, "{:04X}", u32::from(ch));
+			}
+		}
+	}
+
+	/// The run-at-a-time version must give exactly what the char-at-a-time one did.
+	#[test]
+	fn collapse_whitespace_matches_a_char_at_a_time() {
+		fn reference(input: &str) -> String {
+			let mut result = String::new();
+			let (mut in_leading, mut pending_space) = (true, false);
+			for ch in input.chars() {
+				if is_space_like(ch) {
+					if in_leading {
+						result.push(' ');
+					} else {
+						pending_space = true;
+					}
+				} else {
+					in_leading = false;
+					if pending_space {
+						result.push(' ');
+						pending_space = false;
+					}
+					result.push(ch);
+				}
+			}
+			if pending_space {
+				result.push(' ');
+			}
+			result
+		}
+		let pieces = [
+			"a",
+			"bc",
+			" ",
+			"  ",
+			"\t",
+			"\n",
+			"\u{a0}",
+			"\u{200b}",
+			"\u{3000}",
+			"\u{3001}",
+			"é",
+			"\u{2028}",
+			"x\u{2000}y",
+		];
+		let mut seed = 7_u32;
+		for _ in 0..20_000 {
+			let mut input = String::new();
+			for _ in 0..(seed % 9) {
+				seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+				input.push_str(pieces[(seed >> 16) as usize % pieces.len()]);
+			}
+			seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+			assert_eq!(collapse_whitespace(&input), reference(&input), "{input:?}");
+		}
+	}
+
+	#[test]
 	fn collapse_whitespace_empty_returns_empty() {
 		assert_eq!(collapse_whitespace(""), "");
 	}
@@ -269,22 +369,5 @@ mod tests {
 	#[test]
 	fn collapse_whitespace_no_whitespace_unchanged() {
 		assert_eq!(collapse_whitespace("hello"), "hello");
-	}
-
-	#[test]
-	fn display_len_empty_string_is_zero() {
-		assert_eq!(display_len(""), 0);
-	}
-
-	// \r and \n are each one code unit on every platform, so \r\n counts as 2.
-	// This property underlies the find-navigation coordinate system.
-	#[test]
-	fn display_len_crlf_counts_as_two_units() {
-		assert_eq!(display_len("\r\n"), 2);
-	}
-
-	#[test]
-	fn display_len_plain_newline_counts_as_one_unit() {
-		assert_eq!(display_len("\n"), 1);
 	}
 }

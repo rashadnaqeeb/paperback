@@ -1,7 +1,4 @@
-//! [`ListStyle`]: the per-`<ul>`/`<ol>` numbering state (ordered or not, current item number,
-//! `type` attribute) [`super::xml_to_text::XmlToText`] and [`super::html_to_text::HtmlToText`]
-//! both push onto a stack on `<ul>`/`<ol>` open and pop on close, so a nested list's numbering
-//! doesn't leak into its parent's once it closes.
+//! Converters keep these on a stack so a nested list's numbering doesn't leak into its parent's once it closes.
 
 #[derive(Clone, Debug)]
 pub(super) struct ListStyle {
@@ -17,9 +14,6 @@ impl Default for ListStyle {
 }
 
 impl ListStyle {
-	/// Builds the style for a freshly-opened `<ol>`/`<ul>`: `is_ordered` is whether the tag was
-	/// `<ol>`, and `start_attr`/`type_attr` are its `start`/`type` attributes (only meaningful,
-	/// and only read by the caller, when `is_ordered` is set).
 	pub(super) fn new(is_ordered: bool, start_attr: Option<&str>, type_attr: Option<&str>) -> Self {
 		let mut style = Self::default();
 		if is_ordered {
@@ -33,11 +27,31 @@ impl ListStyle {
 		}
 		style
 	}
+
+	/// Each item carries its own number, so only the numbering style goes on the list.
+	pub(super) fn opening_tag(&self) -> String {
+		if !self.ordered {
+			return "<ul>".to_string();
+		}
+		match self.list_type.as_str() {
+			kind @ ("a" | "i") => format!("<ol type=\"{kind}\">"),
+			_ => "<ol>".to_string(),
+		}
+	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	#[test]
+	fn opening_tag_matches_the_numbering_in_the_text() {
+		assert_eq!(ListStyle::new(false, None, Some("a")).opening_tag(), "<ul>");
+		assert_eq!(ListStyle::new(true, Some("3"), None).opening_tag(), "<ol>");
+		assert_eq!(ListStyle::new(true, None, Some("A")).opening_tag(), "<ol type=\"a\">");
+		assert_eq!(ListStyle::new(true, None, Some("I")).opening_tag(), "<ol type=\"i\">");
+		assert_eq!(ListStyle::new(true, None, Some("\"><script>")).opening_tag(), "<ol>");
+	}
 
 	#[test]
 	fn unordered_list_ignores_start_and_type() {

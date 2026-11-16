@@ -1,12 +1,7 @@
-//! Filling in `paperback.iss.in`, including the per-format association tasks and the registry
-//! entries that back them.
-
 use shipfitter::build::configure_file;
 
 use crate::paths::{self, target_profile_dir};
 
-/// Turns a format's display name into an Inno Setup task identifier, e.g.
-/// "Flat `OpenDocument` Presentations" -> "`flat_opendocument_presentations`".
 fn slugify(name: &str) -> String {
 	let mut slug = String::new();
 	let mut last_was_sep = true;
@@ -25,11 +20,14 @@ fn slugify(name: &str) -> String {
 	slug
 }
 
-/// Builds the `[Tasks]` lines offering to associate each format from `paperback_formats::ALL`.
 fn format_tasks_block() -> String {
 	let mut lines = Vec::new();
 	for format in paperback_formats::ALL {
-		let ext_list = format.extensions.iter().map(|ext| format!("*.{ext}")).collect::<Vec<_>>().join(", ");
+		let ext_list = paperback_formats::associated_extensions(format)
+			.iter()
+			.map(|ext| format!("*.{ext}"))
+			.collect::<Vec<_>>()
+			.join(", ");
 		let flags = if format.installer.default_checked { String::new() } else { "; Flags: unchecked".to_string() };
 		lines.push(format!(
 			"\tName: \"assoc_{}\"; Description: \"Associate with {} ({})\"{}",
@@ -42,16 +40,14 @@ fn format_tasks_block() -> String {
 	lines.join("\n")
 }
 
-/// Builds the `[Registry]` lines wiring each format's extensions to the `assoc_*` tasks above.
-/// The shared `zip` extension is skipped here; it's handled by its own standalone task since
-/// multiple parsers (DAISY, Word-in-zip) register it and it shouldn't be tied to just one checkbox.
 fn format_registry_block() -> String {
 	let mut lines = Vec::new();
 	for format in paperback_formats::ALL {
 		let task = format!("assoc_{}", slugify(format.name));
 		lines.push(format!("\t; {}.", format.name));
-		for ext in format.extensions {
-			if *ext == "zip" {
+		for ext in paperback_formats::associated_extensions(format) {
+			// DAISY, Word-in-zip and zipped FB2 all register zip, so it has its own standalone task rather than one format's checkbox.
+			if ext == "zip" {
 				continue;
 			}
 			if format.installer.default_handler {

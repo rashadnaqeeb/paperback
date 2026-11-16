@@ -1,6 +1,4 @@
-//! Checks against a real `RichEdit` control that a window loaded as RTF keeps its last paragraph
-//! mark, so a window extension appended after it starts a paragraph of its own, whether the
-//! extension arrives as RTF or as plain text.
+//! A window loaded as RTF must keep its last paragraph mark, or an appended extension runs into its last paragraph.
 
 // The included modules' own unit tests compile here too, unused.
 #[cfg(target_os = "windows")]
@@ -39,9 +37,9 @@ mod checks {
 	}
 
 	fn load_window(text_ctrl: TextCtrl) {
-		assert!(stream_rtf_into_ctrl(text_ctrl, &build_rtf_for_whole_control(WINDOW, &[], &font_info(text_ctrl))));
+		assert!(stream_rtf_into_ctrl(text_ctrl, &build_rtf_for_whole_control(WINDOW, &[], &[], &font_info(text_ctrl))));
 		assert_eq!(text_ctrl.get_value(), WINDOW, "the loaded window keeps its last paragraph mark");
-		assert_eq!(text_ctrl.get_last_position(), 6, "the loaded window stores every display unit");
+		assert_eq!(text_ctrl.get_last_position(), 6, "the loaded window stores every unit");
 	}
 
 	fn assert_extended(text_ctrl: TextCtrl, path: &str) {
@@ -50,12 +48,12 @@ mod checks {
 			"Intro\nTitle\nBody\n",
 			"{path}: the extension starts a paragraph of its own"
 		);
-		assert_eq!(text_ctrl.get_last_position(), 17, "{path}: every display unit is stored");
+		assert_eq!(text_ctrl.get_last_position(), 17, "{path}: every unit is stored");
 	}
 
 	pub fn run(text_ctrl: TextCtrl) {
 		load_window(text_ctrl);
-		assert!(append_rtf_into_ctrl(text_ctrl, &build_rtf(EXTENSION, &[], &font_info(text_ctrl))));
+		assert!(append_rtf_into_ctrl(text_ctrl, &build_rtf(EXTENSION, &[], &[], &font_info(text_ctrl))));
 		assert_extended(text_ctrl, "RTF extension");
 		load_window(text_ctrl);
 		text_ctrl.append_text(EXTENSION);

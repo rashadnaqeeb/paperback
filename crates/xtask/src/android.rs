@@ -2,7 +2,7 @@ use std::{env, error::Error, process::Command};
 
 use crate::{
 	print_help,
-	workspace::{build_host_ffi_library, fetch_pdfium, project_root},
+	workspace::{MOBILE_CORE_FEATURES, build_host_ffi_library, project_root},
 };
 
 pub fn android() -> Result<(), Box<dyn Error>> {
@@ -23,10 +23,6 @@ pub fn android() -> Result<(), Box<dyn Error>> {
 		}
 	}
 	let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-	let jni_libs = project_root().join("android/app/src/main/jniLibs");
-	fetch_pdfium(pdfium_fetch::ANDROID_ARM64, "libpdfium.so", &jni_libs.join("arm64-v8a/libpdfium.so"))?;
-	fetch_pdfium(pdfium_fetch::ANDROID_ARM, "libpdfium.so", &jni_libs.join("armeabi-v7a/libpdfium.so"))?;
-	fetch_pdfium(pdfium_fetch::ANDROID_X64, "libpdfium.so", &jni_libs.join("x86_64/libpdfium.so"))?;
 	println!("Generating Kotlin bindings via uniffi-bindgen...");
 	let ffi_library = build_host_ffi_library(&cargo)?.to_string_lossy().into_owned();
 	let status = Command::new(&cargo)
@@ -66,12 +62,15 @@ pub fn android() -> Result<(), Box<dyn Error>> {
 			"x86_64",
 			"-o",
 			"android/app/src/main/jniLibs",
-			"build",
+			"rustc",
 			"--release",
 			"-p",
 			"paperback-core",
 			"--features",
-			"uniffi",
+			MOBILE_CORE_FEATURES,
+			"--lib",
+			"--crate-type",
+			"cdylib",
 		])
 		.status()?;
 	if !status.success() {
@@ -96,12 +95,7 @@ pub fn android() -> Result<(), Box<dyn Error>> {
 			println!("Gradle tasks complete.");
 		}
 		if build_aab {
-			// Always its own gradle invocation, never combined with the assemble*/install*
-			// tasks above: android/app/build.gradle.kts disables per-ABI APK splitting
-			// whenever any task in the *same* gradle invocation contains "bundle" (bundle
-			// builds handle per-ABI delivery themselves), which would silently rename the
-			// assembleRelease outputs CI expects (app-arm64-v8a-release.apk etc.) if the
-			// two ran together.
+			// Its own invocation: build.gradle.kts disables per-ABI splits when any task in the same invocation contains "bundle", which would rename the APKs CI expects.
 			run_gradle(&["bundleRelease"])?;
 			println!("App Bundle built: android/app/build/outputs/bundle/release/app-release.aab");
 		}
@@ -114,9 +108,7 @@ fn run_gradle(tasks: &[&str]) -> Result<(), Box<dyn Error>> {
 	let android_dir = project_root().join("android");
 	let mut cmd = if cfg!(windows) {
 		let mut c = Command::new("cmd");
-		// The leading .\ matters: some Windows configs (NoDefaultCurrentDirectoryInExePath)
-		// stop cmd /C from finding a bare "gradlew.bat" in the working directory at all,
-		// failing with "'gradlew.bat' is not recognized..." even though it's right there.
+		// With NoDefaultCurrentDirectoryInExePath set, cmd /C can't find a bare "gradlew.bat" in the working directory.
 		c.arg("/C").arg(".\\gradlew.bat");
 		c
 	} else {

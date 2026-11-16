@@ -1,8 +1,3 @@
-//! The heavier File menu handlers: dynamic recent-document ids
-//! (`menu_ids::RECENT_DOCUMENT_BASE..=RECENT_DOCUMENT_MAX`), the "All Documents" dialog, exporting
-//! the document, saving a picture out of it, and importing and exporting its data. `Open`/`Close`/`Close All`/`Reopen Last
-//! Closed`/`Exit` are thin enough to stay inlined in `bind_menu_events`'s dispatch match.
-
 use std::{path::Path, rc::Rc, sync::Mutex};
 
 use paperback_core::{
@@ -21,10 +16,11 @@ use super::{
 	DocumentManager, DocumentTab, dialogs, ensure_parser_ready_for_path, menu, menu_ids, open_links, resolve_zip_path,
 	update_title_from_manager,
 };
-use crate::ui::{document_manager::display_title, navigation::announce_for_command};
+use crate::ui::{
+	document_manager::display_title,
+	navigation::{announce_for_command, set_caret_to_doc_offset},
+};
 
-/// Handles every menu id not covered by `bind_menu_events`'s own dispatch match: dynamic
-/// recent-document entries and "Show All Documents". Does nothing if `id` matches neither.
 pub(super) fn handle_fallback(
 	id: i32,
 	frame: &Frame,
@@ -216,16 +212,13 @@ pub(super) fn handle_export_document_data(
 		let path_str = tab.file_path.to_string_lossy();
 		config.lock().unwrap().export_document_settings(&path_str, &path);
 		tracing::info!(doc = %tab.file_path.display(), export = %path, "document data exported");
-		let dialog = MessageDialog::builder(
+		wx_utils::show_info(
 			frame,
 			// TRANSLATORS: Success message shown after exporting a document's notes and bookmarks
-			&t("Notes and bookmarks exported successfully."),
+			t("Notes and bookmarks exported successfully."),
 			// TRANSLATORS: Title of the export-succeeded dialog
 			&t("Export Successful"),
-		)
-		.with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation | MessageDialogStyle::Centre)
-		.build();
-		dialog.show_modal();
+		);
 	}
 }
 
@@ -255,10 +248,7 @@ pub(super) fn handle_export_notes_and_bookmarks(
 	let caption = t("Export notes and bookmarks");
 	if entries.is_empty() {
 		let message = if choice.filter == BookmarkFilterType::NotesOnly { t("No notes.") } else { t("No bookmarks.") };
-		MessageDialog::builder(frame, &message, &caption)
-			.with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation | MessageDialogStyle::Centre)
-			.build()
-			.show_modal();
+		wx_utils::show_info(frame, message, &caption);
 		return;
 	}
 	// TRANSLATORS: File filter shown in the "Export notes and bookmarks" save dialog
@@ -303,10 +293,10 @@ pub(super) fn handle_import_document_data(
 	dm: &Rc<Mutex<DocumentManager>>,
 	config: &Rc<Mutex<ConfigManager>>,
 ) {
-	let Ok(dm_ref) = dm.try_lock() else {
+	let Ok(mut dm_ref) = dm.try_lock() else {
 		return;
 	};
-	let Some(tab) = dm_ref.active_tab() else {
+	let Some(tab) = dm_ref.active_tab_mut() else {
 		return;
 	};
 	// TRANSLATORS: File filter shown in the export/import notes-and-bookmarks (.paperback) dialogs
@@ -324,13 +314,11 @@ pub(super) fn handle_import_document_data(
 		let pos = {
 			let config = config.lock().unwrap();
 			config.import_settings_from_file(&path_str, &path);
-			let max_pos = tab.text_ctrl.get_last_position();
-			config.get_validated_document_position(&path_str, max_pos)
+			config.get_validated_document_position(&path_str, tab.session.document_len().as_pos())
 		};
 		tracing::info!(doc = %tab.file_path.display(), import = %path, "document data imported");
-		if pos >= 0 {
-			tab.text_ctrl.set_insertion_point(pos);
-			tab.text_ctrl.show_position(pos);
+		if let Some(pos) = pos {
+			set_caret_to_doc_offset(tab, pos);
 		}
 		let dialog = MessageDialog::builder(
 			frame,
@@ -378,11 +366,6 @@ pub(super) fn handle_save_image(frame: &Frame, dm: &Rc<Mutex<DocumentManager>>) 
 	}
 }
 
-/// Prompts for a save path and exports `tab`'s document as `format`, showing a
-/// generic failure dialog on error. Shared by the `EXPORT_TO_PLAIN_TEXT` /
-/// `EXPORT_TO_HTML` / `EXPORT_TO_MARKDOWN` menu handlers, which differ only in
-/// `format`, the default file `extension`, the file-picker `wildcard`, and the
-/// file-picker `dialog_title`.
 fn export_document_as(
 	frame: &Frame,
 	tab: &DocumentTab,

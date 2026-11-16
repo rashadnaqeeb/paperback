@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- The in-app file browser opens books by path anywhere on the device, which is what this permission is for. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Open from URL downloads documents from links. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <queries>
         <intent>
@@ -13,6 +18,7 @@
         </intent>
     </queries>
 
+    <!-- localeConfig is read from Android 13 on, where each app has its own language. Older versions ignore it, which is what we want. -->
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -20,6 +26,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:localeConfig="@xml/locales_config"
+        tools:ignore="UnusedAttribute"
         android:requestLegacyExternalStorage="true"
         android:windowSoftInputMode="adjustResize"
         android:theme="@style/Theme.MyApplication">
@@ -52,15 +59,21 @@
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                 <data android:mimeType="application/vnd.ms-powerpoint" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
+                <data android:mimeType="application/vnd.ms-xpsdocument" />
+                <data android:mimeType="application/oxps" />
                 <data android:mimeType="application/vnd.oasis.opendocument.text" />
                 <data android:mimeType="application/vnd.oasis.opendocument.presentation" />
                 <data android:mimeType="application/rtf" />
                 <data android:mimeType="application/vnd.ms-htmlhelp" />
                 <data android:mimeType="application/zip" />
+                <data android:mimeType="application/ebrl+zip" />
+                <data android:mimeType="application/vnd.rar" />
+                <data android:mimeType="application/x-rar-compressed" />
                 <data android:pathPattern=".*\\.chm" />
                 <data android:pathPattern=".*\\.doc" />
                 <data android:pathPattern=".*\\.docm" />
                 <data android:pathPattern=".*\\.docx" />
+                <data android:pathPattern=".*\\.ebrl" />
                 <data android:pathPattern=".*\\.epub" />
                 <data android:pathPattern=".*\\.fb2" />
                 <data android:pathPattern=".*\\.fodp" />
@@ -84,8 +97,10 @@
                 <data android:pathPattern=".*\\.ppt" />
                 <data android:pathPattern=".*\\.pptm" />
                 <data android:pathPattern=".*\\.pptx" />
+                <data android:pathPattern=".*\\.rar" />
                 <data android:pathPattern=".*\\.ronn" />
                 <data android:pathPattern=".*\\.rtf" />
+                <data android:pathPattern=".*\\.shtml" />
                 <data android:pathPattern=".*\\.txt" />
                 <data android:pathPattern=".*\\.xhtml" />
                 <data android:pathPattern=".*\\.zip" />

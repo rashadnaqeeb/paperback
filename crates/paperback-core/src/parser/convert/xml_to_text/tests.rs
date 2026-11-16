@@ -1,7 +1,7 @@
 use rstest::rstest;
 
 use super::*;
-use crate::document::MarkerType;
+use crate::document::{DocLen, MarkerType};
 
 #[test]
 fn test_link_collection() {
@@ -15,8 +15,7 @@ fn test_link_collection() {
 	assert_eq!(converter.get_text(), "Hello world");
 }
 
-// SMIL audio and NCX targets anchor to an id expecting it to mark the start of what it
-// narrates, so a link's own id must resolve to where its text starts, not where it ends.
+// SMIL audio and NCX targets expect an id to mark the start of what it narrates.
 #[test]
 fn link_id_position_is_the_start_of_its_text_not_the_end() {
 	let xml = r##"<root><body><p>Before. <a id="lnk1" href="#x">Link text</a> After.</p></body></root>"##;
@@ -26,23 +25,22 @@ fn link_id_position_is_the_start_of_its_text_not_the_end() {
 	assert_eq!(links.len(), 1);
 	let link_offset = links[0].offset;
 	assert_eq!(converter.get_id_positions().get("lnk1").copied(), Some(link_offset));
-	assert_eq!(&converter.get_text()[link_offset..link_offset + "Link text".len()], "Link text");
+	assert_eq!(&converter.get_text()[link_offset.get()..link_offset.get() + "Link text".len()], "Link text");
 }
 
 #[test]
 fn heading_id_position_is_the_start_of_the_heading_not_the_previous_line() {
-	let xml = r##"<root><body><p>Before paragraph.</p><h2 id="hdr1">Chapter One</h2></body></root>"##;
+	let xml = r#"<root><body><p>Before paragraph.</p><h2 id="hdr1">Chapter One</h2></body></root>"#;
 	let mut converter = XmlToText::new();
 	assert!(converter.convert(xml));
 	let headings = converter.get_headings();
 	assert_eq!(headings.len(), 1);
 	let heading_offset = headings[0].offset;
 	assert_eq!(converter.get_id_positions().get("hdr1").copied(), Some(heading_offset));
-	assert_eq!(&converter.get_text()[heading_offset..heading_offset + "Chapter One".len()], "Chapter One");
+	assert_eq!(&converter.get_text()[heading_offset.get()..heading_offset.get() + "Chapter One".len()], "Chapter One");
 }
 
-// `<a>` emits its text in one go and skips its children, so ids on elements inside a link
-// were never recorded, losing the audio clip of any DAISY SMIL par anchored to one.
+// `<a>` skips its children, so ids inside a link were never recorded, losing the audio clip of any DAISY SMIL par anchored to one.
 #[test]
 fn ids_inside_a_link_are_recorded_at_the_links_start() {
 	let xml = r##"<root><body><p>Before. <a href="#x"><em id="em1">Title Page</em></a></p></body></root>"##;
@@ -50,7 +48,7 @@ fn ids_inside_a_link_are_recorded_at_the_links_start() {
 	assert!(converter.convert(xml));
 	let link_offset = converter.get_links()[0].offset;
 	assert_eq!(converter.get_id_positions().get("em1").copied(), Some(link_offset));
-	assert_eq!(&converter.get_text()[link_offset..link_offset + "Title Page".len()], "Title Page");
+	assert_eq!(&converter.get_text()[link_offset.get()..link_offset.get() + "Title Page".len()], "Title Page");
 }
 
 // Same skipped-subtree problem for tables, which emit their text through a helper.
@@ -64,11 +62,10 @@ fn ids_inside_a_table_are_recorded_at_the_tables_start() {
 	assert_ne!(table_offset, 0, "table should start after the preceding paragraph");
 }
 
-// Same off-by-one-line bug as headings/list items/tables/`<hr>`, which
-// `handle_list_start_xml` was missing.
+// `handle_list_start_xml` was missing the off-by-one-line fix that headings, list items, tables and `<hr>` had.
 #[test]
 fn list_id_position_is_the_start_of_the_list_not_the_previous_line() {
-	let xml = r##"<root><body><p>Before paragraph.</p><ul id="lst1"><li>One</li><li>Two</li></ul></body></root>"##;
+	let xml = r#"<root><body><p>Before paragraph.</p><ul id="lst1"><li>One</li><li>Two</li></ul></body></root>"#;
 	let mut converter = XmlToText::new();
 	assert!(converter.convert(xml));
 	let lists = converter.get_lists();
@@ -154,8 +151,18 @@ fn nested_list_increments_level() {
 }
 
 #[test]
+fn dtbook_list_closes_like_ul() {
+	let xml = "<dtbook><book><list><li>A</li></list><list><li>B</li></list></book></dtbook>";
+	let mut converter = XmlToText::new();
+	assert!(converter.convert(xml));
+	let items = converter.get_list_items();
+	assert_eq!(items.iter().map(|i| i.level).collect::<Vec<_>>(), [1, 1]);
+	assert!(converter.get_lists().iter().all(|l| l.length > DocLen::ZERO));
+}
+
+#[test]
 fn table_is_detected() {
-	let xml = "<root><body><table><tr><td>Cell</td></tr></table></body></root>";
+	let xml = "<root><body><table><tr><th>Cell</th></tr></table></body></root>";
 	let mut converter = XmlToText::new();
 	assert!(converter.convert(xml));
 	assert_eq!(converter.get_tables().len(), 1);
@@ -166,9 +173,9 @@ fn find_anchor_byte_offset_locates_block_containing_position() {
 	let xml = "<root><body><p>First paragraph.</p><p>Second paragraph.</p></body></root>";
 	// Text output: "First paragraph.\nSecond paragraph." (second paragraph starts at 17).
 	let mut converter = XmlToText::new();
-	let offset = converter.find_anchor_byte_offset(xml, 20).expect("offset for position in second paragraph");
+	let offset = converter.find_anchor_byte_offset(xml, 20.into()).expect("offset for position in second paragraph");
 	assert!(xml[offset..].starts_with("<p>Second"), "got offset {offset}: {}", &xml[offset..]);
-	let offset = converter.find_anchor_byte_offset(xml, 5).expect("offset for position in first paragraph");
+	let offset = converter.find_anchor_byte_offset(xml, 5.into()).expect("offset for position in first paragraph");
 	assert!(xml[offset..].starts_with("<p>First"), "got offset {offset}: {}", &xml[offset..]);
 }
 
@@ -176,7 +183,7 @@ fn find_anchor_byte_offset_locates_block_containing_position() {
 fn find_anchor_byte_offset_at_position_zero_uses_first_body_element() {
 	let xml = "<root><head><title>T</title></head><body><p>First.</p></body></root>";
 	let mut converter = XmlToText::new();
-	let offset = converter.find_anchor_byte_offset(xml, 0).expect("offset at start");
+	let offset = converter.find_anchor_byte_offset(xml, 0.into()).expect("offset at start");
 	assert!(xml[offset..].starts_with("<p>First."), "got offset {offset}: {}", &xml[offset..]);
 }
 
@@ -185,26 +192,26 @@ fn find_anchor_byte_offset_picks_nearest_inline_element() {
 	let xml = "<root><body><p>Start <em>middle</em> end of line</p></body></root>";
 	// Position inside " end of line". Nearest preceding element start is <em>.
 	let mut converter = XmlToText::new();
-	let offset = converter.find_anchor_byte_offset(xml, 16).expect("offset for position after em");
+	let offset = converter.find_anchor_byte_offset(xml, 16.into()).expect("offset for position after em");
 	assert!(xml[offset..].starts_with("<em>"), "got offset {offset}: {}", &xml[offset..]);
 }
 
 #[test]
 fn find_anchor_byte_offset_returns_none_for_invalid_xml() {
 	let mut converter = XmlToText::new();
-	assert_eq!(converter.find_anchor_byte_offset("<p>broken", 0), None);
+	assert_eq!(converter.find_anchor_byte_offset("<p>broken", 0.into()), None);
 }
 
 #[test]
 fn inject_anchor_at_position_inserts_span_before_block() {
 	let xml = "<root><body><p>First paragraph.</p><p>Second paragraph.</p></body></root>";
-	let result = inject_anchor_at_position(xml, 20, "reading-pos").expect("injection succeeds");
+	let result = inject_anchor_at_position(xml, 20.into(), "reading-pos").expect("injection succeeds");
 	assert!(result.contains(r#"</p><span id="reading-pos"></span><p>Second paragraph.</p>"#), "got: {result}");
 }
 
 #[test]
 fn inject_anchor_at_position_returns_none_for_invalid_xml() {
-	assert_eq!(inject_anchor_at_position("<p>broken", 0, "reading-pos"), None);
+	assert_eq!(inject_anchor_at_position("<p>broken", 0.into(), "reading-pos"), None);
 }
 
 #[test]
@@ -217,26 +224,20 @@ fn dl_dt_dd_produce_separate_lines() {
 	assert!(lines.contains(&"Term"), "dt content should be on its own line");
 	assert!(lines.contains(&"Definition"), "dd content should be on its own line");
 }
-/// `TableInfo.length` must equal the emitted display extent (display units), NOT the
-/// emitted text's byte length. Prefix text ensures `start_offset` > 0. With inline rendering the
-/// emitted row is the TSV "A\t𝄞"; its non-BMP character distinguishes display and byte lengths.
 #[test]
-fn xml_table_display_length_is_display_extent_not_byte_length() {
+fn xml_table_length_counts_positions_not_bytes() {
 	let xml =
-		concat!("<root><body><p>Intro</p>", "<table><tr><td>A</td><td>\u{1D11E}</td></tr></table>", "</body></root>");
+		concat!("<root><body><p>Intro</p>", "<table><tr><th>A</th><td>\u{1D11E}</td></tr></table>", "</body></root>");
 	let mut converter = XmlToText::with_render_tables_inline(true);
 	assert!(converter.convert(xml));
 	let tables = converter.get_tables();
 	assert_eq!(tables.len(), 1, "expected exactly one table");
 	let table = &tables[0];
 	assert_eq!(table.offset, 6, "table starts after 'Intro\\n'");
-	// The emitted row includes a newline. The non-BMP character occupies two UTF-16 units
-	// on Windows/macOS, but one character position on GTK.
-	let expected_length = if cfg!(any(windows, target_os = "macos")) { 5 } else { 4 };
-	assert_eq!(table.length, expected_length, "length must be the platform's display extent");
+	// "A\t𝄞\n": the non-BMP character is four bytes but one position.
+	assert_eq!(table.length, 4, "length must be the table's extent in positions");
 }
 
-/// OFF mode emits the `"[Table]: <first row>"` placeholder; ON mode emits the full TSV.
 #[test]
 fn xml_table_emits_placeholder_or_tsv_by_flag() {
 	let xml = "<root><body><table><tr><td>A</td><td>B</td></tr><tr><td>c</td><td>d</td></tr></table></body></root>";
@@ -248,13 +249,12 @@ fn xml_table_emits_placeholder_or_tsv_by_flag() {
 	assert_eq!(on.get_text(), "A\tB\nc\td");
 }
 
-/// Two XML tables: second table's offset equals first offset + first `display_length`.
 #[test]
 fn xml_two_tables_offsets_are_cumulative() {
 	let xml = concat!(
 		"<root><body>",
-		"<table><tr><td>X</td></tr></table>",
-		"<table><tr><td>Y</td></tr></table>",
+		"<table><tr><th>X</th></tr></table>",
+		"<table><tr><th>Y</th></tr></table>",
 		"</body></root>"
 	);
 	let mut converter = XmlToText::new();
@@ -262,15 +262,11 @@ fn xml_two_tables_offsets_are_cumulative() {
 	let tables = converter.get_tables();
 	assert_eq!(tables.len(), 2, "expected two tables");
 	let t1_offset = tables[0].offset;
-	let t1_display_length = tables[0].length;
+	let t1_length = tables[0].length;
 	let t2_offset = tables[1].offset;
 	assert_eq!(t1_offset, 0, "first table starts at 0");
-	assert!(t1_display_length > 0, "first table has non-zero display_length");
-	assert_eq!(
-		t2_offset,
-		t1_offset + t1_display_length,
-		"second table offset must equal first offset + first display_length"
-	);
+	assert!(t1_length > 0.into(), "first table has a non-zero length");
+	assert_eq!(t2_offset, t1_offset + t1_length, "second table offset must equal first offset + first length");
 }
 
 #[rstest]
@@ -291,7 +287,7 @@ fn test_format_span_collection(#[case] tag: &str, #[case] kind: MarkerType) {
 	};
 	assert_eq!(spans.len(), 1);
 	let text = converter.get_text();
-	assert_eq!(&text[spans[0].offset..spans[0].offset + spans[0].length], "bold");
+	assert_eq!(&text[spans[0].offset.get()..(spans[0].offset + spans[0].length).get()], "bold");
 }
 
 #[test]
@@ -302,7 +298,7 @@ fn test_format_span_tag_matching_is_case_insensitive() {
 	let spans = converter.get_bolds();
 	assert_eq!(spans.len(), 1);
 	let text = converter.get_text();
-	assert_eq!(&text[spans[0].offset..spans[0].offset + spans[0].length], "bold");
+	assert_eq!(&text[spans[0].offset.get()..(spans[0].offset + spans[0].length).get()], "bold");
 }
 
 #[test]
@@ -313,21 +309,15 @@ fn test_format_span_nested_bold_and_italic() {
 	let text = converter.get_text();
 	let italics = converter.get_italics();
 	assert_eq!(italics.len(), 1);
-	assert_eq!(&text[italics[0].offset..italics[0].offset + italics[0].length], "inner");
+	assert_eq!(&text[italics[0].offset.get()..(italics[0].offset + italics[0].length).get()], "inner");
 	let bolds = converter.get_bolds();
 	assert_eq!(bolds.len(), 1);
-	assert_eq!(&text[bolds[0].offset..bolds[0].offset + bolds[0].length], "outer inner");
+	assert_eq!(&text[bolds[0].offset.get()..(bolds[0].offset + bolds[0].length).get()], "outer inner");
 }
 
 #[test]
 fn test_format_span_fully_inside_link_is_dropped_known_limitation() {
-	// Known limitation: `<a>` handling (see `handle_element_opening_xml`) eagerly grabs the full
-	// flattened text of the element via `collect_element_text`, pushes it into `current_line`, and
-	// sets `skip_children = true`. `process_node` then skips recursing into the `<a>`'s children
-	// entirely, so the open/close handlers for a `<b>`/`<i>`/`<u>` nested inside the link never
-	// fire and no format span is recorded. This degrades gracefully (no panic, no bad offset; the
-	// link itself is still recorded correctly) and is left as-is per this task's scope (no changes
-	// to the `<a>`/`skip_children` behavior).
+	// `<a>` skips its children, so formatting nested in a link never records a span; harmless, so left as-is.
 	let xml = "<root><body><a href=\"https://example.com\"><b>bold</b></a></body></root>";
 	let mut converter = XmlToText::new();
 	assert!(converter.convert(xml));
@@ -345,4 +335,168 @@ fn test_no_format_spans_without_formatting_tags() {
 	assert!(converter.get_bolds().is_empty());
 	assert!(converter.get_italics().is_empty());
 	assert!(converter.get_underlines().is_empty());
+}
+
+#[test]
+fn a_link_made_of_a_picture_alone_is_a_link() {
+	let xml = r#"<root><body><p>Go <a href="ch1.xhtml"><img src="cover.png" alt="Cover"/></a> now</p></body></root>"#;
+	let mut converter = XmlToText::new();
+	assert!(converter.convert(xml));
+	assert_eq!(converter.get_text(), "Go [Image: Cover] now");
+	let links = converter.get_links();
+	assert_eq!(links.len(), 1);
+	assert_eq!(
+		(links[0].offset, links[0].text.as_str(), links[0].reference.as_str()),
+		(3.into(), "[Image: Cover]", "ch1.xhtml")
+	);
+	let images = converter.get_images();
+	assert_eq!(images.len(), 1);
+	assert_eq!((images[0].offset, images[0].source.as_str()), (3.into(), "cover.png"));
+}
+
+/// A picture inside a link with text used to be dropped, since only the link's text was read.
+#[test]
+fn a_picture_inside_a_link_with_text_is_kept_in_its_place() {
+	let xml = r#"<root><body><p><a href="ch1.xhtml">Back  to <img alt="Logo"/> home</a></p></body></root>"#;
+	let mut converter = XmlToText::new();
+	assert!(converter.convert(xml));
+	assert_eq!(converter.get_text(), "Back to [Image: Logo] home");
+	assert_eq!(converter.get_links()[0].text, "Back to [Image: Logo] home");
+	assert_eq!(converter.get_images()[0].offset, "Back to ".len());
+}
+
+/// FB2 and most EPUB pictures carry no alt text, and they are still pictures the reader can find, save and read with OCR.
+#[test]
+fn an_undescribed_picture_is_shown_and_decoration_is_not() {
+	let xml =
+		r#"<root><body><p>A <img src="chart.png"/> B <img src="rule.png" role="presentation"/> C</p></body></root>"#;
+	let mut converter = XmlToText::new();
+	assert!(converter.convert(xml));
+	assert_eq!(converter.get_text(), "A [Image] B C");
+	let images = converter.get_images();
+	assert_eq!(images.len(), 1);
+	assert_eq!((images[0].offset, images[0].source.as_str()), (2.into(), "chart.png"));
+}
+
+fn converted_body(body: &str) -> XmlToText {
+	let mut converter = XmlToText::new();
+	assert!(converter.convert(&format!("<root><body>{body}</body></root>")));
+	converter
+}
+
+fn span_text(text: &str, span: &crate::types::FormatInfo) -> String {
+	text.chars().skip(span.offset.get()).take(span.length.get()).collect()
+}
+
+#[test]
+fn a_pre_is_one_block_and_its_code_is_not_marked_again() {
+	let converter = converted_body("<pre><code>a  b\n  c</code></pre>");
+	assert_eq!(converter.get_preformatted().len(), 1);
+	assert_eq!(span_text(converter.get_text(), &converter.get_preformatted()[0]), "a  b\n  c");
+	assert!(converter.get_code().is_empty());
+}
+
+#[test]
+fn a_pre_ending_the_text_stays_inside_it() {
+	let converter = converted_body("<p>one</p><pre>two\n\n</pre>");
+	let text = converter.get_text().to_string();
+	let block = &converter.get_preformatted()[0];
+	assert!((block.offset + block.length).get() <= text.chars().count(), "{text:?}");
+}
+
+#[test]
+fn inline_code_is_marked_where_the_collapsed_line_has_it() {
+	let converter = converted_body("<p>one  two <code>foo</code> three</p>");
+	let text = converter.get_text().to_string();
+	assert_eq!(text, "one two foo three");
+	assert_eq!(span_text(&text, &converter.get_code()[0]), "foo");
+}
+
+#[test]
+fn list_items_know_their_prefix_and_number() {
+	let converter = converted_body("<ol start=\"3\" type=\"a\"><li>one</li><li>two</li></ol><ul><li>three</li></ul>");
+	let text = converter.get_text().to_string();
+	assert_eq!(text, "c. one\nd. two\n\u{2022} three");
+	assert_eq!(converter.get_lists()[0].opening_tag, "<ol type=\"a\">");
+	assert_eq!(converter.get_lists()[1].opening_tag, "<ul>");
+	let items = converter.get_list_items();
+	assert_eq!(items.iter().map(|item| item.number).collect::<Vec<_>>(), [Some(3), Some(4), None]);
+	for item in items {
+		let body: String = text.chars().skip(item.offset.get() + item.prefix_length.get()).take(3).collect();
+		assert!(["one", "two", "thr"].contains(&body.as_str()), "{body}");
+	}
+}
+
+#[test]
+fn superscripts_and_subscripts_are_marked() {
+	let converter = converted_body("<p>x<sup>2</sup> and H<sub>2</sub>O</p>");
+	let text = converter.get_text().to_string();
+	assert_eq!(text, "x2 and H2O");
+	assert_eq!((converter.get_superscripts()[0].offset.get(), converter.get_superscripts()[0].length.get()), (1, 1));
+	assert_eq!((converter.get_subscripts()[0].offset.get(), converter.get_subscripts()[0].length.get()), (8, 1));
+}
+
+fn block_tags(converter: &XmlToText) -> Vec<&'static str> {
+	converter.get_blocks().iter().map(|block| block.tag).collect()
+}
+
+#[test]
+fn wrappers_cover_their_text_and_stay_inside_it() {
+	let converter = converted_body("<p>before</p><blockquote><p>one</p><p>two</p></blockquote>");
+	assert_eq!(block_tags(&converter), ["blockquote"]);
+	assert_eq!(
+		span_text(
+			converter.get_text(),
+			&crate::types::FormatInfo {
+				offset: converter.get_blocks()[0].offset,
+				length: converter.get_blocks()[0].length
+			}
+		),
+		"one\ntwo"
+	);
+}
+
+#[test]
+fn a_break_between_lines_is_recorded_where_the_next_line_starts() {
+	let converter = converted_body("<p>one  <br/>two</p>");
+	assert_eq!(converter.get_text(), "one\ntwo");
+	assert_eq!(block_tags(&converter), ["br"]);
+	assert_eq!(converter.get_blocks()[0].offset.get(), 4);
+}
+
+#[test]
+fn a_break_with_nothing_to_separate_is_not_recorded() {
+	for body in [
+		"<p>one<br/></p><p>two</p>",
+		"<p><br/>one</p>",
+		"<p>one<br/><br/></p>",
+		"<p>one<br/><br/>two</p>",
+		"one<br/><div>two</div>",
+		"one<br/>",
+	] {
+		assert!(converted_body(body).get_blocks().is_empty(), "{body}");
+	}
+}
+
+#[test]
+fn a_break_inside_a_link_keeps_the_words_apart() {
+	let converter = converted_body("<p><a href=\"x\">1<br/>two</a> now</p>");
+	assert_eq!(converter.get_text(), "1 two now");
+	assert_eq!(converter.get_links()[0].text, "1 two");
+	assert!(converter.get_blocks().is_empty());
+}
+
+#[test]
+fn a_break_right_before_a_table_is_not_recorded() {
+	let converter = converted_body("<p>one<br/><table><tr><td>a</td></tr></table></p>");
+	assert!(converter.get_blocks().is_empty());
+}
+
+/// The real pages that did this nested a few thousand unclosed tags; this is far past what the stack ever allowed.
+#[test]
+fn a_document_nested_far_deeper_than_the_stack_still_converts() {
+	let depth = 50_000;
+	let body = format!("{}deep text{}", "<span>".repeat(depth), "</span>".repeat(depth));
+	let converter = converted_body(&body);
+	assert_eq!(converter.get_text(), "deep text");
 }

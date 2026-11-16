@@ -4,13 +4,12 @@ use rstest::rstest;
 use scraper::{ElementRef, Html, Selector};
 
 use crate::{
-	document::DocumentBuffer,
+	document::{DocLen, DocPos, DocumentBuffer},
 	parser::convert::{
 		html_to_text::{HtmlSourceMode, HtmlToText},
 		xml_to_text::XmlToText,
 	},
 	types::{FormulaInfo, HeadingInfo, LinkInfo, ListItemInfo},
-	util::text::display_len,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -56,7 +55,7 @@ struct Converted {
 	headings: Vec<HeadingInfo>,
 	links: Vec<LinkInfo>,
 	list_items: Vec<ListItemInfo>,
-	ids: HashMap<String, usize>,
+	ids: HashMap<String, DocPos>,
 }
 
 fn convert(body: &str, source: Source) -> Converted {
@@ -74,7 +73,7 @@ fn convert_document(input: &str, source: Source, tables: Tables) -> Converted {
 			let mut converter = XmlToText::with_render_tables_inline(inline);
 			assert!(converter.convert(input));
 			Converted {
-				text: converter.get_text(),
+				text: converter.take_text(),
 				formulas: converter.get_formulas().to_vec(),
 				headings: converter.get_headings().to_vec(),
 				links: converter.get_links().to_vec(),
@@ -84,9 +83,9 @@ fn convert_document(input: &str, source: Source, tables: Tables) -> Converted {
 		}
 		Source::Html => {
 			let mut converter = HtmlToText::with_render_tables_inline(inline);
-			assert!(converter.convert(input, HtmlSourceMode::NativeHtml));
+			converter.convert(input, HtmlSourceMode::NativeHtml);
 			Converted {
-				text: converter.get_text(),
+				text: converter.take_text(),
 				formulas: converter.get_formulas().to_vec(),
 				headings: converter.get_headings().to_vec(),
 				links: converter.get_links().to_vec(),
@@ -120,10 +119,8 @@ fn formula_view(formula: &FormulaInfo) -> Html {
 #[case::heading_2("h2")]
 #[case::heading_6("h6")]
 #[case::list_item("li")]
-#[ignore = "deferred: links need shared rendering for nested content and its markers"]
-#[case::deferred_link("a")]
-#[ignore = "deferred: table cells flatten nested content to raw text"]
-#[case::deferred_table("td")]
+#[case::link("a")]
+#[case::table("td")]
 fn embedded_formulas_preserve_text_spans_and_anchors(
 	#[values(Source::Html, Source::Xml)] source: Source,
 	#[case] tag: &str,
@@ -137,8 +134,8 @@ fn embedded_formulas_preserve_text_spans_and_anchors(
 	assert_eq!(converted.formulas.len(), 1);
 	let formula = &converted.formulas[0];
 	assert_eq!(formula.text, expected);
-	assert_eq!(formula.offset, display_len(&format!("{bullet}😀 Before ")));
-	assert_eq!(formula.length, display_len(expected));
+	assert_eq!(formula.offset, DocLen::of(&format!("{bullet}😀 Before ")).as_pos());
+	assert_eq!(formula.length, DocLen::of(expected));
 	assert_eq!(converted.ids["formula"], formula.offset);
 	assert_eq!(converted.ids["token"], formula.offset);
 }
@@ -192,8 +189,8 @@ fn formula_display_controls_line_breaks(
 	assert_eq!(converted.formulas.len(), 1);
 	let formula = &converted.formulas[0];
 	assert_eq!(formula.text, "x^2");
-	assert_eq!(formula.offset, display_len(prefix));
-	assert_eq!(formula.length, display_len("x^2"));
+	assert_eq!(formula.offset, DocLen::of(prefix).as_pos());
+	assert_eq!(formula.length, DocLen::of("x^2"));
 	assert_eq!(converted.ids["formula"], formula.offset);
 	let view = formula_view(formula);
 	let selector = Selector::parse("body > math").unwrap();
@@ -201,7 +198,7 @@ fn formula_display_controls_line_breaks(
 	assert_eq!(math.attr("display"), display);
 	let power = math.child_elements().next().unwrap();
 	assert_eq!(power.value().name(), "msup");
-	assert_eq!(power.value().name.ns.as_ref(), "http://www.w3.org/1998/Math/MathML");
+	assert_eq!(&*power.value().name.ns, "http://www.w3.org/1998/Math/MathML");
 	assert_eq!(power.text().collect::<String>(), "x2");
 }
 
@@ -246,7 +243,7 @@ fn xml_formula_fragments_work_for_mathcat_and_html(#[case] doctype: &str, #[case
 	assert!(
 		std::iter::once(token)
 			.chain(token.ancestors().take(2).filter_map(ElementRef::wrap))
-			.all(|element| { element.value().name.ns.as_ref() == "http://www.w3.org/1998/Math/MathML" })
+			.all(|element| { &*element.value().name.ns == "http://www.w3.org/1998/Math/MathML" })
 	);
 }
 
@@ -268,7 +265,7 @@ fn formula_entities_survive_conversion_and_html_view(#[values(Source::Html, Sour
 	assert_eq!(math.attr("alttext"), Some("a\u{00a0}<\u{00a0}\"b\""));
 	assert_eq!(math.text().collect::<String>(), "a\u{00a0}b");
 	assert!(math.value().attrs.iter().any(|(name, value)| {
-		name.ns.as_ref() == "http://www.w3.org/XML/1998/namespace" && name.local.as_ref() == "lang" && value == "en"
+		&*name.ns == "http://www.w3.org/XML/1998/namespace" && &*name.local == "lang" && value == "en"
 	}));
 }
 
@@ -292,15 +289,22 @@ fn xml_formula_view_retains_foreign_annotations(#[case] annotation: &str, #[case
 	let view = formula_view(&converted.formulas[0]);
 	let selector = Selector::parse(&format!("math > semantics > annotation-xml > {tag}")).unwrap();
 	let annotation = view.select(&selector).next().expect("foreign annotation retained for the view");
-	assert_eq!(annotation.value().name.ns.as_ref(), namespace);
+	assert_eq!(&*annotation.value().name.ns, namespace);
 	assert_eq!(annotation.text().collect::<String>(), "annotation");
 }
 
-// TODO: merge with xml_formula_fragments_work_for_mathcat_and_html when links and tables use shared XML rendering.
-#[rstest]
-#[ignore = "deferred: links flatten XML text, and tables reparse source slices as HTML"]
-fn xml_prefixes_survive_link_and_table_rendering(#[values("a", "td")] tag: &str) {
-	let converted = convert_with_tables(&wrap(tag, INHERITED_PREFIX), Source::Xml, Tables::Inline);
+#[test]
+fn xml_prefixes_survive_link_rendering() {
+	let converted = convert_with_tables(&wrap("a", INHERITED_PREFIX), Source::Xml, Tables::Inline);
+	assert_eq!(converted.text, "sqrt(x)");
+	assert_eq!(converted.formulas.len(), 1);
+}
+
+// TODO: merge with xml_prefixes_survive_link_rendering when tables use shared XML rendering.
+#[test]
+#[ignore = "deferred: tables reparse the XML source slice as HTML, which drops namespace prefixes"]
+fn xml_prefixes_survive_table_rendering() {
+	let converted = convert_with_tables(&wrap("td", INHERITED_PREFIX), Source::Xml, Tables::Inline);
 	assert_eq!(converted.text, "sqrt(x)");
 	assert_eq!(converted.formulas.len(), 1);
 }
@@ -337,7 +341,6 @@ fn svg_formulas_use_their_parsed_namespace(
 }
 
 #[rstest]
-#[ignore = "deferred: table cells flatten nested content to raw text"]
 fn table_formulas_preserve_text_and_spans(
 	#[values(Source::Html, Source::Xml)] source: Source,
 	#[values(Tables::Inline, Tables::Placeholder)] tables: Tables,
@@ -355,13 +358,12 @@ fn table_formulas_preserve_text_and_spans(
 	assert_eq!(converted.formulas.len(), count);
 	let buffer = DocumentBuffer::with_content(converted.text);
 	for formula in converted.formulas {
-		let start = buffer.byte_index_for_display(formula.offset);
-		let end = buffer.byte_index_for_display(formula.offset + formula.length);
+		let start = buffer.byte_at(formula.offset);
+		let end = buffer.byte_at(formula.offset + formula.length);
 		assert_eq!(buffer.slice(start..end), formula.text);
 	}
 }
 
-// TODO: merge with the link case in embedded_formulas_preserve_text_spans_and_anchors when links retain markers.
 #[test]
 fn html_link_text_uses_formula_conversion() {
 	let converted = convert(&wrap("a", &format!("Before <math>{}</math> after.", POWER.0)), Source::Html);
@@ -374,14 +376,13 @@ fn html_link_text_uses_formula_conversion() {
 #[rstest]
 #[case::at_start("")]
 #[case::after_text("Before ")]
-#[ignore = "deferred: links need shared rendering for nested content and its markers"]
 fn link_formula_spans_count_boundary_whitespace_once(
 	#[case] prefix: &str,
 	#[values(Source::Html, Source::Xml)] source: Source,
 ) {
 	let converted = convert(&format!(r##"<p>{prefix}<a href="#x">  <math>{}</math></a></p>"##, POWER.0), source);
 	assert_eq!(converted.formulas.len(), 1);
-	assert_eq!(converted.formulas[0].offset, display_len(prefix));
+	assert_eq!(converted.formulas[0].offset, DocLen::of(prefix).as_pos());
 }
 
 #[rstest]
@@ -398,9 +399,9 @@ fn reusing_a_converter_clears_formula_markers(#[values(Source::Html, Source::Xml
 		}
 		Source::Html => {
 			let mut converter = HtmlToText::new();
-			assert!(converter.convert(with_formulas, HtmlSourceMode::NativeHtml));
+			converter.convert(with_formulas, HtmlSourceMode::NativeHtml);
 			assert_eq!(converter.get_formulas().len(), 1);
-			assert!(converter.convert(plain, HtmlSourceMode::NativeHtml));
+			converter.convert(plain, HtmlSourceMode::NativeHtml);
 			assert!(converter.get_formulas().is_empty());
 		}
 	}

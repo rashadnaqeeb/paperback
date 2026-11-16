@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use clap::{Parser, ValueEnum};
 
 #[derive(Parser)]
-#[command(name = "pb", about = "Convert any document to text, HTML, or Markdown")]
+#[command(name = "pb", version = env!("PB_DISPLAY_VERSION"), about = "Convert any document to text, HTML, or Markdown")]
 pub struct Cli {
 	/// Input document files, patterns or http(s) links. `*` and `?` are expanded, so the same command line works on Windows. Quote a link that holds ? or &
-	#[arg(required_unless_present_any = ["list_formats", "files_from"], num_args = 1..)]
+	#[arg(required_unless_present_any = ["list_formats", "list_braille_tables", "files_from"], num_args = 1..)]
 	pub input: Vec<PathBuf>,
 	/// Also convert the documents listed in this file, one path per line; `-` reads the list from stdin. Spaces around a name are removed, blank lines and lines starting with # are skipped, and patterns are not expanded
 	#[arg(long, value_name = "FILE")]
@@ -14,6 +14,12 @@ pub struct Cli {
 	/// List the formats pb can read, and the extensions it knows them by
 	#[arg(long)]
 	pub list_formats: bool,
+	/// List the braille tables Braille Ready Files and PEF books can be read with, for --braille-table
+	#[arg(long)]
+	pub list_braille_tables: bool,
+	/// The braille table to back-translate Braille Ready Files and PEF books with, such as en-us-g2.ctb (default: en-ueb-g2.ctb, Unified English Braille grade 2)
+	#[arg(long, value_name = "TABLE")]
+	pub braille_table: Option<String>,
 	/// Output format
 	#[arg(short, long, default_value = "text")]
 	pub format: Format,
@@ -50,13 +56,15 @@ pub struct Cli {
 	/// The largest document to download from a link, in MB
 	#[arg(long, value_name = "MB", default_value_t = 512)]
 	pub max_download_size: u64,
-	/// Keep every line of an untagged PDF page separate instead of joining wrapped lines back
-	/// into paragraphs (for code listings, poetry and transcripts)
+	/// Keep every line separate instead of joining wrapped lines back into paragraphs, on pages that don't mark their paragraphs, such as untagged or OCR-read PDF pages (for code listings, poetry and transcripts)
 	#[arg(long)]
 	pub no_join_paragraphs: bool,
 	/// Print paperback-core's parser log output to stderr (set `RUST_LOG` for finer control)
 	#[arg(short, long)]
 	pub verbose: bool,
+	/// How many documents to convert at once when there are several; 0, the default, means one per processor and 1 converts them in turn, reporting in the order given. Downloads, password prompts and OCR still take one document at a time
+	#[arg(short, long, value_name = "N", default_value_t = 0)]
+	pub jobs: usize,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -70,7 +78,6 @@ pub enum Format {
 }
 
 impl Format {
-	/// The extension a file of this format is given, which is what names it in `--output-dir`.
 	#[must_use]
 	pub const fn extension(self) -> &'static str {
 		match self {
@@ -91,8 +98,7 @@ mod tests {
 		Cli::try_parse_from(args).expect("parse args")
 	}
 
-	/// Catches conflicting flags, duplicate short options and other definition mistakes that
-	/// clap only reports at runtime.
+	/// clap only reports definition mistakes like conflicting flags at runtime.
 	#[test]
 	fn the_command_definition_is_valid() {
 		Cli::command().debug_assert();
@@ -103,7 +109,6 @@ mod tests {
 		assert!(Cli::try_parse_from(["pb"]).is_err(), "input path must be required");
 	}
 
-	/// Asking what pb reads is a question about pb, not about a file, so it takes none.
 	#[test]
 	fn listing_the_formats_needs_no_input() {
 		let cli = parse(&["pb", "--list-formats"]);
@@ -124,19 +129,23 @@ mod tests {
 		assert!(!cli.no_prompt);
 		assert!(!cli.no_join_paragraphs);
 		assert!(!cli.verbose);
+		assert_eq!(cli.jobs, 0, "as many at once as there are processors unless asked");
 	}
 
-	/// One file per argument, in the order given. A Windows shell hands `*.pdf` over as one
-	/// literal argument, so several can arrive having been named one at a time as well as several
-	/// having been expanded before pb saw them.
+	#[test]
+	fn reads_how_many_documents_to_convert_at_once() {
+		assert_eq!(parse(&["pb", "a.epub", "-j", "4"]).jobs, 4);
+		assert_eq!(parse(&["pb", "a.epub", "--jobs", "0"]).jobs, 0);
+		assert!(Cli::try_parse_from(["pb", "a.epub", "--jobs", "-1"]).is_err());
+	}
+
 	#[test]
 	fn takes_several_inputs() {
 		let cli = parse(&["pb", "a.epub", "b.pdf", "c.docx"]);
 		assert_eq!(cli.input, [PathBuf::from("a.epub"), PathBuf::from("b.pdf"), PathBuf::from("c.docx")]);
 	}
 
-	/// A pattern reaches the parser whole rather than being rejected as an option, so `inputs`
-	/// gets to expand it and say why when it matches nothing.
+	/// So `inputs` can expand it and say why when it matches nothing.
 	#[test]
 	fn a_pattern_reaches_the_parser_whole() {
 		assert_eq!(parse(&["pb", "*.pdf"]).input, [PathBuf::from("*.pdf")]);
@@ -151,9 +160,6 @@ mod tests {
 		assert!(!parse(&["pb", "a.epub", "--output-dir", "out"]).force);
 	}
 
-	/// `--force` applies wherever the output lands: refusing to replace a named file as well as a
-	/// folder is the whole of it, and a flag that only guarded one of the two would leave the
-	/// other silently overwriting.
 	#[test]
 	fn the_force_flag_is_accepted_wherever_the_output_goes() {
 		assert!(parse(&["pb", "a.epub", "-o", "out.txt", "--force"]).force);
@@ -162,8 +168,6 @@ mod tests {
 		assert!(!parse(&["pb", "a.epub", "-o", "out.txt"]).force);
 	}
 
-	/// Naming one file to write to and a folder to write into are two different instructions, and
-	/// taking both means guessing which one was meant.
 	#[test]
 	fn a_named_file_and_an_output_directory_are_mutually_exclusive() {
 		assert!(Cli::try_parse_from(["pb", "a.epub", "-o", "out.txt", "--output-dir", "out"]).is_err());
@@ -199,19 +203,27 @@ mod tests {
 	}
 
 	#[test]
+	fn accepts_a_braille_table() {
+		assert_eq!(
+			parse(&["pb", "book.brf", "--braille-table", "en-us-g2.ctb"]).braille_table.as_deref(),
+			Some("en-us-g2.ctb")
+		);
+		assert!(parse(&["pb", "--list-braille-tables"]).list_braille_tables);
+	}
+
+	#[test]
 	fn accepts_the_no_join_paragraphs_flag() {
 		assert!(parse(&["pb", "b.pdf", "--no-join-paragraphs"]).no_join_paragraphs);
 	}
 
-	/// The specification is left as typed rather than parsed here, so that the error a reader gets
-	/// for a bad one comes from the code that knows what a page is.
+	/// Parsed later, so a bad one gets its error from the code that knows what a page is.
 	#[test]
 	fn the_pages_flag_is_handed_over_whole() {
 		assert_eq!(parse(&["pb", "b.pdf", "--pages", "5-10,80-end"]).pages.as_deref(), Some("5-10,80-end"));
 		assert_eq!(parse(&["pb", "b.pdf"]).pages, None);
 	}
 
-	/// pb has always read a document the way the app does, running heads taken out, so a script written against it keeps getting the same text. Keeping them is the request.
+	/// pb has always taken running heads out as the app does, so scripts written against it keep getting the same text.
 	#[test]
 	fn repeated_lines_are_taken_out_unless_asked_to_keep_them() {
 		assert!(!parse(&["pb", "b.pdf"]).keep_repeated);
@@ -219,11 +231,7 @@ mod tests {
 		assert!(parse(&["pb", "b.pdf", "--keep-repeated"]).keep_repeated);
 	}
 
-	/// No flag turns the OCR instruction back on. --ocr-image-pages is not such a flag: it reads the
-	/// pages the instruction marks and takes the instruction out of the file, so a conversion that
-	/// prints it is a fault in the pass rather than something the reader asked for. Asserted against
-	/// the command's own argument list, since parsing sample command lines would pass just as well
-	/// against a flag that existed but was never spelled out in them.
+	/// Checked against the argument list, since sample command lines would pass with a flag they never spell out.
 	#[test]
 	fn no_flag_offers_the_ocr_placeholder() {
 		let flags: Vec<String> =
@@ -242,9 +250,6 @@ mod tests {
 		assert!(parse(&["pb", "b.pdf", "--ocr-image-pages"]).ocr_image_pages);
 	}
 
-	/// The two flags ask for disjoint kinds of page, so each stands on its own. Neither requires the
-	/// other, since a reader who wants scanned pages re-read and a reader who wants text pages
-	/// re-read are asking for different work.
 	#[test]
 	fn either_page_flag_can_be_given_on_its_own() {
 		let images = parse(&["pb", "b.pdf", "--ocr-image-pages"]);
@@ -280,16 +285,12 @@ mod tests {
 		assert!(parse(&["pb", "a.epub"]).files_from.is_none());
 	}
 
-	/// Paths that start with a dash or contain spaces reach the parser intact rather than being
-	/// read as flags.
 	#[test]
 	fn treats_awkward_paths_as_input() {
 		let cli = parse(&["pb", "--", "-weird name.txt"]);
 		assert_eq!(cli.input, [PathBuf::from("-weird name.txt")]);
 	}
 
-	/// Each format names its files differently, and a reader who asked for Markdown should not
-	/// find `.txt` beside their book wondering what happened to the request.
 	#[test]
 	fn every_format_names_its_files() {
 		assert_eq!(Format::Text.extension(), "txt");

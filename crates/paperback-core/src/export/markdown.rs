@@ -1,7 +1,4 @@
-use crate::{
-	document::{Document, MarkerType},
-	util::text::ch_width,
-};
+use crate::document::{DocPos, Document, MarkerType};
 
 #[must_use]
 pub fn render(doc: &Document) -> String {
@@ -14,15 +11,12 @@ pub fn render(doc: &Document) -> String {
 		BoldClose,
 		ItalicOpen,
 		ItalicClose,
-		// Replace `until` display-units of content with "\n---\n"
-		Replace { until: usize },
+		Replace { until: DocPos },
 	}
 	struct Ev {
-		pos: usize,
+		pos: DocPos,
 		kind: Mk,
-		/// Which span this event belongs to, counting up in the order spans are opened.
-		/// Closing in the reverse of that order is what keeps two spans over the same text
-		/// nested inside one another rather than interleaved.
+		/// Closing in the reverse of opening order keeps two spans over the same text nested rather than interleaved.
 		span: usize,
 	}
 	let mut events: Vec<Ev> = Vec::new();
@@ -51,18 +45,13 @@ pub fn render(doc: &Document) -> String {
 				events.push(Ev { pos: end, kind: Mk::ItalicClose, span });
 			}
 			MarkerType::Separator => {
-				// Replace the dash line written into the content by html_to_text with "---"
 				events.push(Ev { pos, kind: Mk::Replace { until: pos + marker.length }, span });
 			}
-			// MarkerType::Underline intentionally has no arm: CommonMark has no native
-			// underline construct; falls through to the `_` arm below and is silently
-			// dropped from markdown output rather than emitting raw HTML `<u>`.
+			// Underline is dropped: CommonMark has no underline, and raw `<u>` is worse than none.
 			_ => {}
 		}
 	}
-	// At equal positions: close before replace before prefix before open. Spans that start
-	// together open in the order their markers were recorded and close in the reverse of
-	// it, so a bold link comes out as `**[text](url)**` rather than `[**text](url)**`.
+	// Spans starting together close in reverse, so a bold link is `**[text](url)**`, not `[**text](url)**`.
 	events.sort_by(|a, b| {
 		let class = |k: &Mk| match k {
 			Mk::LinkClose(_) | Mk::BoldClose | Mk::ItalicClose => 0u8,
@@ -78,10 +67,11 @@ pub fn render(doc: &Document) -> String {
 	});
 	let mut md = String::with_capacity(content.len() + events.len() * 4);
 	let mut event_idx = 0usize;
-	let mut display_pos = 0usize;
-	let mut skip_until: Option<usize> = None;
-	for ch in content.chars() {
-		while event_idx < events.len() && events[event_idx].pos <= display_pos {
+	let mut position = DocPos::ZERO;
+	let mut skip_until: Option<DocPos> = None;
+	let mut rest = content.as_str();
+	while !rest.is_empty() {
+		while event_idx < events.len() && events[event_idx].pos <= position {
 			if skip_until.is_some_and(|u| events[event_idx].pos < u) {
 				event_idx += 1;
 				continue;
@@ -100,24 +90,25 @@ pub fn render(doc: &Document) -> String {
 				Mk::BoldOpen | Mk::BoldClose => md.push_str("**"),
 				Mk::ItalicOpen | Mk::ItalicClose => md.push('*'),
 				Mk::Replace { until } => {
-					// Leading newline ensures "---" is never parsed as a setext heading underline
+					// The leading newline keeps "---" from being read as a setext heading underline.
 					md.push_str("\n---\n");
 					skip_until = Some(*until);
 				}
 			}
 			event_idx += 1;
 		}
-		if let Some(until) = skip_until {
-			if display_pos < until {
-				display_pos += ch_width(ch);
-				continue;
-			}
+		if skip_until.is_some_and(|until| position >= until) {
 			skip_until = None;
 		}
-		md.push(ch);
-		display_pos += ch_width(ch);
+		let next_event = events.get(event_idx).map(|event| event.pos);
+		let stop = skip_until.into_iter().chain(next_event).min();
+		let (run, tail) = stop.map_or((rest, ""), |stop| super::split_after_chars(rest, stop.get() - position.get()));
+		rest = tail;
+		position = stop.unwrap_or(position);
+		if skip_until.is_none() {
+			md.push_str(run);
+		}
 	}
-	// Flush any closes that fall at or past end of content
 	while event_idx < events.len() {
 		match &events[event_idx].kind {
 			Mk::LinkClose(url) => {
@@ -137,21 +128,22 @@ pub fn render(doc: &Document) -> String {
 	normalize_newlines(&md)
 }
 
-// Expand single newlines to blank lines and collapse runs of 3+ newlines to 2.
-// Markdown ignores single newlines; a blank line is required for paragraph breaks.
+// Markdown ignores single newlines, so every break becomes a blank line.
 fn normalize_newlines(s: &str) -> String {
 	let mut out = String::with_capacity(s.len() + s.len() / 4);
 	let mut nl_run = 0usize;
-	for ch in s.chars() {
-		if ch == '\n' {
+	for (index, line) in s.split('\n').enumerate() {
+		if index > 0 {
 			nl_run += 1;
-		} else {
-			if nl_run > 0 {
-				out.push_str("\n\n");
-			}
-			nl_run = 0;
-			out.push(ch);
 		}
+		if line.is_empty() {
+			continue;
+		}
+		if nl_run > 0 {
+			out.push_str("\n\n");
+		}
+		nl_run = 0;
+		out.push_str(line);
 	}
 	if nl_run > 0 {
 		out.push('\n');
@@ -176,23 +168,23 @@ mod tests {
 
 	#[test]
 	fn test_bold_basic() {
-		let doc = simple_doc("bold text", vec![Marker::new(MarkerType::Bold, 0).with_length(4)]);
+		let doc = simple_doc("bold text", vec![Marker::new(MarkerType::Bold, 0.into()).with_length(4.into())]);
 		let md = render(&doc);
 		assert!(md.contains("**bold**"), "Expected **bold** in markdown: {md}");
 	}
 
 	#[test]
 	fn test_italic_basic() {
-		let doc = simple_doc("italic text", vec![Marker::new(MarkerType::Italic, 0).with_length(6)]);
+		let doc = simple_doc("italic text", vec![Marker::new(MarkerType::Italic, 0.into()).with_length(6.into())]);
 		let md = render(&doc);
 		assert!(md.contains("*italic*"), "Expected *italic* in markdown: {md}");
 	}
 
 	#[test]
 	fn test_underline_produces_no_syntax() {
-		let doc = simple_doc("underline text", vec![Marker::new(MarkerType::Underline, 0).with_length(9)]);
+		let doc =
+			simple_doc("underline text", vec![Marker::new(MarkerType::Underline, 0.into()).with_length(9.into())]);
 		let md = render(&doc);
-		// The text should still appear, but without any markdown syntax
 		assert!(md.contains("underline"), "Expected text 'underline' in markdown: {md}");
 		assert!(!md.contains("__"), "Expected no __ syntax for underline");
 		assert!(!md.contains("_underline_"), "Expected no _underline_ italic-like syntax");
@@ -201,40 +193,42 @@ mod tests {
 
 	#[test]
 	fn test_nested_bold_italic() {
-		// "bold italic" where 0-4 is bold, 5-11 is italic
 		let doc = simple_doc(
 			"bold italic",
-			vec![Marker::new(MarkerType::Bold, 0).with_length(4), Marker::new(MarkerType::Italic, 5).with_length(6)],
+			vec![
+				Marker::new(MarkerType::Bold, 0.into()).with_length(4.into()),
+				Marker::new(MarkerType::Italic, 5.into()).with_length(6.into()),
+			],
 		);
 		let md = render(&doc);
 		assert!(md.contains("**bold**"), "Expected **bold** in markdown: {md}");
 		assert!(md.contains("*italic*"), "Expected *italic* in markdown: {md}");
 	}
 
-	// A hotspot whose text is also bold gives two spans over exactly the same characters.
-	// Closing them in the order they opened would interleave the two into `[**x](url)**`,
-	// which no markdown renderer reads as a bold link.
+	// A bold hotspot gives two spans over the same characters, and interleaving them is no bold link to any renderer.
 	#[test]
 	fn a_bold_link_nests_rather_than_interleaving() {
 		let doc = simple_doc(
 			"define",
 			vec![
-				Marker::new(MarkerType::Bold, 0).with_length(6),
-				Marker::new(MarkerType::Link, 0).with_text("define".to_string()).with_reference("topic7".to_string()),
+				Marker::new(MarkerType::Bold, 0.into()).with_length(6.into()),
+				Marker::new(MarkerType::Link, 0.into())
+					.with_text("define".to_string())
+					.with_reference("topic7".to_string()),
 			],
 		);
 		assert_eq!(render(&doc).trim(), "**[define](topic7)**");
 	}
 
-	// The markers can arrive the other way round, and the same rule has to hold: whichever
-	// span opened last is the one that closes first.
 	#[test]
 	fn a_linked_bold_run_nests_the_other_way_round() {
 		let doc = simple_doc(
 			"define",
 			vec![
-				Marker::new(MarkerType::Link, 0).with_text("define".to_string()).with_reference("topic7".to_string()),
-				Marker::new(MarkerType::Bold, 0).with_length(6),
+				Marker::new(MarkerType::Link, 0.into())
+					.with_text("define".to_string())
+					.with_reference("topic7".to_string()),
+				Marker::new(MarkerType::Bold, 0.into()).with_length(6.into()),
 			],
 		);
 		assert_eq!(render(&doc).trim(), "[**define**](topic7)");
@@ -242,8 +236,7 @@ mod tests {
 
 	#[test]
 	fn test_bold_close_at_end_of_content() {
-		// Test that a bold span ending exactly at end-of-content doesn't lose its closing **
-		let doc = simple_doc("bold", vec![Marker::new(MarkerType::Bold, 0).with_length(4)]);
+		let doc = simple_doc("bold", vec![Marker::new(MarkerType::Bold, 0.into()).with_length(4.into())]);
 		let md = render(&doc);
 		assert!(md.contains("**bold**"), "Expected **bold** in markdown with closing **: {md}");
 		let count = md.matches("**").count();
@@ -252,8 +245,7 @@ mod tests {
 
 	#[test]
 	fn test_italic_close_at_end_of_content() {
-		// Test that an italic span ending exactly at end-of-content doesn't lose its closing *
-		let doc = simple_doc("italic", vec![Marker::new(MarkerType::Italic, 0).with_length(6)]);
+		let doc = simple_doc("italic", vec![Marker::new(MarkerType::Italic, 0.into()).with_length(6.into())]);
 		let md = render(&doc);
 		assert!(md.contains("*italic*"), "Expected *italic* in markdown with closing *: {md}");
 		let count = md.matches('*').count();

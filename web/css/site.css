@@ -397,6 +397,10 @@ img {
 	margin-top: 0;
 }
 
+.release .total {
+	color: var(--muted);
+}
+
 .release .count {
 	color: var(--muted);
 	font-size: 0.9rem;
@@ -427,6 +431,12 @@ details > summary {
 	cursor: pointer;
 	font-weight: 600;
 	padding: 0.3rem 0;
+}
+
+/* A heading in a summary is there to be navigated to, and stays on the line of the arrow that opens it. */
+details > summary h3 {
+	display: inline;
+	margin: 0;
 }
 
 .site-footer {
@@ -478,7 +488,7 @@ details > summary {
 	}
 }
 
-/* Google's badge carries its own transparent margin, so it sits in a line of text without any of its own. */
+/* Google's badge carries its own transparent margin and Apple's is drawn at the same 40px height, so both sit in a line of text without any of their own. */
 .store-badge img {
 	vertical-align: middle;
 }

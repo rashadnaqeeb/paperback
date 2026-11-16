@@ -74,12 +74,13 @@ jobs:
       run: |
         $env:PATH = "$env:PATH;${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin;${{ steps.msys2.outputs.msys2-location }}\usr\bin"
         cargo release
-    - name: Check wxWidgets translations were embedded
+    # The app embeds wxWidgets' catalogs deflated, so the binary has no plain text to look for.
+    # It embeds whatever this tree holds, and an empty tree is how they went missing (#958).
+    - name: Check wxWidgets translations were built
       shell: bash
       run: |
-        exe=target/release/paperback${{ runner.os == 'Windows' && '.exe' || '' }}
-        if ! grep -aq "Project-Id-Version: wxWidgets" "$exe"; then
-          echo "::error::$exe embeds no wxWidgets catalogs, so stock wx strings would ship untranslated"
+        if ! compgen -G "target/release/wxdragon_sys_cmake_build/share/locale/de/LC_MESSAGES/wxstd*.mo" > /dev/null; then
+          echo "::error::wxWidgets built no catalogs to embed, so stock wx strings would ship untranslated"
           exit 1
         fi
     - name: Sign artifacts
@@ -163,12 +164,13 @@ jobs:
       run: |
         $env:PATH = "$env:PATH;${{ steps.msys2.outputs.msys2-location }}\ucrt64\bin;${{ steps.msys2.outputs.msys2-location }}\usr\bin"
         cargo release
-    - name: Check wxWidgets translations were embedded
+    # The app embeds wxWidgets' catalogs deflated, so the binary has no plain text to look for.
+    # It embeds whatever this tree holds, and an empty tree is how they went missing (#958).
+    - name: Check wxWidgets translations were built
       shell: bash
       run: |
-        exe=target/release/paperback${{ runner.os == 'Windows' && '.exe' || '' }}
-        if ! grep -aq "Project-Id-Version: wxWidgets" "$exe"; then
-          echo "::error::$exe embeds no wxWidgets catalogs, so stock wx strings would ship untranslated"
+        if ! compgen -G "target/release/wxdragon_sys_cmake_build/share/locale/de/LC_MESSAGES/wxstd*.mo" > /dev/null; then
+          echo "::error::wxWidgets built no catalogs to embed, so stock wx strings would ship untranslated"
           exit 1
         fi
     - name: Sign artifacts
@@ -204,7 +206,8 @@ jobs:
         retention-days: 30
 
   build-linux:
-    runs-on: ubuntu-latest
+    # Pinned: the image's glibc is the oldest one the binaries run on, and `ubuntu-latest` moving to 26.04 stopped them starting on Ubuntu 24.04 and Debian 13 (#1252).
+    runs-on: ubuntu-24.04
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7
@@ -241,12 +244,23 @@ jobs:
         chmod +x /usr/local/bin/appimagetool
     - name: Build
       run: cargo release
-    - name: Check wxWidgets translations were embedded
+    # A newer image or toolchain raises this without any error of its own, and the people it locks out can't start the app to say so.
+    - name: Check the oldest glibc the binaries run on
       shell: bash
       run: |
-        exe=target/release/paperback${{ runner.os == 'Windows' && '.exe' || '' }}
-        if ! grep -aq "Project-Id-Version: wxWidgets" "$exe"; then
-          echo "::error::$exe embeds no wxWidgets catalogs, so stock wx strings would ship untranslated"
+        needed=$(objdump -T target/release/paperback target/release/pb | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sed 's/GLIBC_//' | sort -Vu | tail -1)
+        echo "The binaries need glibc $needed"
+        if [ "$(printf '%s\n' "$needed" 2.39 | sort -V | tail -1)" != "2.39" ]; then
+          echo "::error::The binaries need glibc $needed, newer than Ubuntu 24.04's 2.39 (#1252)"
+          exit 1
+        fi
+    # The app embeds wxWidgets' catalogs deflated, so the binary has no plain text to look for.
+    # It embeds whatever this tree holds, and an empty tree is how they went missing (#958).
+    - name: Check wxWidgets translations were built
+      shell: bash
+      run: |
+        if ! compgen -G "target/release/wxdragon_sys_cmake_build/share/locale/de/LC_MESSAGES/wxstd*.mo" > /dev/null; then
+          echo "::error::wxWidgets built no catalogs to embed, so stock wx strings would ship untranslated"
           exit 1
         fi
     - name: Sign artifacts
@@ -281,7 +295,8 @@ jobs:
         retention-days: 30
 
   build-linux-arm64:
-    runs-on: ubuntu-26.04-arm
+    # Pinned: the image's glibc is the oldest one the binaries run on, and `ubuntu-latest` moving to 26.04 stopped them starting on Ubuntu 24.04 and Debian 13 (#1252).
+    runs-on: ubuntu-24.04-arm
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7
@@ -318,12 +333,23 @@ jobs:
         chmod +x /usr/local/bin/appimagetool
     - name: Build
       run: cargo release
-    - name: Check wxWidgets translations were embedded
+    # A newer image or toolchain raises this without any error of its own, and the people it locks out can't start the app to say so.
+    - name: Check the oldest glibc the binaries run on
       shell: bash
       run: |
-        exe=target/release/paperback${{ runner.os == 'Windows' && '.exe' || '' }}
-        if ! grep -aq "Project-Id-Version: wxWidgets" "$exe"; then
-          echo "::error::$exe embeds no wxWidgets catalogs, so stock wx strings would ship untranslated"
+        needed=$(objdump -T target/release/paperback target/release/pb | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sed 's/GLIBC_//' | sort -Vu | tail -1)
+        echo "The binaries need glibc $needed"
+        if [ "$(printf '%s\n' "$needed" 2.39 | sort -V | tail -1)" != "2.39" ]; then
+          echo "::error::The binaries need glibc $needed, newer than Ubuntu 24.04's 2.39 (#1252)"
+          exit 1
+        fi
+    # The app embeds wxWidgets' catalogs deflated, so the binary has no plain text to look for.
+    # It embeds whatever this tree holds, and an empty tree is how they went missing (#958).
+    - name: Check wxWidgets translations were built
+      shell: bash
+      run: |
+        if ! compgen -G "target/release/wxdragon_sys_cmake_build/share/locale/de/LC_MESSAGES/wxstd*.mo" > /dev/null; then
+          echo "::error::wxWidgets built no catalogs to embed, so stock wx strings would ship untranslated"
           exit 1
         fi
     - name: Sign artifacts
@@ -478,17 +504,24 @@ jobs:
         echo "/opt/homebrew/opt/gettext/bin" >> $GITHUB_PATH
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-apple-darwin,x86_64-apple-darwin
     - name: Cache Rust build artifacts
       uses: Swatinem/rust-cache@v2
     # Why these two steps exist: see build-windows.
     - name: Cache wxWidgets translations
       uses: actions/cache@v6
       with:
-        path: target/release/wxdragon_sys_cmake_build/share/locale
+        path: |
+          target/aarch64-apple-darwin/release/wxdragon_sys_cmake_build/share/locale
+          target/x86_64-apple-darwin/release/wxdragon_sys_cmake_build/share/locale
         key: wx-locale-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Cargo.lock') }}
     - name: Rebuild wxWidgets if its translations are missing
       shell: bash
-      run: test -d target/release/wxdragon_sys_cmake_build/share/locale || cargo clean --release -p wxdragon-sys
+      run: |
+        for target in aarch64-apple-darwin x86_64-apple-darwin; do
+          test -d target/$target/release/wxdragon_sys_cmake_build/share/locale || cargo clean --release -p wxdragon-sys --target $target
+        done
     - name: Import signing certificate
       if: github.event_name == 'push' && github.repository == 'trypsynth/paperback'
       env:
@@ -518,14 +551,24 @@ jobs:
       env:
         MACOSX_DEPLOYMENT_TARGET: "15.0"
       run: cargo release
-    - name: Check wxWidgets translations were embedded
+    # Why this checks the catalog tree and not the binary: see build-windows.
+    - name: Check wxWidgets translations were built
       shell: bash
       run: |
-        exe=target/release/paperback${{ runner.os == 'Windows' && '.exe' || '' }}
-        if ! grep -aq "Project-Id-Version: wxWidgets" "$exe"; then
-          echo "::error::$exe embeds no wxWidgets catalogs, so stock wx strings would ship untranslated"
-          exit 1
-        fi
+        for target in aarch64-apple-darwin x86_64-apple-darwin; do
+          if ! compgen -G "target/$target/release/wxdragon_sys_cmake_build/share/locale/de/LC_MESSAGES/wxstd*.mo" > /dev/null; then
+            echo "::error::wxWidgets built no catalogs to embed for $target, so stock wx strings would ship untranslated"
+            exit 1
+          fi
+        done
+    # No Intel Mac runs this job, so Rosetta is the only check that the Intel half of the
+    # universal binaries starts at all.
+    - name: Check the app is universal
+      run: |
+        for binary in paperback pb; do
+          lipo target/release/Paperback.app/Contents/MacOS/$binary -verify_arch arm64 x86_64
+        done
+        arch -x86_64 target/release/Paperback.app/Contents/MacOS/pb --list-formats > /dev/null
     - name: Notarize and staple DMG
       if: github.event_name == 'push' && github.repository == 'trypsynth/paperback'
       env:

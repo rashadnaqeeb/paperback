@@ -16,7 +16,11 @@ use std::{
 	time::{Duration, Instant},
 };
 
-use paperback_core::{config::ConfigManager, session::DocumentSession};
+use paperback_core::{
+	config::ConfigManager,
+	document::{DocLen, DocPos},
+	session::DocumentSession,
+};
 use wxdragon::{prelude::*, timer::Timer};
 
 use super::{DocumentManager, move_to_offset_and_record_history, parse_settings, persist_navigation_history};
@@ -56,12 +60,8 @@ pub fn configure_sync(config: &ConfigManager) {
 
 #[cfg(target_os = "macos")]
 mod icloud {
-	use std::{
-		ffi::{CStr, CString, c_char},
-		ptr,
-	};
-
-	use objc::{class, msg_send, runtime::Object, sel, sel_impl};
+	use objc2::rc::Retained;
+	use objc2_foundation::{NSString, NSUbiquitousKeyValueStore};
 	use paperback_core::config::SyncStore;
 
 	/// `NSUbiquitousKeyValueStore`, which the iPhone app shares by naming the same store in its
@@ -71,55 +71,28 @@ mod icloud {
 	impl ICloudStore {
 		pub fn new() -> Self {
 			// Picks up what iCloud brought while the app was not running.
-			let _: bool = unsafe { msg_send![store(), synchronize] };
+			store().synchronize();
 			Self
 		}
 	}
 
-	fn store() -> *mut Object {
-		unsafe { msg_send![class!(NSUbiquitousKeyValueStore), defaultStore] }
+	fn store() -> Retained<NSUbiquitousKeyValueStore> {
+		NSUbiquitousKeyValueStore::defaultStore()
 	}
 
-	fn ns_string(text: &str) -> *mut Object {
-		let Ok(text) = CString::new(text) else { return ptr::null_mut() };
-		unsafe { msg_send![class!(NSString), stringWithUTF8String: text.as_ptr()] }
-	}
-
-	/// # Safety
-	///
-	/// `string` is null or a live `NSString`.
-	unsafe fn rust_string(string: *mut Object) -> Option<String> {
-		if string.is_null() {
-			return None;
-		}
-		let utf8: *const c_char = unsafe { msg_send![string, UTF8String] };
-		(!utf8.is_null()).then(|| unsafe { CStr::from_ptr(utf8) }.to_string_lossy().into_owned())
-	}
-
-	// Called on the UI thread only, inside the event loop's autorelease pool.
+	// Called on the UI thread only.
 	impl SyncStore for ICloudStore {
 		fn get(&self, key: String) -> Option<String> {
-			let value: *mut Object = unsafe { msg_send![store(), stringForKey: ns_string(&key)] };
-			unsafe { rust_string(value) }
+			store().stringForKey(&NSString::from_str(&key)).map(|value| value.to_string())
 		}
 
 		fn set(&self, key: String, value: String) {
 			tracing::debug!(key, bytes = value.len(), "wrote this Mac's places to iCloud");
-			let _: () = unsafe { msg_send![store(), setString: ns_string(&value) forKey: ns_string(&key)] };
+			store().setString_forKey(Some(&NSString::from_str(&value)), &NSString::from_str(&key));
 		}
 
 		fn keys(&self) -> Vec<String> {
-			unsafe {
-				let dictionary: *mut Object = msg_send![store(), dictionaryRepresentation];
-				let keys: *mut Object = msg_send![dictionary, allKeys];
-				let count: usize = msg_send![keys, count];
-				(0..count)
-					.filter_map(|index| {
-						let key: *mut Object = msg_send![keys, objectAtIndex: index];
-						rust_string(key)
-					})
-					.collect()
-			}
+			store().dictionaryRepresentation().allKeys().iter().map(|key| key.to_string()).collect()
 		}
 	}
 }
@@ -127,11 +100,11 @@ mod icloud {
 /// What the sync timer remembers between ticks.
 pub struct SyncWatch {
 	/// The active book, its caret at the last tick, and since when the caret has been there.
-	caret: Option<(PathBuf, i64, Instant)>,
+	caret: Option<(PathBuf, DocPos, Instant)>,
 	front: Option<Instant>,
 	last_pull: Option<Instant>,
 	/// Each open book's length as sync last saw it, to notice a book parsed again.
-	lengths: BTreeMap<PathBuf, i64>,
+	lengths: BTreeMap<PathBuf, DocLen>,
 	/// Books with a saved place that sync has not seen yet, offered to the other devices one per
 	/// tick; `None` until the first tick lists them.
 	unseen: Option<Vec<String>>,
@@ -236,7 +209,7 @@ fn offer_one_saved_place(config: &ConfigManager, watch: &mut SyncWatch) {
 		let unseen: Vec<String> = config
 			.get_all_documents()
 			.into_iter()
-			.filter(|path| config.get_document_position(path) > 0 || !config.get_bookmarks(path).is_empty())
+			.filter(|path| config.get_document_position(path) > DocPos::ZERO || !config.get_bookmarks(path).is_empty())
 			.collect();
 		tracing::info!(books = unseen.len(), "offering saved places to sync");
 		unseen

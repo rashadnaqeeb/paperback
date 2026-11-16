@@ -1,6 +1,6 @@
-<!-- machine-translated from doc/readme.md (source-hash: cc466634600b58b4; sections: 84030068,db723a70,df2f4c18,e9b82d46,1387e8b7,3887c286,0ee39028,3a4c3efe,d3762a01,e9860ee8,80b9b9ca); please review and edit as needed -->
+<!-- machine-translated from doc/readme.md (source-hash: ba700ddfbaf3e99f; sections: 64167837,db723a70,df2f4c18,aa6b9ca2,1387e8b7,b8a00464,74f0c8e7,490ed50c,d3762a01,e9860ee8,15aeaaed); please review and edit as needed -->
 
-# Paperback - phiên bản 1.0
+# Paperback - phiên bản 1.1
 
 ## Giới thiệu
 
@@ -22,11 +22,11 @@ Paperback chạy trên Windows 10/11, tất cả các phiên bản ARM macOS hi�
 * Có thể chạy hoàn toàn di động hoặc cài đặt với liên kết tệp được thiết lập tự động.
 * Hỗ trợ một loạt lớn các định dạng tệp phổ biến.
 * Phát sách nói, với tốc độ có thể điều chỉnh và dấu trang ghi nhớ thời gian chính xác.
-* Đọc các trang PDF được quét bằng OCR tích hợp trong Windows và macOS.
+* Đọc các trang PDF được quét bằng OCR tích hợp trong Windows và macOS, hoặc bằng Tesseract trên Linux.
 * Dấu trang và ghi chú, để bạn có thể đánh dấu vị trí của mình và quay lại nó.
 * Mọi phím tắt bàn phím có thể được thay đổi.
 * Mở tài liệu trực tiếp từ các liên kết http và https, và tải xuống lại chúng khi bạn mở lại hoặc nhấn `F5`, giữ lại vị trí đọc và dấu trang của bạn. Khi khôi phục các tài liệu bạn đã mở, nó tải xuống lại những tài liệu từ các liên kết có kích thước 2 MB trở xuống.
-* Đi kèm với `pb`, một công cụ dòng lệnh chuyển đổi bất kỳ tài liệu được hỗ trợ nào thành HTML, Markdown hoặc văn bản thuần túy. Nó có thể nhận bao nhiêu tài liệu bạn cung cấp, tự động mở rộng `*.pdf` và các tệp tương tự để lệnh dòng lệnh tương tự hoạt động trên Windows, và có thể ghi một tệp trên mỗi tài liệu vào một thư mục. Nó cũng có thể đọc danh sách các tài liệu từ một tệp hoặc từ stdin với `--files-from`, và chuyển đổi các tài liệu trực tiếp từ các liên kết http và https.
+* Đi kèm với `pb`, một công cụ dòng lệnh chuyển đổi bất kỳ tài liệu được hỗ trợ nào thành HTML, Markdown hoặc văn bản thuần túy. Nó có thể nhận bao nhiêu tài liệu bạn cung cấp, tự động mở rộng `*.pdf` và các tệp tương tự để lệnh dòng lệnh tương tự hoạt động trên Windows, và có thể ghi một tệp trên mỗi tài liệu vào một thư mục, chuyển đổi nhiều tài liệu cùng một lúc (`--jobs` xác định số lượng). Nó cũng có thể đọc danh sách các tài liệu từ một tệp hoặc từ stdin với `--files-from`, và chuyển đổi các tài liệu trực tiếp từ các liên kết http và https.
 
 ## Khả năng Tương thích với Trình Đọc Màn hình
 
@@ -48,11 +48,14 @@ Nếu JAWS không nói gì khi bạn nhấn một phím mà nó sẽ báo cáo �
 
 Paperback hỗ trợ các định dạng và phần mở rộng sau:
 
-* Lưu trữ sách truyện tranh (`.cbz`)
+* Tệp Braille Sẵn sàng và sách Portable Embosser Format, được dịch ngược lại thành bản in với bảng braille bạn chọn (`.brf`, `.pef`)
+* Lưu trữ sách truyện tranh (`.cbz`, `.cbr`)
 * Tệp trợ giúp CHM (`.chm`)
 * Sách DAISY (`.opf`, `.zip`)
-* Sách EPUB (`.epub`)
+* Sách eBraille, được đọc bản in khi chúng bao gồm nó, và ngược lại được dịch ngược với mã braille mà chúng đặt tên (`.ebrl`, hoặc `.opf` của sách không được nén)
+* Sách EPUB (`.epub`, hoặc `.opf` của sách không được nén)
 * Sách điện tử FB2 (`.fb2`)
+* Hướng dẫn GNU Info (`.info`, có nén gzip hoặc không, và các hướng dẫn tách được mở từ bất kỳ phần nào của chúng)
 * Tài liệu HTML (`.htm`, `.html`, `.xhtml`)
 * Các trang hướng dẫn, cả `man` và BSD `mdoc` (`.1` đến `.9`, `.man`, `.roff` và các dạng nén gzip của mỗi trang)
 * Tài liệu Markdown (`.md`, `.markdown`, `.mdx`, `.mdown`, `.mdwn`, `.mkd`, `.mkdn`, `.mkdown`, `.ronn`)
@@ -62,12 +65,15 @@ Paperback hỗ trợ các định dạng và phần mở rộng sau:
 * Sách nói MP3 (`.mp3`)
 * Trình chiếu OpenDocument (`.odp`, `.fodp`)
 * Tệp văn bản OpenDocument (`.odt`, `.fodt`)
+* Tệp trợ giúp và sách OS/2, cùng với hình ảnh của chúng (`.inf`, `.hlp`)
 * Tài liệu PDF (`.pdf`)
 * Trình chiếu PowerPoint (`.pptx`, `.pptm`, `.ppt`)
+* Lưu trữ RAR của sách, được mở như zip, với danh sách để chọn khi một tệp chứa nhiều sách (`.rar`)
 * Tài liệu reStructuredText (`.rst`, `.rest`)
 * Tài liệu RTF (`.rtf`)
 * Tài liệu Windows Write (`.wri`)
 * Tệp WinHelp (`.hlp`)
+* Tài liệu XPS và OpenXPS (`.xps`, `.oxps`)
 * Tệp văn bản thuần túy và tệp nhật ký (`.txt`, `.log`)
 
 ## Phím tắt bàn phím
@@ -75,6 +81,8 @@ Paperback hỗ trợ các định dạng và phần mở rộng sau:
 Paperback được thiết kế để sử dụng với bàn phím trước tiên. Dưới đây là các phím tắt hiện tại.
 
 Các phím tắt dưới đây là cho Windows. Nơi macOS khác, phím tương đương được ghi chú trong dấu ngoặc — chủ yếu vì Ctrl+G, Ctrl+W, và Alt+Left/Right đã bị chiếm bởi các quy ước hệ thống hoặc ứng dụng khác trên nền tảng đó.
+
+Các phím tắt dấu câu được đặt tên theo các phím của bàn phím US. Trên bàn phím khác, nhấn phím ở cùng một vị trí, bất kể nó được ghi nhãn là gì: trên bàn phím Hungary, phím được ghi nhãn `é` hoạt động như `;` và phím được ghi nhãn `á` như `'`, vì vậy `Ctrl+'` có nghĩa là Ctrl và phím `á`. Các menu vẫn hiển thị tên US. Trên macOS, các menu sẽ hiển thị các phím mà bàn phím của bạn sử dụng thay vào đó.
 
 ### Menu Tệp
 
@@ -86,6 +94,7 @@ Các phím tắt dưới đây là cho Windows. Nơi macOS khác, phím tương 
 * `Ctrl+R`: Hiển thị hộp thoại "Tất cả tài liệu" (từ Tài liệu gần đây).
 * `Ctrl+Shift+C`: Mở thư mục chứa.
 * `Ctrl+Shift+E`: Xuất dữ liệu tài liệu (`.paperback`).
+* `Ctrl+Alt+E`: Xuất dấu trang và ghi chú dưới dạng tệp văn bản hoặc HTML có thể đọc được.
 * `Ctrl+Shift+I`: Nhập dữ liệu tài liệu (`.paperback`).
 * `Ctrl+E`: Xuất tài liệu hiện tại sang văn bản thuần.
 * `Ctrl+Q`: Thoát (chỉ Windows; trên macOS điều này nằm trong menu ứng dụng thay vào đó).
@@ -103,7 +112,7 @@ Các phím tắt dưới đây là cho Windows. Nơi macOS khác, phím tương 
 
 * `F5`: Đọc lại tài liệu hiện tại từ đĩa, hoặc tải lại nếu nó được mở từ một liên kết. Hoạt động cho dù "Tự động tải lại các tài liệu đã thay đổi" có được bật trong Cài đặt hay không.
 * `Ctrl+Alt+W`: Bật/tắt tự động ngắt dòng.
-* `F11` (macOS: `RawCtrl+Ctrl+F`, tức là Control+Command+F): Bật/tắt toàn màn hình.
+* `F11` (macOS: `Control+Cmd+F`, tức là Control+Command+F): Bật/tắt toàn màn hình.
 * `Ctrl+Shift+V`: Mở nội dung hiện tại trong Chế độ xem web.
 * `Ctrl+U`: Xem nguồn tài liệu trong một tab mới.
 
@@ -114,7 +123,7 @@ Các phím tắt dưới đây là cho Windows. Nơi macOS khác, phím tương 
 * `Ctrl+G` (macOS: `Cmd+L`): Đi đến dòng.
 * `Ctrl+Shift+G` (macOS: `Cmd+Shift+L`): Đi đến phần trăm.
 * `Ctrl+P`: Đi đến trang (khi được tài liệu hiện tại hỗ trợ).
-* `=`: Thông báo phần trăm đọc hiện tại của bạn và trang, ví dụ: "15%, trang 30". Trang bị bỏ qua đối với các tài liệu không có số trang.
+* `=`: Thông báo phần trăm đọc hiện tại của bạn và trang, ví dụ: "15%, trang 30". Trang bị bỏ qua đối với các tài liệu không có số trang. Trong một cuốn sách âm thanh, bạn đã tiến bao xa và nó chạy bao lâu sẽ đến sau, ví dụ: "15%, 1:02:03 của 10:30:00".
 * `Alt+Left` (macOS: `Cmd+[`): Quay lại trong lịch sử điều hướng.
 * `Alt+Right` (macOS: `Cmd+]`): Tiến lên trong lịch sử điều hướng.
 * `[`: Phần trước.
@@ -152,7 +161,7 @@ Các phím tắt dưới đây là cho Windows. Nơi macOS khác, phím tương 
 * `B`: Dấu trang tiếp theo.
 * `Shift+N`: Ghi chú trước.
 * `N`: Ghi chú tiếp theo.
-* `Ctrl+Shift+W` (macOS: `RawCtrl+Shift+W`, tức là phím Control vật lý chứ không phải Cmd): Xem văn bản ghi chú ở vị trí hiện tại.
+* `Ctrl+Shift+W` (macOS: `Control+Shift+W`, tức là phím Control vật lý chứ không phải Cmd): Xem văn bản ghi chú ở vị trí hiện tại.
 * `Ctrl+B`: Nhảy đến tất cả dấu trang và ghi chú.
 * `Ctrl+Alt+B`: Nhảy đến dấu trang chỉ.
 * `Ctrl+Alt+M`: Nhảy đến ghi chú chỉ.
@@ -161,7 +170,9 @@ Các phím tắt dưới đây là cho Windows. Nơi macOS khác, phím tương 
 
 ### Menu Âm Thanh
 
-* `Ctrl+Space` (macOS: `RawCtrl+Space`, tức là phím Control vật lý, vì Cmd+Space mở Spotlight): Phát/tạm dừng kể chuyện âm thanh.
+* `Ctrl+Space` (macOS: `Control+Space`, tức là phím Control vật lý, vì Cmd+Space mở Spotlight): Phát/tạm dừng kể chuyện âm thanh.
+* `Ctrl+J`: Đi tới một thời điểm trong bản ghi âm. Nhập dưới dạng `1:23:45`, `23:45` hoặc `45` giây, hoặc đặt `+` hoặc `-` ở phía trước để di chuyển từ nơi bạn đang ở, ví dụ: `+5:00`. Hộp thoại hiển thị bạn đã tiến bao xa và cuốn sách chạy bao lâu.
+* `Shift+=`: Nói bạn đã tiến bao xa vào chương này và còn lại bao nhiêu, ví dụ: "Chương 3, 4:10 của 12:00, 7:50 còn lại".
 * `'`: Tìm kiếm kể chuyện âm thanh về phía trước.
 * `;`: Tìm kiếm kể chuyện âm thanh về phía sau.
 * `Shift+'`: Tăng lượng tìm kiếm âm thanh.
@@ -173,9 +184,10 @@ Các phím tắt dưới đây là cho Windows. Nơi macOS khác, phím tương 
 
 ### Menu Công Cụ
 
-* `Ctrl+W` (macOS: `RawCtrl+W`, tức là phím Control vật lý chứ không phải Cmd): Hiển thị số từ cho tài liệu hiện tại.
+* `Ctrl+W` (macOS: `Control+W`, tức là phím Control vật lý chứ không phải Cmd): Hiển thị số từ cho tài liệu hiện tại.
 * `Ctrl+I`: Hiển thị thông tin tài liệu.
 * `Ctrl+Shift+O`: Nhận diện một loạt các trang PDF được quét bằng OCR.
+* `Ctrl+Shift+R`: Nhận diện trang PDF hoặc truyện tranh mà con trỏ đang ở bằng OCR, thay thế bất kỳ văn bản nào nó đã có.
 * `Ctrl+Shift+S`: Bật/tắt bộ hẹn giờ ngủ.
 * `Ctrl+,`: Mở Cài đặt (macOS: trong menu ứng dụng).
 
@@ -194,7 +206,8 @@ Các phím tắt dưới đây là cho Windows. Nơi macOS khác, phím tương 
 * `Ctrl+Tab` và `Ctrl+Shift+Tab`: Đi đến tài liệu đang mở tiếp theo hoặc trước đó, quấn quanh ở một trong hai đầu.
 * `Enter` hoặc `Space` trong văn bản tài liệu: Theo dõi liên kết hoặc mở chế độ xem bảng hoặc công thức ở con trỏ.
 * `Enter` trên trang PDF được quét: Nhận diện trang bằng OCR.
-* `Shift+F10` hoặc phím Menu/Ứng dụng trong văn bản tài liệu: Mở menu ngữ cảnh. Trên một hình ảnh trong EPUB, HTML, Markdown, CHM, FB2 hoặc truyện tranh, nó cũng cung cấp lựa chọn để lưu hình ảnh vào một tệp.
+* `Enter` trên một hình ảnh không phải là liên kết: Hiển thị văn bản được nhận diện trong hình ảnh, trong một chế độ xem mà `Escape` đóng. Hình ảnh chính nó được để yên, và văn bản của tài liệu không thay đổi.
+* `Shift+F10` hoặc phím Menu/Ứng dụng trong văn bản tài liệu: Mở menu ngữ cảnh. Trên một hình ảnh trong PDF, EPUB, HTML, Markdown, CHM, FB2 hoặc truyện tranh, nó cũng cung cấp lựa chọn để lưu hình ảnh vào một tệp, và trên Windows và macOS để đọc văn bản trong đó, đó là cách đọc một hình ảnh cũng là liên kết.
 
 ## iOS và Android
 
@@ -233,7 +246,7 @@ Menu More Options là nơi mọi thứ khác nằm. Một số mục hoạt đ�
 * **Go To:** nhảy tới một dòng, một trang hoặc một phần trăm trong tài liệu. Chọn cái nào bằng Bộ chọn Mode.
 * **Recent Documents:** mọi tài liệu bạn đã mở, mỗi tài liệu được đánh dấu là hiện đang mở, đã đóng hoặc tệp bị thiếu. Mỗi tài liệu có hai hành động của trình đọc màn hình: Remove loại bỏ nó khỏi danh sách và Locate cho phép bạn tìm tài liệu có tệp đã được di chuyển. Clear Recent Documents làm trống danh sách mà không xóa bất kỳ tài liệu nào.
 * **Word Count:** số từ trong tài liệu.
-* **Document Info:** tiêu đề, tác giả, tên tệp và trên iOS cũng là số dòng và ký tự.
+* **Thông tin tài liệu:** tiêu đề, tác giả, tên tệp, tiến độ của bạn trong tài liệu và số từ, dòng và ký tự. Đối với sách âm thanh, nó cũng cho biết có bao nhiêu tệp và, khi Paperback có thể xác định, chúng chạy bao lâu tổng cộng và trung bình.
 * **Export:** lưu tài liệu dưới dạng văn bản thuần túy, HTML hoặc Markdown.
 * **Sleep Timer:** dừng đọc sau 5, 10, 15, 30, 45 hoặc 60 phút, hoặc một thời gian của riêng bạn. Mở nó lại khi nó đang chạy để xem còn bao lâu hoặc để hủy nó.
 * **Help:** mở readme này.
@@ -301,6 +314,132 @@ Lưu ý: Tôi coi một nhà tài trợ GitHub công khai là căn cứ để t�
 * Tyler Rodick
 
 ## Nhật ký thay đổi
+
+### Phiên bản 1.1
+
+1.1 mang đến một công cụ PDF mới, chế độ văn bản iOS được xây dựng lại, OCR trên Linux, tài liệu từ liên kết, hỗ trợ cho hàng chục năm các tệp Word, Write và PowerPoint cũ hơn, và nhiều hơn nữa.
+
+#### Được thêm
+
+##### Chung
+* Một bản dịch tiếng Hungary và hướng dẫn người dùng.
+* Mở một tài liệu từ liên kết, trên mọi nền tảng. `F5` tải xuống nó lại.
+* `F5` tải lại tài liệu.
+* `Ctrl+1` đến `Ctrl+9` nhảy đến chín tài liệu đầu tiên đang mở của bạn.
+* `Ctrl+Tab` và `Ctrl+Shift+Tab` chuyển đổi tài liệu trên macOS và Linux.
+* Hộp thoại Mở và Tất cả tài liệu mở mọi tài liệu bạn chọn, mỗi cái trong tab riêng của nó.
+* Lưu hình ảnh từ menu bối cảnh.
+* Xuất dấu trang và ghi chú dưới dạng văn bản hoặc HTML.
+* Cài đặt cho mức nhật ký và cho dù Tìm kiếm có chọn kết quả khớp của nó.
+* Phím tắt cửa sổ có thể là bất kỳ phím nào, được đặt trên tab Toàn hệ thống mới của Tùy chỉnh Phím tắt.
+* Sao chép cho biết nó sao chép bao nhiêu, và văn bản vẫn ở trên clipboard sau khi Paperback đóng.
+* Mỗi mục menu có khóa truy cập riêng của nó trong mọi ngôn ngữ.
+* Một tệp zip không đọc được mở dưới dạng danh sách các tài liệu bên trong.
+
+##### Định dạng mới
+* Word cho Windows 1 và 2, Word cho DOS, Word cho Mac 4 và 5, và các phiên bản Unicode của Word 6 và 95.
+* PowerPoint 95.
+* FictionBook được nén (`.fb2.zip`).
+* Sách DAISY 3 chỉ là DTBook trong zip hoặc chỉ âm thanh.
+
+##### OCR
+* OCR trên Linux, thông qua Tesseract.
+* Nhận dạng trang hiện tại (`Ctrl+Shift+R`) đọc lại trang bạn đang ở, ngay cả khi nó có văn bản.
+* `Enter` trên hình ảnh đọc văn bản của nó.
+* Văn bản được nhận dạng tuân theo bố cục trang và được ghi nhớ, vì vậy tài liệu được quét mở cùng với văn bản của nó.
+* Hàng loạt OCR có thể redo các trang có văn bản, đọc nhiều trang cùng một lúc và dừng lại khi bạn đóng tài liệu.
+
+##### Sách nói
+* Tốc độ lên đến 4x ở mọi nơi, được ghi nhớ trong các phiên.
+* Kiểm soát âm lượng.
+
+##### Tài liệu PDF
+* Một công cụ PDF mới: nhanh hơn, sử dụng mọi lõi CPU và không cần thư viện pdfium.
+* Các tiêu đề được tìm thấy trong các trang không được gắn thẻ và tiêu đề tốt hơn.
+* Một cài đặt để giữ lại đầu trang và chân trang lặp lại.
+
+##### Tài liệu khác
+* Word: danh sách được đánh số và có dấu đầu dòng, ghi chú cuối trang, ghi chú cuối, bình luận, văn bản thay thế hình ảnh, điều hướng danh sách và các trang của Word.
+* OpenDocument: ghi chú cuối trang và bình luận sau văn bản.
+* Tiêu đề và tác giả từ siêu dữ liệu của tài liệu trong Word, PowerPoint, OpenDocument, RTF, Markdown và reStructuredText.
+* Truyện tranh: tiêu đề, nhà văn, loại trang và dấu trang từ ComicInfo.xml.
+* FB2: tiêu đề, mục lục và các dòng thơ riêng biệt.
+* Hình ảnh trong sách MOBI, KF8 và DAISY được nén có thể được lưu và đọc bằng OCR.
+* Toán học được phân định bằng dấu đô la trong Markdown.
+* Các chỉ thị Sphinx trong reStructuredText.
+* Hình ảnh không có mô tả hiển thị dưới dạng [Image].
+
+##### iOS và Android
+* Một dòng Ngôn ngữ trong Cài đặt.
+* Thông tin tài liệu hiển thị tiến độ của bạn và số tệp cũng như thời gian chạy của sách nói.
+* Chế độ văn bản được ghi nhớ.
+* Tiếp tục đọc liên tục sau khi Tìm kiếm.
+* iOS: chế độ văn bản được xây dựng lại cho VoiceOver. Đọc tất cả đi qua toàn bộ cuốn sách, các rotor tiếp cận tất cả, danh sách và bảng là danh sách và bảng thực, ba ngón tay lướt quay trang, và ba ngón tay chạm cung cấp trang và phần trăm.
+* iOS: giọng nói, tốc độ và cao độ cho mỗi cuốn sách, từ Phát biểu cho Cuốn sách này.
+* iOS: tài liệu được bảo vệ bằng mật khẩu.
+* iOS: chia sẻ sách DAISY được nén và sách nói MP3 với Paperback.
+* iOS: bộ định thời ngủ dừng sách nói.
+* iOS: tiếng Slovakia và tiếng Ukraina.
+* Android: thay đổi tốc độ và cao độ áp dụng cho đoạn văn được đọc và hoạt động với công cụ mặc định của hệ thống.
+* Android: chạy trên các thiết bị x86_64.
+
+##### macOS
+* Một ứng dụng phổ quát, gốc trên Intel và Apple silicon.
+* pb được bao gồm trong ứng dụng.
+
+##### pb
+* Chuyển đổi theo trang, toàn bộ thư mục, danh sách tệp (`--files-from`) hoặc liên kết.
+
+#### Đã thay đổi
+* Thanh menu được tổ chức lại thành tám menu.
+* Thanh trạng thái nói "Tiến độ" thay vì "Đọc".
+* Các lệnh menu thông báo những gì chúng làm, thay vì bị chìm khi menu đóng.
+* Cập nhật đóng Paperback bình thường và đưa nó trở lại phía trước.
+* Các tệp văn bản khổng lồ mở với một phần bộ nhớ, và giới hạn 4 GB đã biến mất.
+* Chuyển đổi MOBI, Word và HTML, Tìm tất cả và Tìm kiếm tất cả tài liệu nhanh hơn.
+* Tệp thực thi Windows nhỏ hơn 3 MB.
+
+#### Đã sửa lỗi
+
+##### Chung
+* Các phím tắt dấu chấm trên bố cục bàn phím cần Shift cho chúng; Tùy chỉnh Phím tắt cờ bất kỳ cách nào bố cục của bạn không thể gõ.
+* Tiêu điểm quay trở lại tài liệu sau `Win+D`.
+* Sự cố mở dấu trang cho tài liệu mới, trong Tìm tất cả và trên một số tệp MOBI bị hỏng.
+* Regex Tìm kiếm chọn toàn bộ kết quả trùng khớp.
+* Thanh trạng thái của sách nói không còn lật lọng giữa tiến độ âm thanh và văn bản.
+* Số từ bao gồm văn bản được đọc bằng OCR.
+* Các trang được quét không còn thông báo hình ảnh của riêng chúng.
+* Tùy chọn PATH của bộ cài đặt.
+* Cập nhật Linux tìm các bản tải xuống của chúng và AppImage cập nhật dưới dạng AppImage.
+* Dòng bình luận trong các tệp Word và OpenDocument được dịch.
+
+##### Tài liệu
+* Tệp Windows Write được mở dưới dạng tệp nhị phân.
+* PDF: văn bản lặp lại tại ngắt trang trong PDF được gắn thẻ, cột thứ hai đọc trước tiên, khoảng trắng bị mất và dấu gạch ngang ở cuối dòng, văn bản trong phông chữ Loại 3 và các chữ số nội dung.
+* RTF: kết thúc dòng CR trần, danh sách có dấu gạch ngang, văn bản trước đoạn đầu tiên, văn bản có dấu và CJK, văn bản bị mất sau dấu gạch chéo thoát, và RTF được lưu dưới dạng `.doc`.
+* Tệp Word và PowerPoint có vùng chứa bị hỏng mà Word vẫn mở.
+* Văn bản Word trong các thay đổi được theo dõi, trường và ô bảng.
+* Liên kết PowerPoint, slide không có văn bản và emoji.
+* `<` và `&` trong ô bảng Word, PowerPoint và OpenDocument.
+* Tệp OpenDocument được bảo vệ bằng mật khẩu từ LibreOffice hiện tại.
+* Tệp CHM trong trang mã của chúng và tệp HTML và DAISY trong mã hóa được khai báo.
+* Sách DAISY được nén có tham chiếu sử dụng trường hợp sai và sách DAISY 2.02 chỉ đọc cụm từ đầu tiên của phần.
+* Các trang hướng dẫn được chuyển hướng bằng `.so`.
+* Vật liệu trước Markdown được đọc dưới dạng văn bản.
+
+##### macOS
+* Điều hướng bắt đầu dòng, kích hoạt bàn phím và thông báo sao chép.
+* Lệnh menu bối cảnh của VoiceOver mở cái của Paperback.
+* Các phím tắt menu không còn được thông báo qua những gì chúng làm.
+
+##### iOS và Android
+* iOS: khởi chạy không còn bị giết khi khôi phục các cuốn sách lớn.
+* iOS: mở lại trên tab bạn đang đọc, đóng tab không còn đọc cuốn sách trước và Tài liệu gần đây giữ thứ tự của chúng.
+* iOS: sách nói không còn được trích xuất lại ở mỗi lần khởi chạy.
+* iOS: các quy tắc regex từ điển lời nói lấy `\1`.
+* Android: đọc to từ tài liệu được bảo vệ bằng mật khẩu.
+* Android: Trước ở đầu không còn đọc lại đoạn đầu tiên và chế độ văn bản không còn khóa cuộn của nó.
+* Android: sử dụng pin ít hơn khi đọc và tạm dừng.
 
 ### Phiên bản 1.0
 

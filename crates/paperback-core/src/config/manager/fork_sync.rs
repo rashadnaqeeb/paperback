@@ -6,11 +6,10 @@
 //! on every device whatever its path. Position and bookmarks carry their own save times and the
 //! newest of each wins, so reading on one device never undoes a bookmark added on another.
 //!
-//! Positions in the store are in shared units rather than the local config's display units. The
-//! Mac counts UTF-16 code units where the iPhone counts characters, and the Mac renders tables as
-//! their text where the iPhone leaves a one-line placeholder, so the same place has different
-//! offsets on the two. Shared units count characters with every table as one, which both buffers
-//! agree on. A book whose two buffers still differ in length (a different engine version, say)
+//! Positions in the store are in shared units rather than the local config's positions. The Mac
+//! renders tables as their text where the iPhone leaves a one-line placeholder, so the same place
+//! has different positions on the two. Shared units count characters with every table as one,
+//! which both buffers agree on. A book whose two buffers still differ in length (a different engine version, say)
 //! has its positions scaled, which lands near the right place rather than drifting from the start.
 //!
 //! The device's value is written from [`ConfigManager::flush`], so every save the apps already
@@ -28,8 +27,7 @@ use serde::{Deserialize, Serialize};
 use super::ConfigManager;
 use crate::{
 	config::settings::StoredBookmark,
-	document::{Document, MarkerType},
-	util::text::ch_width,
+	document::{DocPos, Document, MarkerType},
 };
 
 /// Where the devices' sync state is kept, given by the app. Both apps give Apple's iCloud key-value
@@ -101,13 +99,9 @@ struct SyncBookmark {
 	note: String,
 }
 
-/// Converts a book's local display offsets to shared units and back.
+/// Converts a book's local positions to shared units and back.
 struct SharedUnits {
-	/// Character offsets of the characters wider than one display unit, and the display offset of
-	/// each. Empty where display units are characters.
-	wide_chars: Vec<usize>,
-	wide_display: Vec<usize>,
-	/// Tables as character ranges, in order, without overlaps.
+	/// Tables as position ranges, in order, without overlaps.
 	tables: Vec<(usize, usize)>,
 	chars: usize,
 	length: u64,
@@ -116,19 +110,11 @@ struct SharedUnits {
 impl SharedUnits {
 	fn new(doc: &Document) -> Self {
 		let buffer = &doc.buffer;
-		let wide_chars: Vec<usize> =
-			buffer.content.chars().enumerate().filter(|(_, ch)| ch_width(*ch) > 1).map(|(index, _)| index).collect();
-		let wide_display = wide_chars.iter().enumerate().map(|(count, index)| index + count).collect();
 		let mut ranges: Vec<(usize, usize)> = buffer
 			.markers
 			.iter()
-			.filter(|marker| marker.mtype == MarkerType::Table && marker.length > 0)
-			.map(|marker| {
-				(
-					buffer.char_index_for_display(marker.position),
-					buffer.char_index_for_display(marker.position + marker.length),
-				)
-			})
+			.filter(|marker| marker.mtype == MarkerType::Table && !marker.length.is_zero())
+			.map(|marker| (marker.position.get(), (marker.position + marker.length).get()))
 			.collect();
 		ranges.sort_unstable();
 		let mut tables: Vec<(usize, usize)> = Vec::new();
@@ -138,16 +124,14 @@ impl SharedUnits {
 				_ => tables.push((start, end)),
 			}
 		}
-		let chars = buffer.content.chars().count();
+		let chars = buffer.len().get();
 		let removed: usize = tables.iter().map(|(start, end)| end - start - 1).sum();
 		let length = (chars - removed) as u64;
-		Self { wide_chars, wide_display, tables, chars, length }
+		Self { tables, chars, length }
 	}
 
-	fn to_shared(&self, display: i64) -> u64 {
-		let display = usize::try_from(display.max(0)).unwrap_or(0);
-		let wide_before = self.wide_display.partition_point(|&offset| offset < display);
-		let ch = (display - wide_before).min(self.chars);
+	fn to_shared(&self, local: DocPos) -> u64 {
+		let ch = local.get().min(self.chars);
 		let mut removed = 0;
 		for &(start, end) in &self.tables {
 			if ch >= end {
@@ -161,7 +145,7 @@ impl SharedUnits {
 		(ch - removed) as u64
 	}
 
-	fn to_display(&self, shared: u64) -> i64 {
+	fn to_local(&self, shared: u64) -> DocPos {
 		let shared = usize::try_from(shared).unwrap_or(usize::MAX);
 		let mut removed = 0;
 		let mut ch = None;
@@ -173,17 +157,16 @@ impl SharedUnits {
 			}
 			removed += end - start - 1;
 		}
-		let ch = ch.unwrap_or_else(|| shared.saturating_add(removed)).min(self.chars);
-		i64::try_from(ch + self.wide_chars.partition_point(|&index| index < ch)).unwrap_or(i64::MAX)
+		DocPos::from_raw(ch.unwrap_or_else(|| shared.saturating_add(removed)).min(self.chars))
 	}
 
 	/// `shared` from a device whose copy of the book is `from_length` long, in this copy's units.
-	fn to_display_from(&self, shared: u64, from_length: u64) -> i64 {
+	fn to_local_from(&self, shared: u64, from_length: u64) -> DocPos {
 		if from_length == 0 || from_length == self.length {
-			return self.to_display(shared);
+			return self.to_local(shared);
 		}
 		let scaled = u128::from(shared) * u128::from(self.length) / u128::from(from_length);
-		self.to_display(u64::try_from(scaled).unwrap_or(u64::MAX))
+		self.to_local(u64::try_from(scaled).unwrap_or(u64::MAX))
 	}
 
 	fn bookmarks_to_shared(&self, bookmarks: &[StoredBookmark]) -> Vec<SyncBookmark> {
@@ -265,7 +248,7 @@ impl ConfigManager {
 
 	/// Takes anything newer from other devices for the books open this run, for when the app comes
 	/// back to the front. Returns each book whose position moved, with where it moved to.
-	pub fn sync_pull(&self) -> Vec<(String, i64)> {
+	pub fn sync_pull(&self) -> Vec<(String, DocPos)> {
 		if !self.initialized || self.sync.borrow().store.is_none() {
 			return Vec::new();
 		}
@@ -336,7 +319,7 @@ impl ConfigManager {
 		Entry {
 			name: Path::new(path).file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default(),
 			length: units.length,
-			position: units.to_shared(doc.map_or(0, |doc| doc.last_position)),
+			position: units.to_shared(doc.map_or(DocPos::ZERO, |doc| doc.last_position)),
 			position_saved: 0,
 			bookmarks_saved: 0,
 			bookmarks: doc.map(|doc| units.bookmarks_to_shared(&doc.bookmarks)).unwrap_or_default(),
@@ -404,7 +387,7 @@ impl ConfigManager {
 	/// Applies the newest position and the newest bookmarks another device has for `key` where they
 	/// are newer than this device's. Returns whether anything was taken, and the new local
 	/// position if it moved.
-	fn take_newer(&self, key: &str, others: &[SyncFile]) -> (bool, Option<i64>) {
+	fn take_newer(&self, key: &str, others: &[SyncFile]) -> (bool, Option<DocPos>) {
 		let own = {
 			let mut guard = self.sync.borrow_mut();
 			let sync = &mut *guard;
@@ -430,7 +413,7 @@ impl ConfigManager {
 	/// units, and makes this device's entry say what it now holds with the save times of what it
 	/// took. Otherwise the next flush would see a change and stamp it as new. Returns the new
 	/// position if it moved.
-	fn apply(&self, key: &str, position: Option<&Entry>, bookmarks: Option<&Entry>) -> Option<i64> {
+	fn apply(&self, key: &str, position: Option<&Entry>, bookmarks: Option<&Entry>) -> Option<DocPos> {
 		let mut guard = self.sync.borrow_mut();
 		let sync = &mut *guard;
 		let book = sync.open.get(key)?;
@@ -440,7 +423,7 @@ impl ConfigManager {
 			let mut data = self.data.borrow_mut();
 			let doc = Self::doc_entry_mut(&mut data, key.to_string(), &book.path);
 			if let Some(remote) = position {
-				let local = units.to_display_from(remote.position, remote.length);
+				let local = units.to_local_from(remote.position, remote.length);
 				if local != doc.last_position {
 					doc.last_position = local;
 					moved = Some(local);
@@ -449,8 +432,8 @@ impl ConfigManager {
 			if let Some(remote) = bookmarks {
 				doc.bookmarks.retain(|bookmark| bookmark.audio_ms.is_some());
 				doc.bookmarks.extend(remote.bookmarks.iter().map(|bookmark| StoredBookmark {
-					start: units.to_display_from(bookmark.start, remote.length),
-					end: units.to_display_from(bookmark.end, remote.length),
+					start: units.to_local_from(bookmark.start, remote.length),
+					end: units.to_local_from(bookmark.end, remote.length),
 					note: bookmark.note.clone(),
 					audio_ms: None,
 				}));
@@ -492,12 +475,15 @@ mod tests {
 		util::test_support::TempDir,
 	};
 
+	fn at(position: usize) -> DocPos {
+		DocPos::from_raw(position)
+	}
+
 	fn doc(content: &str, tables: &[(usize, usize)]) -> Document {
 		let mut buffer = DocumentBuffer::with_content(content.to_string());
 		for &(start, end) in tables {
-			let position = buffer.display_index_for_char(start);
-			let mut marker = Marker::new(MarkerType::Table, position);
-			marker.length = buffer.display_index_for_char(end) - position;
+			let mut marker = Marker::new(MarkerType::Table, at(start));
+			marker.length = at(end) - at(start);
 			buffer.add_marker(marker);
 		}
 		let mut doc = Document::new();
@@ -545,12 +531,12 @@ mod tests {
 		let doc = doc("Intro\nA\tB\nC\tD\nAfter\n", &[(6, 13)]);
 		let units = SharedUnits::new(&doc);
 		assert_eq!(units.length, 20 - 7 + 1);
-		assert_eq!(units.to_shared(3), 3);
-		assert_eq!(units.to_shared(6), 6);
-		assert_eq!(units.to_shared(9), 6);
-		assert_eq!(units.to_shared(14), 8);
-		assert_eq!(units.to_display(6), 6);
-		assert_eq!(units.to_display(8), 14);
+		assert_eq!(units.to_shared(DocPos::from_raw(3)), 3);
+		assert_eq!(units.to_shared(DocPos::from_raw(6)), 6);
+		assert_eq!(units.to_shared(DocPos::from_raw(9)), 6);
+		assert_eq!(units.to_shared(DocPos::from_raw(14)), 8);
+		assert_eq!(units.to_local(6), DocPos::from_raw(6));
+		assert_eq!(units.to_local(8), DocPos::from_raw(14));
 	}
 
 	#[test]
@@ -560,25 +546,16 @@ mod tests {
 		let inline = SharedUnits::new(&inline);
 		let placeholder = SharedUnits::new(&placeholder);
 		assert_eq!(inline.length, placeholder.length);
-		let after_inline = 14;
-		let after_placeholder = 19;
+		let after_inline = DocPos::from_raw(14);
+		let after_placeholder = DocPos::from_raw(19);
 		assert_eq!(inline.to_shared(after_inline), placeholder.to_shared(after_placeholder));
-		assert_eq!(placeholder.to_display(inline.to_shared(after_inline)), after_placeholder);
-	}
-
-	#[test]
-	fn characters_wider_than_one_display_unit_are_counted_once() {
-		let doc = doc("a\u{1F600}b\nnext\n", &[]);
-		let units = SharedUnits::new(&doc);
-		let next = doc.buffer.display_index_for_char(4);
-		assert_eq!(units.to_shared(i64::try_from(next).unwrap()), 4);
-		assert_eq!(units.to_display(4), i64::try_from(next).unwrap());
+		assert_eq!(placeholder.to_local(inline.to_shared(after_inline)), after_placeholder);
 	}
 
 	#[test]
 	fn a_book_of_another_length_has_its_position_scaled() {
 		let units = SharedUnits::new(&doc(&"x".repeat(1000), &[]));
-		assert_eq!(units.to_display_from(250, 500), 500);
+		assert_eq!(units.to_local_from(250, 500), 500);
 	}
 
 	#[test]
@@ -590,18 +567,18 @@ mod tests {
 		let mac = device(&store, "mac");
 		let phone = device(&store, "iphone");
 		mac.sync_open(&a, &book);
-		mac.set_document_position(&a, 17);
-		mac.add_bookmark(&a, 35, 35, "Third");
+		mac.set_document_position(&a, at(17));
+		mac.add_bookmark(&a, at(35), at(35), "Third");
 		mac.flush();
 		tick();
 		assert!(phone.sync_open(&b, &book));
-		assert_eq!(phone.get_document_position(&b), 17);
+		assert_eq!(phone.get_document_position(&b), at(17));
 		assert_eq!(phone.get_bookmarks(&b)[0].note, "Third");
-		phone.set_document_position(&b, 35);
-		phone.remove_bookmark(&b, 35, 35);
+		phone.set_document_position(&b, at(35));
+		phone.remove_bookmark(&b, at(35), at(35));
 		phone.flush();
 		tick();
-		assert_eq!(mac.sync_pull(), vec![(a.clone(), 35)]);
+		assert_eq!(mac.sync_pull(), vec![(a.clone(), at(35))]);
 		assert!(mac.get_bookmarks(&a).is_empty(), "a deleted bookmark stays deleted");
 	}
 
@@ -614,7 +591,7 @@ mod tests {
 		let mac = device(&store, "mac");
 		let phone = device(&store, "iphone");
 		mac.sync_open(&a, &book);
-		mac.set_document_position(&a, 5);
+		mac.set_document_position(&a, at(5));
 		mac.flush();
 		tick();
 		phone.sync_open(&b, &book);
@@ -636,15 +613,15 @@ mod tests {
 		let phone = device(&store, "iphone");
 		mac.sync_open(&a, &book);
 		phone.sync_open(&b, &book);
-		mac.add_bookmark(&a, 5, 5, "");
+		mac.add_bookmark(&a, at(5), at(5), "");
 		mac.flush();
 		tick();
-		phone.set_document_position(&b, 10);
+		phone.set_document_position(&b, at(10));
 		phone.flush();
 		tick();
 		mac.sync_pull();
 		phone.sync_pull();
-		assert_eq!(mac.get_document_position(&a), 10);
+		assert_eq!(mac.get_document_position(&a), at(10));
 		assert_eq!(phone.get_bookmarks(&b).len(), 1);
 	}
 
@@ -657,14 +634,14 @@ mod tests {
 		let book = doc("One.\nTwo.\nThree.\n", &[]);
 		let mac = device(&store, "mac");
 		mac.sync_open(&a, &book);
-		mac.set_document_position(&a, 5);
+		mac.set_document_position(&a, at(5));
 		mac.flush();
 		tick();
 		let phone = ConfigManager::in_memory();
-		phone.set_document_position(&b, 10);
+		phone.set_document_position(&b, at(10));
 		phone.sync_start("iphone", store);
 		phone.sync_open(&b, &book);
-		assert_eq!(phone.get_document_position(&b), 5);
+		assert_eq!(phone.get_document_position(&b), at(5));
 	}
 
 	/// Places from before sync count as equally old: each device keeps its own, and one with nothing
@@ -677,18 +654,18 @@ mod tests {
 		let c = folder.write_str("third/book.epub", "the book");
 		let book = doc("One.\nTwo.\nThree.\n", &[]);
 		let mac = ConfigManager::in_memory();
-		mac.set_document_position(&a, 5);
+		mac.set_document_position(&a, at(5));
 		mac.sync_start("mac", store.clone());
 		mac.sync_open(&a, &book);
 		mac.flush();
 		let phone = ConfigManager::in_memory();
-		phone.set_document_position(&b, 10);
+		phone.set_document_position(&b, at(10));
 		phone.sync_start("iphone", store.clone());
 		phone.sync_open(&b, &book);
-		assert_eq!(phone.get_document_position(&b), 10);
+		assert_eq!(phone.get_document_position(&b), at(10));
 		let ipad = device(&store, "ipad");
 		ipad.sync_open(&c, &book);
-		assert_eq!(ipad.get_document_position(&c), 5);
+		assert_eq!(ipad.get_document_position(&c), at(5));
 	}
 
 	/// A reinstalled app, or one run with fresh settings, has nothing for the book; what its own
@@ -703,19 +680,19 @@ mod tests {
 		let phone = device(&store, "iphone");
 		mac.sync_open(&a, &book);
 		phone.sync_open(&b, &book);
-		phone.set_document_position(&b, 10);
-		phone.add_bookmark(&b, 5, 5, "");
+		phone.set_document_position(&b, at(10));
+		phone.add_bookmark(&b, at(5), at(5), "");
 		phone.flush();
 		tick();
 		mac.sync_pull();
 		let reinstalled = device(&store, "iphone");
 		reinstalled.sync_open(&b, &book);
 		reinstalled.flush();
-		assert_eq!(reinstalled.get_document_position(&b), 10);
+		assert_eq!(reinstalled.get_document_position(&b), at(10));
 		assert_eq!(reinstalled.get_bookmarks(&b).len(), 1);
 		tick();
 		mac.sync_pull();
-		assert_eq!(mac.get_document_position(&a), 10);
+		assert_eq!(mac.get_document_position(&a), at(10));
 		assert_eq!(mac.get_bookmarks(&a).len(), 1);
 	}
 
@@ -727,7 +704,7 @@ mod tests {
 		let book = doc("One.\nTwo.\nThree.\n", &[]);
 		let mac = device(&store, "mac");
 		mac.sync_open(&a, &book);
-		mac.set_document_position(&a, 5);
+		mac.set_document_position(&a, at(5));
 		mac.flush();
 		// The Mac's clock a minute ahead of the phone's.
 		mac.sync.borrow_mut().own.books.values_mut().for_each(|entry| entry.position_saved += 60_000);
@@ -735,9 +712,9 @@ mod tests {
 		mac.flush();
 		let phone = device(&store, "iphone");
 		phone.sync_open(&b, &book);
-		phone.set_document_position(&b, 10);
+		phone.set_document_position(&b, at(10));
 		phone.flush();
-		assert_eq!(mac.sync_pull(), vec![(a, 10)]);
+		assert_eq!(mac.sync_pull(), vec![(a, at(10))]);
 	}
 
 	/// A damaged value: writing over it would leave only this run's books.
@@ -750,7 +727,7 @@ mod tests {
 		store.set("device.mac".to_string(), "not toml [".to_string());
 		let mac = device(&store, "mac");
 		mac.sync_open(&a, &book);
-		mac.set_document_position(&a, 5);
+		mac.set_document_position(&a, at(5));
 		mac.flush();
 		assert_eq!(store.get("device.mac".to_string()).unwrap(), "not toml [");
 	}
@@ -765,16 +742,16 @@ mod tests {
 		let phone = device(&store, "iphone");
 		mac.sync_open(&a, &book);
 		phone.sync_open(&b, &book);
-		mac.add_bookmark(&a, 5, 5, "");
+		mac.add_bookmark(&a, at(5), at(5), "");
 		mac.flush();
 		tick();
-		phone.set_document_position(&b, 10);
+		phone.set_document_position(&b, at(10));
 		phone.sync_pull();
 		phone.flush();
 		tick();
 		mac.sync_pull();
 		assert_eq!(phone.get_bookmarks(&b).len(), 1);
-		assert_eq!(mac.get_document_position(&a), 10);
+		assert_eq!(mac.get_document_position(&a), at(10));
 	}
 
 	#[test]

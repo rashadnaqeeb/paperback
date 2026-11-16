@@ -8,7 +8,7 @@ use super::{
 	FindDialogState, do_find_all, handle_find_action, handle_result_go,
 	results_list::{ResultsList, build_results_list},
 };
-use crate::ui::{dialogs::DIALOG_PADDING, document_manager::DocumentManager};
+use crate::ui::{dialogs::dialog_padding, document_manager::DocumentManager};
 
 pub(super) struct FindDialogWidgets {
 	pub(super) find_label: StaticText,
@@ -46,6 +46,7 @@ pub(super) fn build_find_dialog_ui(
 	result_rows: Rc<RefCell<Vec<FindAllLine>>>,
 	result_labels: Rc<RefCell<Vec<String>>>,
 ) -> FindDialogWidgets {
+	let padding = dialog_padding(&dialog);
 	let combo_width = 250;
 	let option_padding = 2;
 	let button_spacing = 5;
@@ -78,16 +79,15 @@ pub(super) fn build_find_dialog_ui(
 	dialog.set_escape_id(ID_CANCEL);
 	dialog.set_affirmative_id(ID_OK);
 	let find_sizer = BoxSizer::builder(Orientation::Horizontal).build();
-	find_sizer.add(&find_label, 0, SizerFlag::AlignCenterVertical | SizerFlag::Right, DIALOG_PADDING);
+	find_sizer.add(&find_label, 0, SizerFlag::AlignCenterVertical | SizerFlag::Right, padding);
 	find_sizer.add(&find_combo, 1, SizerFlag::Expand, 0);
 	let button_sizer = BoxSizer::builder(Orientation::Horizontal).build();
 	button_sizer.add(&find_prev_btn, 0, SizerFlag::Right, button_spacing);
 	button_sizer.add(&find_next_btn, 0, SizerFlag::Right, button_spacing);
 	button_sizer.add(&find_all_btn, 0, SizerFlag::Right, button_spacing);
-	// The Find All results view, hidden until a search with matches switches to it.
 	let results_sizer = BoxSizer::builder(Orientation::Vertical).build();
 	let results_list = build_results_list(dialog, result_rows, result_labels);
-	results_sizer.add(&results_list, 1, SizerFlag::Expand | SizerFlag::All, DIALOG_PADDING);
+	results_sizer.add(&results_list, 1, SizerFlag::Expand | SizerFlag::All, padding);
 	let results_button_sizer = BoxSizer::builder(Orientation::Horizontal).build();
 	// TRANSLATORS: Button that jumps to the selected find result
 	let go_btn = Button::builder(&dialog).with_label(&t("&Go")).build();
@@ -96,40 +96,39 @@ pub(super) fn build_find_dialog_ui(
 		&results_button_sizer,
 		0,
 		SizerFlag::Expand | SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom,
-		DIALOG_PADDING,
+		padding,
 	);
-	// A single Cancel is shared by both views and always visible, so Escape always maps to one
-	// available button.
+	// One Cancel shared by both views and always visible, so Escape always has a button to map to.
 	let cancel_sizer = BoxSizer::builder(Orientation::Horizontal).build();
 	cancel_sizer.add_stretch_spacer(1);
 	cancel_sizer.add(&cancel_btn, 0, SizerFlag::All, 0);
 	let main_sizer = BoxSizer::builder(Orientation::Vertical).build();
-	main_sizer.add_sizer(&find_sizer, 0, SizerFlag::Expand | SizerFlag::All, DIALOG_PADDING);
+	main_sizer.add_sizer(&find_sizer, 0, SizerFlag::Expand | SizerFlag::All, padding);
 	main_sizer.add_sizer(
 		&options_box,
 		0,
 		SizerFlag::Expand | SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom,
-		DIALOG_PADDING,
+		padding,
 	);
 	main_sizer.add_sizer(
 		&button_sizer,
 		0,
 		SizerFlag::Expand | SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom,
-		DIALOG_PADDING,
+		padding,
 	);
 	main_sizer.add_sizer(
 		&results_sizer,
 		0,
 		SizerFlag::Expand | SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom,
-		DIALOG_PADDING,
+		padding,
 	);
 	main_sizer.add_sizer(
 		&cancel_sizer,
 		0,
 		SizerFlag::Expand | SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom,
-		DIALOG_PADDING,
+		padding,
 	);
-	// Open on the query view: hide the results windows before sizing so the dialog starts small.
+	// Hidden before sizing so the dialog starts small.
 	results_list.show(false);
 	go_btn.show(false);
 	find_next_btn.set_default();
@@ -151,7 +150,6 @@ pub(super) fn build_find_dialog_ui(
 	}
 }
 
-/// Binds a Cancel button to hide the dialog and save its settings.
 fn bind_cancel_button(
 	button: Button,
 	dialog: Dialog,

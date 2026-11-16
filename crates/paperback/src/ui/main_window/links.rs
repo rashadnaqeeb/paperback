@@ -1,6 +1,3 @@
-//! Opening documents from links: one download window for all the links given at once, then a tab
-//! for each document that came down.
-
 use std::{path::Path, rc::Rc, sync::Mutex};
 
 use paperback_core::{
@@ -24,8 +21,6 @@ use crate::{
 	working_copy::WorkingCopy,
 };
 
-/// Downloads `links` in one window and opens each document that came down, then lists what could
-/// not be opened. A link that is already open only selects its tab.
 pub fn open_links(
 	frame: &Frame,
 	dm: &Rc<Mutex<DocumentManager>>,
@@ -35,8 +30,6 @@ pub fn open_links(
 	open_links_then(frame, dm, config, links, || {});
 }
 
-/// [`open_links`], then `then` once the documents have opened, or straight away when there is
-/// nothing to download.
 pub fn open_links_then(
 	frame: &Frame,
 	dm: &Rc<Mutex<DocumentManager>>,
@@ -83,9 +76,6 @@ pub fn open_links_then(
 	);
 }
 
-/// Downloads the document the tab for `link` was opened from again and reads it in place,
-/// keeping the reading position, then calls `reloaded`. A refusal or a failed download is
-/// reported and leaves the tab as it was.
 pub fn download_again(
 	frame: &Frame,
 	dm: &Rc<Mutex<DocumentManager>>,
@@ -130,9 +120,15 @@ fn download(link: &str, n: usize, count: usize, progress: &Progress) -> Outcome 
 	if let Some(extension) = fetch::refused_extension(link) {
 		return failed(FetchError::Refused(extension));
 	}
-	let remote = match fetch::open(link, fetch::DEFAULT_MAX_SIZE) {
-		Ok(remote) => remote,
-		Err(error) => return failed(error),
+	let owned_link = link.to_string();
+	let remote = match links::unless_cancelled(
+		|| progress.is_cancelled(),
+		|_, _| {},
+		move |_, _| fetch::open(&owned_link, fetch::DEFAULT_MAX_SIZE),
+	) {
+		None => return Outcome::Skipped,
+		Some(Ok(remote)) => remote,
+		Some(Err(error)) => return failed(error),
 	};
 	let info = remote.info().clone();
 	let warned = match info.verdict(link) {
@@ -151,10 +147,15 @@ fn download(link: &str, n: usize, count: usize, progress: &Progress) -> Outcome 
 		Err(error) => return failed(error.into()),
 	};
 	progress.set_message(&links::step(Stage::Downloading, n, count, &info.file_name));
-	match remote.save(copy.path(), progress.cancel_flag(), |done, total| progress.set(done, total)) {
-		Ok(_) => Outcome::Downloaded { link: link.to_string(), copy, warned },
-		Err(FetchError::Cancelled) => Outcome::Skipped,
-		Err(error) => failed(error),
+	let path = copy.path().to_path_buf();
+	match links::unless_cancelled(
+		|| progress.is_cancelled(),
+		|done, total| progress.set(done, total),
+		move |cancel, moved| remote.save(&path, cancel, moved),
+	) {
+		Some(Ok(_)) => Outcome::Downloaded { link: link.to_string(), copy, warned },
+		None | Some(Err(FetchError::Cancelled)) => Outcome::Skipped,
+		Some(Err(error)) => failed(error),
 	}
 }
 
@@ -177,7 +178,7 @@ fn open_downloads(
 	if opened_any {
 		update_title_from_manager(frame, &dm.lock().unwrap());
 		rebuild_menu_bar(frame, dm, config);
-		dm.lock().unwrap().focus_document_text();
+		dm.lock().unwrap().focus_document_text_announced();
 	}
 	if !problems.is_empty() {
 		// TRANSLATORS: Title of the error listing the links that could not be opened
@@ -196,8 +197,7 @@ fn open_download(
 	if links::needs_open_as(warned, copy.path()) && !choose_format(frame, Path::new(link), config) {
 		return false;
 	}
-	// A zip of several books offers the same list as one opened from disk, unless a format was
-	// picked for the link.
+	// A zip of several books offers the same list as one opened from disk, unless a format was picked for the link.
 	if config.lock().unwrap().get_document_format(link).is_empty() {
 		match browse_zip(frame, copy.path(), false) {
 			None => return false,

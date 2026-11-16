@@ -1,6 +1,3 @@
-//! Saving the picture under the caret: finding the image or figure there, and reading its bytes
-//! out of wherever the document keeps them, unchanged.
-
 use std::{
 	fs::{self, File},
 	io::BufReader,
@@ -17,10 +14,14 @@ use zip::ZipArchive;
 
 use super::DocumentSession;
 use crate::{
-	document::MarkerType,
-	parser::{fb2, is_data_uri, is_external_url},
+	document::{DocPos, MarkerType},
+	parser::{cbz, fb2, ipf, is_data_uri, is_external_url, mobi},
 	t,
-	util::{text::url_decode, zip::read_zip_entry_bytes},
+	util::{
+		rar,
+		text::url_decode,
+		zip::{read_zip_entry_bytes, read_zip_entry_bytes_with_password},
+	},
 };
 
 /// Books write base64 with and without padding, and with line breaks, and none of it is worth refusing a picture over.
@@ -30,34 +31,33 @@ const LENIENT_BASE64: GeneralPurpose = GeneralPurpose::new(
 );
 
 impl DocumentSession {
-	/// The file name to offer when saving the image at `position`, or `None` when there is no image there whose picture can be saved.
 	#[must_use]
-	pub fn image_file_name_at(&self, position: i64) -> Option<String> {
+	pub fn image_file_name_at(&self, position: DocPos) -> Option<String> {
 		self.image_source_at(position).map(|source| image_file_name(&source))
 	}
 
-	/// Writes the picture of the image at `position` to `output_path`.
-	///
-	/// # Errors
-	///
-	/// Returns an error when there is no saveable image at `position`, or its picture cannot be read or written.
-	pub fn save_image(&self, position: i64, output_path: &str) -> Result<()> {
-		let source = self.image_source_at(position).context("no saveable image at this position")?;
-		let bytes = self.image_bytes(&source)?;
+	pub fn save_image(&self, position: DocPos, output_path: &str) -> Result<()> {
+		let bytes = self.image_bytes_at(position)?;
 		fs::write(output_path, bytes).with_context(|| format!("failed to write '{output_path}'"))
 	}
 
-	/// Where the picture of the image or figure at `position` lives. A described image covers its placeholder text; a picture page carries no length and covers its whole line.
-	fn image_source_at(&self, position: i64) -> Option<String> {
-		let pos = usize::try_from(position.max(0)).unwrap_or(0);
-		let (line_start, line_end) = self.line_bounds_at(position)?;
+	/// Saving a picture and reading the text off one both go through here, so they agree about which picture the caret is on.
+	pub fn image_bytes_at(&self, position: DocPos) -> Result<Vec<u8>> {
+		let source = self.image_source_at(position).context("no image at this position")?;
+		self.image_bytes(&source)
+	}
+
+	/// A described image covers its placeholder text; a picture page carries no length and covers its whole line.
+	fn image_source_at(&self, position: DocPos) -> Option<String> {
+		let pos = position.min(self.handle.document().buffer.end());
+		let (line_start, line_end) = self.line_bounds_at(pos)?;
 		let markers = &self.handle.document().buffer.markers;
 		[MarkerType::Image, MarkerType::Figure]
 			.into_iter()
 			.filter_map(|mtype| markers.get(self.handle.current_marker_index(pos, mtype)?))
 			.filter(|marker| {
-				if marker.length == 0 {
-					i64::try_from(marker.position).is_ok_and(|start| start >= line_start && start <= line_end)
+				if marker.length.is_zero() {
+					marker.position >= line_start && marker.position <= line_end
 				} else {
 					pos < marker.position + marker.length
 				}
@@ -71,10 +71,37 @@ impl DocumentSession {
 		if is_data_uri(source) {
 			return decode_data_uri(source);
 		}
+		// A MOBI book's picture is a record of the file, which its parser named by number.
+		if let Some(record) = source.strip_prefix("mobi-record:") {
+			let index: usize =
+				record.split('.').next().unwrap_or_default().parse().context("malformed mobi picture reference")?;
+			let data = fs::read(&self.file_path)?;
+			let offsets = mobi::pictures::record_offsets(&data);
+			return mobi::pictures::record_bytes(&data, &offsets, index)
+				.map(<[u8]>::to_vec)
+				.context("the book has no such picture");
+		}
+		if source.starts_with(ipf::PICTURE_PREFIX) {
+			return ipf::picture_bytes(&self.file_path, source);
+		}
+		// A PDF names pictures by where their objects sit, so the reference, not the extension, says which reader they need.
+		if source.starts_with("pdf:") {
+			let (page_index, path) = parse_pdf_image_reference(source)?;
+			let password = (!self.password.is_empty()).then_some(self.password.as_str());
+			let document = crate::pdf_engine::Document::open(&self.file_path, password)?;
+			let page = document.page(page_index)?;
+			return path
+				.parse()
+				.ok()
+				.and_then(|id| page.image_png(id))
+				.context("the picture could not be read from the pdf");
+		}
 		let extension = Path::new(&self.file_path).extension().map(|ext| ext.to_string_lossy().to_ascii_lowercase());
 		match extension.as_deref() {
-			Some("epub" | "cbz" | "cbr") => {
-				let mut archive = ZipArchive::new(BufReader::new(File::open(&self.file_path)?))?;
+			// A real RAR, comic or not, was read from the zip copy of it, which holds no password.
+			Some("epub" | "ebrl" | "cbz" | "cbr" | "rar") => {
+				let mut archive =
+					ZipArchive::new(BufReader::new(File::open(rar::as_zip(Path::new(&self.file_path))?)?))?;
 				read_zip_entry_bytes(&mut archive, source)
 			}
 			Some("chm") => {
@@ -83,6 +110,12 @@ impl DocumentSession {
 				Ok(chm.read(&entry)?)
 			}
 			Some("fb2") => Ok(LENIENT_BASE64.decode(strip_whitespace(&fb2::binary_data(&self.file_path, source)?))?),
+			// A zipped DAISY book, whatever its name: its parser has already pointed each picture at its entry, and the archive may need the book's password.
+			_ if cbz::is_zip(&self.file_path) => {
+				let mut archive = ZipArchive::new(BufReader::new(File::open(&self.file_path)?))?;
+				let password = (!self.password.is_empty()).then_some(self.password.as_str());
+				read_zip_entry_bytes_with_password(&mut archive, source, password)
+			}
 			_ => {
 				let path = local_image_path(&self.file_path, source);
 				fs::read(&path).with_context(|| format!("failed to read '{}'", path.display()))
@@ -91,7 +124,7 @@ impl DocumentSession {
 	}
 }
 
-/// A document read from disk names its pictures relative to itself, the way a browser would resolve them.
+/// Resolved relative to the document, as a browser would.
 fn local_image_path(document_path: &str, source: &str) -> std::path::PathBuf {
 	let source = source.split(['#', '?']).next().unwrap_or_default();
 	let source = url_decode(source);
@@ -101,6 +134,15 @@ fn local_image_path(document_path: &str, source: &str) -> std::path::PathBuf {
 		return source.to_path_buf();
 	}
 	Path::new(document_path).parent().unwrap_or_else(|| Path::new("")).join(source)
+}
+
+/// The parser writes these as `pdf:<page>:<path>`.
+fn parse_pdf_image_reference(source: &str) -> Result<(usize, String)> {
+	let mut parts = source.splitn(3, ':');
+	let bad = || anyhow::anyhow!("malformed pdf image reference");
+	let page = parts.nth(1).and_then(|text| text.parse().ok()).ok_or_else(bad)?;
+	let path = parts.next().filter(|path| !path.is_empty()).ok_or_else(bad)?;
+	Ok((page, path.to_string()))
 }
 
 fn decode_data_uri(uri: &str) -> Result<Vec<u8>> {
@@ -116,10 +158,18 @@ fn strip_whitespace(text: &str) -> String {
 	text.chars().filter(|c| !c.is_ascii_whitespace()).collect()
 }
 
-/// The name a picture is offered under: the last part of its path, or for one carried inline, a generic name with the extension its media type implies.
 fn image_file_name(source: &str) -> String {
 	// TRANSLATORS: File name stem offered when saving a picture that has no file name of its own
 	let fallback = t("image");
+	if source.starts_with("pdf:") {
+		return pdf_image_file_name(source, &fallback);
+	}
+	if let Some(record) = source.strip_prefix("mobi-record:") {
+		return format!("{fallback} {record}");
+	}
+	if let Some(offset) = source.strip_prefix(ipf::PICTURE_PREFIX) {
+		return format!("{fallback} {offset}.bmp");
+	}
 	if is_data_uri(source) {
 		let media_type = source[5..].split([';', ',']).next().unwrap_or_default().to_ascii_lowercase();
 		let subtype = media_type.strip_prefix("image/").unwrap_or_default().split('+').next().unwrap_or_default();
@@ -133,6 +183,15 @@ fn image_file_name(source: &str) -> String {
 	let path = if path.is_empty() { source.trim_start_matches('#') } else { path };
 	let name = url_decode(path.rsplit(['/', '\\']).next().unwrap_or_default());
 	if name.is_empty() { fallback } else { name }
+}
+
+/// Named by page and content-stream path, so a second picture from the same book does not land on the first.
+fn pdf_image_file_name(source: &str, fallback: &str) -> String {
+	let Some((page, path)) = source.strip_prefix("pdf:").and_then(|rest| rest.split_once(':')) else {
+		return format!("{fallback}.png");
+	};
+	let page = page.parse::<u32>().map_or(0, |page| page + 1);
+	format!("{fallback} {page} {}.png", path.replace('/', "-"))
 }
 
 #[cfg(test)]
@@ -150,6 +209,8 @@ mod tests {
 	#[case("data:image/jpeg;base64,AAAA", "image.jpg")]
 	#[case("data:image/svg+xml,%3Csvg%3E", "image.svg")]
 	#[case("data:;base64,AAAA", "image")]
+	#[case("pdf:2:0/1", "image 3 0-1.png")]
+	#[case("mobi-record:57.jpg", "image 57.jpg")]
 	fn a_picture_is_offered_under_its_own_name(#[case] source: &str, #[case] expected: &str) {
 		assert_eq!(image_file_name(source), expected);
 	}

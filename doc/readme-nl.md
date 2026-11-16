@@ -1,6 +1,6 @@
-<!-- machine-translated from doc/readme.md (source-hash: cc466634600b58b4; sections: 84030068,db723a70,df2f4c18,e9b82d46,1387e8b7,3887c286,0ee39028,3a4c3efe,d3762a01,e9860ee8,80b9b9ca); please review and edit as needed -->
+<!-- machine-translated from doc/readme.md (source-hash: ba700ddfbaf3e99f; sections: 64167837,db723a70,df2f4c18,aa6b9ca2,1387e8b7,b8a00464,74f0c8e7,490ed50c,d3762a01,e9860ee8,15aeaaed); please review and edit as needed -->
 
-# Paperback - versie 1.0
+# Paperback - versie 1.1
 
 ## Inleiding
 
@@ -16,17 +16,17 @@ Paperback draait op Windows 10/11, alle moderne versies van macOS op ARM, Linux,
 * Bijzonder snel, zelfs op oude hardware.
 * Eenvoudige interface met tabbladen, waarmee je zoveel documenten naast elkaar kunt openen als je wilt.
 * Bewaart je exacte leespositie in elk document dat je opent.
-* Onthoudt desgewenst welke documenten je open had toen je het programma afsloot en herstelt ze bij de volgende start.
+* Onthoudt desgewenst welke documenten je open had toen je het programma afsloot en heropent ze bij de volgende start.
 * Bevat navigatiefunctionaliteit die lijkt op de bladermodus van veel schermlezers, om snel en eenvoudig door documenten te navigeren.
 * Bevat een robuust zoekvenster, met functies zoals geschiedenis en ondersteuning voor reguliere expressies.
 * Kan volledig portable worden uitgevoerd of worden geïnstalleerd met automatisch ingestelde bestandstoewijzingen.
 * Ondersteunt een enorme reeks gangbare bestandsindelingen.
 * Speelt audioboeken af, met instelbare snelheid en bladwijzers die het exacte tijdstip onthouden.
-* Leest gescande PDF-pagina's met de OCR die in Windows en macOS is ingebouwd.
+* Leest gescande PDF-pagina's met de OCR die in Windows en macOS is ingebouwd, of met Tesseract op Linux.
 * Bladwijzers en notities, zodat je kunt markeren waar je gebleven bent en er later naar terug kunt gaan.
 * Elke toetsenbordsneltoets kan worden aangepast.
-* Opent documenten rechtstreeks via http- en https-links en downloadt ze opnieuw wanneer je ze heropent of op `F5` drukt, met behoud van je leespositie en bladwijzers. Bij het herstellen van de documenten die je open had, downloadt Paperback de documenten van links die 2 MB of kleiner waren opnieuw.
-* Wordt geleverd met `pb`, een terminalprogramma dat elk ondersteund document omzet naar HTML, Markdown of platte tekst. Het accepteert zoveel documenten als je opgeeft, verwerkt jokertekens zoals `*.pdf` zelf zodat dezelfde opdracht ook op Windows werkt, en kan per document één bestand in een map schrijven. Het kan ook een lijst met documenten uit een bestand of van stdin lezen met `--files-from` en documenten rechtstreeks via http- en https-links omzetten.
+* Opent documenten rechtstreeks via http- en https-links en downloadt ze opnieuw wanneer je ze heropent of op `F5` drukt, met behoud van je leespositie en bladwijzers. Bij het heropenen van de documenten die je open had, downloadt Paperback de documenten van links die 2 MB of kleiner waren opnieuw.
+* Wordt geleverd met `pb`, een terminalprogramma dat elk ondersteund document omzet naar HTML, Markdown of platte tekst. Het accepteert zoveel documenten als je opgeeft, verwerkt jokertekens zoals `*.pdf` zelf zodat dezelfde opdracht ook op Windows werkt, en kan per document één bestand in een map schrijven, waarbij meerdere tegelijk worden omgezet (`--jobs` bepaalt hoeveel). Het kan ook een lijst met documenten uit een bestand of van stdin lezen met `--files-from` en documenten rechtstreeks via http- en https-links omzetten.
 
 ## Schermlezercompatibiliteit
 
@@ -48,11 +48,14 @@ Als JAWS niets zegt wanneer je op een toets drukt die iets zou moeten melden, op
 
 Paperback ondersteunt de volgende indelingen en extensies:
 
-* Comicarchieven (`.cbz`)
+* Braille Ready Files en Portable Embosser Format-boeken, teruggezet naar druk met de brailletabel van jouw keuze (`.brf`, `.pef`)
+* Comicarchieven (`.cbz`, `.cbr`)
 * CHM-helpbestanden (`.chm`)
 * DAISY-boeken (`.opf`, `.zip`)
-* EPUB-boeken (`.epub`)
+* eBraille-boeken, gelezen in druk als ze die bevatten, en anders teruggezet met de braillecode die ze aangeven (`.ebrl`, of de `.opf` van een die niet gecomprimeerd is)
+* EPUB-boeken (`.epub`, of de `.opf` van een die niet gecomprimeerd is)
 * FB2-e-books (`.fb2`)
+* GNU Info-handleidingen (`.info`, met of zonder gzip, en gesplitste handleidingen geopend vanaf een van hun onderdelen)
 * HTML-documenten (`.htm`, `.html`, `.xhtml`)
 * Manual pages, zowel `man` als BSD `mdoc` (`.1` t/m `.9`, `.man`, `.roff` en de met gzip gecomprimeerde vormen daarvan)
 * Markdown-documenten (`.md`, `.markdown`, `.mdx`, `.mdown`, `.mdwn`, `.mkd`, `.mkdn`, `.mkdown`, `.ronn`)
@@ -62,12 +65,15 @@ Paperback ondersteunt de volgende indelingen en extensies:
 * MP3-audioboeken (`.mp3`)
 * OpenDocument-presentaties (`.odp`, `.fodp`)
 * OpenDocument-tekstbestanden (`.odt`, `.fodt`)
+* OS/2-helpbestanden en -boeken, met hun afbeeldingen (`.inf`, `.hlp`)
 * PDF-documenten (`.pdf`)
 * PowerPoint-presentaties (`.pptx`, `.pptm`, `.ppt`)
+* RAR-archieven van boeken, die openen als een ZIP-bestand, met een lijst om uit te kiezen als er meerdere in zitten (`.rar`)
 * reStructuredText-documenten (`.rst`, `.rest`)
 * RTF-documenten (`.rtf`)
 * Windows Write-documenten (`.wri`)
 * WinHelp-bestanden (`.hlp`)
+* XPS en OpenXPS-documenten (`.xps`, `.oxps`)
 * Plattetekst- en logbestanden (`.txt`, `.log`)
 
 ## Sneltoetsen
@@ -75,6 +81,8 @@ Paperback ondersteunt de volgende indelingen en extensies:
 Paperback is ontworpen voor toetsenbordgericht gebruik. Hieronder staan de huidige sneltoetsen.
 
 De sneltoetsen hieronder gelden voor Windows. Waar macOS afwijkt, staat het equivalent tussen haakjes — vooral omdat Ctrl+G, Ctrl+W en Alt+Links/Rechts op dat platform al bezet zijn door andere systeem- of appconventies.
+
+Leestekenssneltoetsen krijgen hun naam van de toetsen van een amerikaans toetsenbord. Op een ander toetsenbordindeling druk je op de toets op dezelfde plaats, ongeacht het label: op een Hongaars toetsenbord werkt de toets met label `é` als `;` en die met label `á` als `'`, dus `Ctrl+'` betekent Ctrl en de `á`-toets. Menu's tonen nog steeds de amerikaanse namen. Op macOS tonen menu's in plaats daarvan de toetsen die jouw indeling gebruikt.
 
 ### Menu Bestand
 
@@ -86,6 +94,7 @@ De sneltoetsen hieronder gelden voor Windows. Waar macOS afwijkt, staat het equi
 * `Ctrl+R`: Het venster "Alle documenten" tonen (vanuit Recente documenten).
 * `Ctrl+Shift+C`: Bovenliggende map openen.
 * `Ctrl+Shift+E`: Documentgegevens exporteren (`.paperback`).
+* `Ctrl+Alt+E`: Bladwijzers en notities exporteren als een leesbaar tekst- of HTML-bestand.
 * `Ctrl+Shift+I`: Documentgegevens importeren (`.paperback`).
 * `Ctrl+E`: Het huidige document exporteren naar platte tekst.
 * `Ctrl+Q`: Afsluiten (alleen Windows; op macOS staat dit in het appmenu).
@@ -103,7 +112,7 @@ De sneltoetsen hieronder gelden voor Windows. Waar macOS afwijkt, staat het equi
 
 * `F5`: Het huidige document opnieuw van schijf inlezen, of het opnieuw downloaden als het via een link is geopend. Werkt ongeacht of "Gewijzigde documenten automatisch opnieuw laden" in Instellingen is ingeschakeld.
 * `Ctrl+Alt+W`: Automatische terugloop in-/uitschakelen.
-* `F11` (macOS: `RawCtrl+Ctrl+F`, oftewel Control+Command+F): Volledig scherm in-/uitschakelen.
+* `F11` (macOS: `Control+Cmd+F`, oftewel Control+Command+F): Volledig scherm in-/uitschakelen.
 * `Ctrl+Shift+V`: De huidige inhoud openen in webweergave.
 * `Ctrl+U`: De documentbron in een nieuw tabblad weergeven.
 
@@ -114,7 +123,7 @@ De sneltoetsen hieronder gelden voor Windows. Waar macOS afwijkt, staat het equi
 * `Ctrl+G` (macOS: `Cmd+L`): Ga naar regel.
 * `Ctrl+Shift+G` (macOS: `Cmd+Shift+L`): Ga naar percentage.
 * `Ctrl+P`: Ga naar pagina (indien ondersteund door het huidige document).
-* `=`: Je huidige leespercentage en pagina melden, bijvoorbeeld "15%, pagina 30". Bij documenten zonder paginanummers wordt de pagina weggelaten.
+* `=`: Je huidige leespercentage en pagina melden, bijvoorbeeld "15%, pagina 30". Bij documenten zonder paginanummers wordt de pagina weggelaten. In een audioboek volgen je voortgang en de totale duur erna, bijvoorbeeld "15%, 1:02:03 van 10:30:00".
 * `Alt+Links` (macOS: `Cmd+[`): Terug in navigatiegeschiedenis.
 * `Alt+Rechts` (macOS: `Cmd+]`): Vooruit in navigatiegeschiedenis.
 * `[`: Vorige sectie.
@@ -152,7 +161,7 @@ De sneltoetsen hieronder gelden voor Windows. Waar macOS afwijkt, staat het equi
 * `B`: Volgende bladwijzer.
 * `Shift+N`: Vorige notitie.
 * `N`: Volgende notitie.
-* `Ctrl+Shift+W` (macOS: `RawCtrl+Shift+W`, oftewel de fysieke Control-toets in plaats van Cmd): De notitietekst op de huidige positie bekijken.
+* `Ctrl+Shift+W` (macOS: `Control+Shift+W`, oftewel de fysieke Control-toets in plaats van Cmd): De notitietekst op de huidige positie bekijken.
 * `Ctrl+B`: Naar alle bladwijzers en notities springen.
 * `Ctrl+Alt+B`: Alleen naar bladwijzers springen.
 * `Ctrl+Alt+M`: Alleen naar notities springen.
@@ -161,21 +170,24 @@ De sneltoetsen hieronder gelden voor Windows. Waar macOS afwijkt, staat het equi
 
 ### Menu Audio
 
-* `Ctrl+Spatie` (macOS: `RawCtrl+Spatie`, oftewel de fysieke Control-toets, omdat Cmd+Spatie Spotlight opent): Audio afspelen/pauzeren.
+* `Ctrl+Spatie` (macOS: `Control+Spatie`, oftewel de fysieke Control-toets, omdat Cmd+Spatie Spotlight opent): Audio afspelen/pauzeren.
+* `Ctrl+J`: Naar een bepaald moment in de opname gaan. Typ het als `1:23:45`, `23:45` of `45` seconden, of zet `+` of `-` ervoor om vanuit jouw huidige positie te verplaatsen, bijvoorbeeld `+5:00`. Het venster toont hoe ver je bent en hoe lang het boek duurt.
+* `Shift+=`: Melden hoe ver je in dit hoofdstuk bent en hoeveel er nog over is, bijvoorbeeld "Hoofdstuk 3, 4:10 van 12:00, 7:50 resterend".
 * `'`: Audio vooruitspoelen.
 * `;`: Audio terugspoelen.
 * `Shift+'`: De audiospoelstap vergroten.
 * `Shift+;`: De audiospoelstap verkleinen.
 * `Ctrl+Shift+.`: Audio sneller afspelen.
 * `Ctrl+Shift+,`: Audio langzamer afspelen.
-* `Ctrl+'`: Audio luider afspelen.
-* `Ctrl+;`: Audio stiller afspelen.
+* `Ctrl+'`: Het audiovolume verhogen.
+* `Ctrl+;`: Het audiovolume verlagen.
 
 ### Menu Extra
 
-* `Ctrl+W` (macOS: `RawCtrl+W`, oftewel de fysieke Control-toets in plaats van Cmd): Woordenaantal van het huidige document tonen.
+* `Ctrl+W` (macOS: `Control+W`, oftewel de fysieke Control-toets in plaats van Cmd): Woordenaantal van het huidige document tonen.
 * `Ctrl+I`: Documentinformatie tonen.
 * `Ctrl+Shift+O`: Een reeks gescande PDF-pagina's herkennen met OCR.
+* `Ctrl+Shift+R`: De PDF- of comicpagina waarop de cursor staat herkennen met OCR, waarbij eventuele bestaande tekst wordt vervangen.
 * `Ctrl+Shift+S`: Slaaptimer in-/uitschakelen.
 * `Ctrl+,`: Instellingen openen (macOS: in het appmenu).
 
@@ -194,7 +206,8 @@ De sneltoetsen hieronder gelden voor Windows. Waar macOS afwijkt, staat het equi
 * `Ctrl+Tab` en `Ctrl+Shift+Tab`: Ga naar het volgende of vorige geopende document; na het laatste kom je weer bij het eerste en andersom.
 * `Enter` of `Spatie` in de documenttekst: Een link volgen of een tabel- of formuleweergave openen op de cursor.
 * `Enter` op een gescande PDF-pagina: De pagina herkennen met OCR.
-* `Shift+F10` of de menu- of applicatietoets in de documenttekst: Het contextmenu openen. Op een afbeelding in een EPUB, HTML, Markdown, CHM, FB2 of comicarchief biedt het ook de mogelijkheid om de afbeelding op te slaan in een bestand.
+* `Enter` op een afbeelding die geen link is: De in de afbeelding herkende tekst tonen, in een weergave die je met `Escape` sluit. De afbeelding zelf blijft ongewijzigd, en de documenttekst ook.
+* `Shift+F10` of de menu- of applicatietoets in de documenttekst: Het contextmenu openen. Op een afbeelding in een PDF, EPUB, HTML, Markdown, CHM, FB2 of comicarchief kun je daar ook de afbeelding opslaan in een bestand, en op Windows en macOS de tekst erin lezen. Zo lees je een afbeelding die ook een link is.
 
 ## iOS en Android
 
@@ -233,7 +246,7 @@ In het menu Meer opties vind je al het andere. Sommige items werken in elke app 
 * **Ga naar:** spring naar een regel, een pagina of een percentage van het document. Kies welke met de keuzelijst Modus.
 * **Recente documenten:** alle documenten die je hebt geopend, elk gemarkeerd als momenteel open, gesloten of bestand ontbreekt. Elk document heeft twee schermlezeracties: Verwijderen haalt het uit de lijst en Terugvinden laat je een document terugvinden waarvan het bestand is verplaatst. Recente documenten wissen leegt de lijst zonder documenten te verwijderen.
 * **Woordenaantal:** het aantal woorden in het document.
-* **Documentinformatie:** de titel, de auteur, de bestandsnaam en op iOS ook het aantal regels en tekens.
+* **Documentinformatie:** de titel, de auteur, de bestandsnaam, hoe ver je in het document bent, en het aantal woorden, regels en tekens. Bij een audioboek zie je ook hoeveel bestanden het bevat en, als Paperback dat kan bepalen, hoe lang ze in totaal en gemiddeld duren.
 * **Exporteren:** slaat het document op als platte tekst, HTML of Markdown.
 * **Slaaptimer:** stopt het lezen na 5, 10, 15, 30, 45 of 60 minuten, of na een tijd die je zelf opgeeft. Open hem opnieuw terwijl hij loopt om te zien hoeveel tijd er nog over is, of om hem te annuleren.
 * **Help:** opent deze handleiding.
@@ -301,6 +314,132 @@ Let op: een openbare GitHub-sponsor beschouw ik als grond voor automatische opna
 * Tyler Rodick
 
 ## Versiegeschiedenis
+
+### Versie 1.1
+
+1.1 brengt een nieuwe PDF-engine, een opnieuw gebouwde iOS-tekstmodus, OCR op Linux, documenten via links, ondersteuning voor decennia aan oudere Word-, Write- en PowerPoint-bestanden en veel meer.
+
+#### Toegevoegd
+
+##### Algemeen
+* Een Hongaarse vertaling en handleiding.
+* Een document openen via een link, op elk platform. `F5` downloadt het opnieuw.
+* `F5` laadt het document opnieuw.
+* `Ctrl+1` t/m `Ctrl+9` springen naar je eerste negen geopende documenten.
+* `Ctrl+Tab` en `Ctrl+Shift+Tab` wisselen van document op macOS en Linux.
+* Elk document dat je kiest in het venster Document openen of Alle documenten, wordt in een eigen tabblad geopend.
+* Een afbeelding opslaan vanuit het contextmenu.
+* Bladwijzers en notities exporteren als tekst of HTML.
+* Instellingen voor het logniveau en voor het markeren van gevonden tekst.
+* De venstersneltoets kan elke toets zijn, in te stellen op het nieuwe tabblad Systeembreed van Toetsenbordsneltoetsen aanpassen.
+* Kopiëren meldt hoeveel er is gekopieerd, en de tekst blijft op het klembord staan nadat Paperback is afgesloten.
+* Elk menu-item heeft in elke taal zijn eigen letter, die je in het menu kunt gebruiken om het item te activeren.
+* Een onleesbaar ZIP-bestand wordt geopend als een lijst met de documenten erin.
+
+##### Nieuwe indelingen
+* Word voor Windows 1 en 2, Word voor DOS, Word voor Mac 4 en 5, en de Unicode-edities van Word 6 en 95.
+* PowerPoint 95.
+* Gecomprimeerde FictionBook-bestanden (`.fb2.zip`).
+* DAISY 3-boeken die alleen uit een DTBook in een ZIP-bestand bestaan, of alleen uit audio.
+
+##### OCR
+* OCR op Linux, via Tesseract.
+* Huidige pagina herkennen (`Ctrl+Shift+R`) leest de pagina waarop je bent opnieuw, ook als die al tekst bevat.
+* `Enter` op een afbeelding leest de tekst erin.
+* Herkende tekst volgt de opmaak van de pagina en wordt onthouden, dus een gescand document wordt met zijn tekst geopend.
+* Bulk-OCR kan pagina's met tekst opnieuw herkennen, leest meerdere pagina's tegelijk en stopt wanneer je het document sluit.
+
+##### Audioboeken
+* Overal snelheden tot 4x, die tussen sessies worden onthouden.
+* Volumeregeling.
+
+##### PDF-documenten
+* Een nieuwe PDF-engine: sneller, gebruikt elke CPU-kern en heeft geen pdfium-bibliotheek nodig.
+* Koppen gevonden in niet-getagde pagina's en betere titels.
+* Een instelling om herhaalde kop- en voetteksten te behouden.
+
+##### Overige documenten
+* Word: genummerde lijsten en lijsten met opsommingstekens, voetnoten, eindnoten, opmerkingen, alternatieve tekst bij afbeeldingen, lijstnavigatie en de eigen pagina's van Word.
+* OpenDocument: voetnoten en opmerkingen na de tekst.
+* Titels en auteurs uit de metadata van het document in Word, PowerPoint, OpenDocument, RTF, Markdown en reStructuredText.
+* Comics: titel, schrijver, paginatypes en bladwijzers uit ComicInfo.xml.
+* FB2: koppen, een inhoudsopgave en aparte versregels.
+* Afbeeldingen in MOBI-, KF8- en gecomprimeerde DAISY-boeken kunnen worden opgeslagen en gelezen met OCR.
+* Wiskunde tussen dollartekens in Markdown.
+* Sphinx-instructies in reStructuredText.
+* Afbeeldingen zonder beschrijving worden getoond als [Afbeelding].
+
+##### iOS en Android
+* Een optie Taal in Instellingen.
+* Documentinformatie toont je voortgang, en het aantal bestanden en de totale tijdsduur van een audioboek.
+* Tekstmodus wordt onthouden.
+* Doorgaan met lezen na Zoeken.
+* iOS: tekstmodus opnieuw gebouwd voor VoiceOver. Alles laten voorlezen gaat door het hele boek, de rotors kunnen de hele inhoud bereiken, lijsten en tabellen zijn echte lijsten en tabellen, vegen met drie vingers slaat pagina's om, en tikken met drie vingers geeft de pagina en het percentage.
+* iOS: een stem, spreeksnelheid en toonhoogte per boek, via Spraak voor dit boek.
+* iOS: met een wachtwoord beveiligde documenten.
+* iOS: gecomprimeerde DAISY-boeken en MP3-audioboeken delen met Paperback.
+* iOS: de slaaptimer stopt audioboeken.
+* iOS: Slowaaks en Oekraïens.
+* Android: wijzigingen in spreeksnelheid en toonhoogte gelden voor de alinea die wordt voorgelezen, en werken met de standaardengine van het systeem.
+* Android: draait op x86_64-apparaten.
+
+##### macOS
+* Een universele app, native op Intel en Apple silicon.
+* pb is inbegrepen in de app.
+
+##### pb
+* Converteren per pagina, van een hele map, van een lijst met bestanden (`--files-from`) of van een link.
+
+#### Gewijzigd
+* De menubalk is opnieuw ingedeeld in acht menu's.
+* De statusbalk zegt "Voortgang" in plaats van "Lezen".
+* Menuopdrachten melden wat ze hebben gedaan, in plaats van dat die melding wegvalt terwijl het menu sluit.
+* Updates sluiten Paperback normaal af en halen het weer naar voren.
+* Enorme tekstbestanden worden geopend met een fractie van het geheugen, en de limiet van 4 GB is verdwenen.
+* MOBI-, Word- en HTML-conversie, Alles zoeken en zoeken in Alle documenten zijn sneller.
+* Het uitvoerbare bestand voor Windows is 3 MB kleiner.
+
+#### Opgelost
+
+##### Algemeen
+* Sneltoetsen met leestekens op toetsenbordindelingen waarvoor Shift nodig is; Toetsenbordsneltoetsen aanpassen markeert sneltoetsen die je indeling niet kan typen.
+* De focus keert terug naar het document na `Win+D`.
+* Crashes bij het openen van bladwijzers voor een nieuw document, in Alles zoeken en bij enkele beschadigde MOBI-bestanden.
+* Zoeken met regex selecteert de hele overeenkomst.
+* De statusbalk van een audioboek springt niet langer heen en weer tussen audio- en tekstvoortgang.
+* Het woordenaantal telt ook tekst die met OCR is gelezen.
+* Gescande pagina's melden hun eigen afbeelding niet langer.
+* De optie in het installatieprogramma om Paperback aan PATH toe te voegen.
+* Linux-updates vinden hun downloads, en een AppImage wordt bijgewerkt als AppImage.
+* De opmerkingsregel in Word- en OpenDocument-bestanden wordt vertaald.
+
+##### Documenten
+* Windows Write-bestanden die als binair bestand werden geopend.
+* PDF: herhaalde tekst bij pagina-einden in getagde PDF's, tweede kolommen die eerst werden gelezen, verloren spaties en afbreekstreepjes aan regeleinden, tekst in Type 3-lettertypen en de punten die de regels in inhoudsopgaven opvullen.
+* RTF: losse CR-regeleinden, lijsten met streepjes, tekst vóór de eerste alinea, tekst met accenten en CJK-tekst, tekst die verloren ging na een letterlijke backslash, en RTF opgeslagen als `.doc`.
+* Word- en PowerPoint-bestanden met beschadigde containers die Word nog steeds opent.
+* Word-tekst in bijgehouden wijzigingen, velden en tabelcellen.
+* PowerPoint-links, dia's zonder tekst en emoji's.
+* `<` en `&` in Word-, PowerPoint- en OpenDocument-tabelcellen.
+* Met een wachtwoord beveiligde OpenDocument-bestanden uit de huidige LibreOffice.
+* CHM-bestanden in hun codetabel, en HTML- en DAISY-bestanden in hun gedeclareerde codering.
+* Gecomprimeerde DAISY-boeken waarvan de verwijzingen de verkeerde hoofdletters gebruiken, en DAISY 2.02-boeken waarvan alleen de eerste frase van een sectie werd gelezen.
+* Manual pages die omleiden met `.so`.
+* Markdown-frontmatter die als tekst werd gelezen.
+
+##### macOS
+* Navigatie naar het begin van een regel, activeren met het toetsenbord en kopieermeldingen.
+* De contextmenuopdracht van VoiceOver opent het contextmenu van Paperback.
+* Menusneltoetsen overstemmen niet langer de melding van wat ze doen.
+
+##### iOS en Android
+* iOS: starten wordt niet langer afgebroken terwijl grote boeken worden heropend.
+* iOS: de app opent weer op het tabblad waarop je las, een tabblad sluiten leest het vorige boek niet langer voor, en Recente documenten behouden hun volgorde.
+* iOS: audioboeken worden niet langer bij elke start opnieuw uitgepakt.
+* iOS: regexregels in het uitspraakwoordenboek accepteren `\1`.
+* Android: voorlezen van met een wachtwoord beveiligde documenten.
+* Android: Vorige aan de bovenkant leest de eerste alinea niet langer opnieuw en tekstmodus springt niet langer bij het scrollen.
+* Android: minder batterijgebruik tijdens lezen en pauzeren.
 
 ### Versie 1.0
 
@@ -547,7 +686,7 @@ De iOS- en Android-apps openen elke indeling die de desktopversie ondersteunt, e
 * Opgelost dat 'Laatst gesloten heropenen' de meegeleverde handleiding probeerde te heropenen.
 * Opgelost dat je geselecteerde tabblad niet goed de focus kreeg na het opnieuw starten van Paperback.
 * De omgang van Paperback met bestanden op Windows-netwerkschijven: 'Bestandslocatie openen' focust het bestand nu correct op de netwerkopslag, en de paden bevatten geen vreemde tekens meer.
-* .paperback-bestanden worden bij het herstellen van documenten niet langer geforceerd geladen; in plaats daarvan wordt je om bevestiging gevraagd wanneer er een wordt gevonden.
+* .paperback-bestanden worden bij het heropenen van documenten niet langer geforceerd geladen; in plaats daarvan wordt je om bevestiging gevraagd wanneer er een wordt gevonden.
 * Bovenliggende map openen focust nu het betreffende bestand in de Verkenner.
 * Bij het openen van de handleiding wordt nu je gekozen taal gerespecteerd.
 * De gebruikersinterface van Paperback wordt nu goed geschaald op schermen met hoge DPI.
@@ -763,7 +902,7 @@ De iOS- en Android-apps openen elke indeling die de desktopversie ondersteunt, e
 * De inhoudsopgave is nu in enkele gevallen overzichtelijker; bijvoorbeeld als je een onderliggend en een bovenliggend item met dezelfde tekst op dezelfde positie hebt, zie je nu alleen het bovenliggende item.
 * De inhoudsopgave in bepaalde CHM-documenten opgelost.
 * De inhoudsopgave in EPUB 3-boeken met absolute paden opgelost.
-* CHM-documenten tonen nu hun titel zoals ingesteld in het metagegevensbestand.
+* CHM-documenten tonen nu hun titel zoals ingesteld in het metadatabestand.
 
 ### Versie 0.4.0
 * Ondersteuning voor CHM-bestanden toegevoegd!
@@ -790,7 +929,7 @@ De iOS- en Android-apps openen elke indeling die de desktopversie ondersteunt, e
 * Een selectievakje toegevoegd aan het optievenster om tekstterugloop in of uit te schakelen!
 * Het is nu mogelijk om te doneren aan de ontwikkeling van Paperback, via het nieuwe donatie-item in het menu Help of via de link 'sponsor this project' onderaan de hoofdpagina van de GitHub-repository.
 * Markdown-documenten hebben nu altijd een titel, en Paperback zou nu vrijwel elk Markdown-bestand moeten kunnen laden.
-* PDF-documenten hebben nu altijd een titel, zelfs als de metagegevens ontbreken.
+* PDF-documenten hebben nu altijd een titel, zelfs als de metadata ontbreekt.
 * Van PDF-bibliotheek gewisseld naar die welke in Chromium wordt gebruikt, wat zorgt voor veel betrouwbaarder PDF-verwerking in het algemeen.
 * Je kunt nu slechts één instantie van Paperback tegelijk laten draaien. Als je paperback.exe met een bestandsnaam uitvoert terwijl het al draait, wordt dat document geopend in de reeds draaiende instantie.
 * Je kunt nu op Delete drukken op een document in het tabbladbesturingselement om het te sluiten.

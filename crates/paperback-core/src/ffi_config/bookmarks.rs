@@ -2,12 +2,13 @@
 //! sync can carry them between the two.
 
 use super::ConfigManagerFfi;
+use crate::document::DocPos;
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BookmarkFfi {
-	pub start: i64,
-	pub end: i64,
+	pub start: DocPos,
+	pub end: DocPos,
 	pub note: String,
 }
 
@@ -28,24 +29,28 @@ impl ConfigManagerFfi {
 			.collect()
 	}
 
-	pub fn add_bookmark_ffi(&self, path: String, start: i64, end: i64, note: String) {
+	pub fn add_bookmark_ffi(&self, path: String, start: DocPos, end: DocPos, note: String) {
 		self.inner.lock().unwrap().add_bookmark(&path, start, end, &note);
 	}
 
-	pub fn remove_bookmark_ffi(&self, path: String, start: i64, end: i64) {
+	pub fn remove_bookmark_ffi(&self, path: String, start: DocPos, end: DocPos) {
 		self.inner.lock().unwrap().remove_bookmark(&path, start, end);
 	}
 
-	pub fn update_bookmark_note_ffi(&self, path: String, start: i64, end: i64, note: String) {
+	pub fn update_bookmark_note_ffi(&self, path: String, start: DocPos, end: DocPos, note: String) {
 		self.inner.lock().unwrap().update_bookmark_note(&path, start, end, &note);
 	}
 
 	/// Where the reader was before a jump, kept in the desktop's temporary bookmark: `-1` when there is none.
 	pub fn get_temporary_bookmark_ffi(&self, path: String) -> i64 {
-		self.inner.lock().unwrap().get_temporary_bookmark(&path).unwrap_or(-1)
+		self.inner
+			.lock()
+			.unwrap()
+			.get_temporary_bookmark(&path)
+			.map_or(-1, |position| i64::try_from(position).unwrap_or(i64::MAX))
 	}
 
-	pub fn set_temporary_bookmark_ffi(&self, path: String, position: i64) {
+	pub fn set_temporary_bookmark_ffi(&self, path: String, position: DocPos) {
 		self.inner.lock().unwrap().set_temporary_bookmark(&path, Some(position));
 	}
 }
@@ -61,16 +66,21 @@ mod tests {
 		let config = ConfigManagerFfi::new();
 		assert!(config.initialize(dir.join("config.toml").to_string_lossy().into_owned()));
 		let book = "/books/book.epub".to_string();
-		config.add_bookmark_ffi(book.clone(), 50, 60, "Later".to_string());
-		config.add_bookmark_ffi(book.clone(), 10, 20, "Earlier".to_string());
+		config.add_bookmark_ffi(book.clone(), DocPos::from_raw(50), DocPos::from_raw(60), "Later".to_string());
+		config.add_bookmark_ffi(book.clone(), DocPos::from_raw(10), DocPos::from_raw(20), "Earlier".to_string());
 		let marks = config.get_bookmarks_ffi(book.clone());
-		assert_eq!(marks.iter().map(|m| m.start).collect::<Vec<_>>(), vec![10, 50]);
-		config.update_bookmark_note_ffi(book.clone(), 10, 20, "Renamed".to_string());
+		assert_eq!(marks.iter().map(|m| m.start).collect::<Vec<_>>(), vec![DocPos::from_raw(10), DocPos::from_raw(50)]);
+		config.update_bookmark_note_ffi(
+			book.clone(),
+			DocPos::from_raw(10),
+			DocPos::from_raw(20),
+			"Renamed".to_string(),
+		);
 		assert_eq!(config.get_bookmarks_ffi(book.clone())[0].note, "Renamed");
-		config.remove_bookmark_ffi(book.clone(), 50, 60);
+		config.remove_bookmark_ffi(book.clone(), DocPos::from_raw(50), DocPos::from_raw(60));
 		assert_eq!(config.get_bookmarks_ffi(book).len(), 1);
 		assert_eq!(config.get_temporary_bookmark_ffi("/books/book.epub".to_string()), -1);
-		config.set_temporary_bookmark_ffi("/books/book.epub".to_string(), 42);
+		config.set_temporary_bookmark_ffi("/books/book.epub".to_string(), DocPos::from_raw(42));
 		assert_eq!(config.get_temporary_bookmark_ffi("/books/book.epub".to_string()), 42);
 		std::fs::remove_dir_all(dir).unwrap();
 	}

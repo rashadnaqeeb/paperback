@@ -1,6 +1,6 @@
-<!-- machine-translated from doc/readme.md (source-hash: cc466634600b58b4; sections: 84030068,db723a70,df2f4c18,e9b82d46,1387e8b7,3887c286,0ee39028,3a4c3efe,d3762a01,e9860ee8,80b9b9ca); please review and edit as needed -->
+<!-- machine-translated from doc/readme.md (source-hash: ba700ddfbaf3e99f; sections: 64167837,db723a70,df2f4c18,aa6b9ca2,1387e8b7,b8a00464,74f0c8e7,490ed50c,d3762a01,e9860ee8,15aeaaed); please review and edit as needed -->
 
-# Paperback - Version 1.0
+# Paperback - Version 1.1
 
 ## Einführung
 
@@ -22,11 +22,11 @@ Paperback läuft auf Windows 10/11, allen modernen ARM-Versionen von macOS, Linu
 * Kann vollständig portabel ausgeführt oder mit automatisch eingerichteten Dateizuordnungen installiert werden.
 * Unterstützt eine riesige Auswahl an gängigen Dateiformaten.
 * Spielt Audiobooks mit verstellbarer Geschwindigkeit und Lesezeichen ab, die die genaue Zeit speichern.
-* Liest gescannte PDF-Seiten mit der in Windows und macOS integrierten Texterkennung.
+* Liest gescannte PDF-Seiten mit der in Windows und macOS integrierten Texterkennung oder mit Tesseract unter Linux.
 * Lesezeichen und Notizen, damit du deine Position markieren und später dorthin zurückkehren kannst.
 * Jede Tastenkombination kann geändert werden.
 * Öffnet Dokumente direkt aus http- und https-Links, und lädt sie erneut herunter, wenn du sie erneut öffnest oder `F5` drückst, wobei die Leseposition und Lesezeichen erhalten bleiben. Beim Wiederherstellen der Dokumente, die du geöffnet hattest, lädt es erneut die Dokumente aus Links herunter, die 2 MB oder kleiner waren.
-* Kommt mit `pb`, einem Befehlszeilentool, das beliebige unterstützte Dokumente in HTML, Markdown oder einfachen Text konvertiert. Es verarbeitet beliebig viele Dokumente, expandiert `*.pdf` und ähnliches selbst, sodass dieselbe Befehlszeile auf Windows funktioniert, und kann eine Datei pro Dokument in einen Ordner schreiben. Es kann auch eine Liste von Dokumenten aus einer Datei oder von stdin mit `--files-from` lesen und Dokumente direkt von http- und https-Links konvertieren.
+* Kommt mit `pb`, einem Befehlszeilentool, das beliebige unterstützte Dokumente in HTML, Markdown oder einfachen Text konvertiert. Es verarbeitet beliebig viele Dokumente, expandiert `*.pdf` und ähnliches selbst, sodass dieselbe Befehlszeile auf Windows funktioniert, und kann eine Datei pro Dokument in einen Ordner schreiben, wobei mehrere gleichzeitig konvertiert werden (`--jobs` legt fest, wie viele). Es kann auch eine Liste von Dokumenten aus einer Datei oder von stdin mit `--files-from` lesen und Dokumente direkt von http- und https-Links konvertieren.
 
 ## Bildschirmleser-Kompatibilität
 
@@ -48,11 +48,14 @@ Wenn JAWS nichts sagt, wenn du eine Taste drückst, die etwas melden sollte, öf
 
 Paperback unterstützt die folgenden Formate und Dateitypen:
 
-* Comic-Book-Archive (`.cbz`)
+* Braille-Ready-Dateien und Portable-Embosser-Format-Bücher, zurückgewandelt in Druck mit der von dir gewählten Braille-Tabelle (`.brf`, `.pef`)
+* Comic-Book-Archive (`.cbz`, `.cbr`)
 * CHM-Hilfedateien (`.chm`)
 * DAISY-Bücher (`.opf`, `.zip`)
-* EPUB-Bücher (`.epub`)
+* eBraille-Bücher, gelesen in Druck, wenn sie ihn enthalten, ansonsten zurückgewandelt mit dem Braille-Code, den sie bezeichnen (`.ebrl`, oder das `.opf` eines, das nicht komprimiert ist)
+* EPUB-Bücher (`.epub`, oder das `.opf` eines, das nicht komprimiert ist)
 * FB2-eBooks (`.fb2`)
+* GNU-Info-Handbücher (`.info`, komprimiert oder nicht, und geteilte Handbücher, die von einem ihrer Teile aus geöffnet werden)
 * HTML-Dokumente (`.htm`, `.html`, `.xhtml`)
 * Manualseiten, sowohl `man` als auch BSD `mdoc` (`.1` bis `.9`, `.man`, `.roff` und die komprimierten Versionen von jedem)
 * Markdown-Dokumente (`.md`, `.markdown`, `.mdx`, `.mdown`, `.mdwn`, `.mkd`, `.mkdn`, `.mkdown`, `.ronn`)
@@ -62,12 +65,15 @@ Paperback unterstützt die folgenden Formate und Dateitypen:
 * MP3-Hörbücher (`.mp3`)
 * OpenDocument-Präsentationen (`.odp`, `.fodp`)
 * OpenDocument-Textdateien (`.odt`, `.fodt`)
+* OS/2-Hilfedateien und Bücher mit ihren Bildern (`.inf`, `.hlp`)
 * PDF-Dokumente (`.pdf`)
 * PowerPoint-Präsentationen (`.pptx`, `.pptm`, `.ppt`)
+* RAR-Archive von Büchern, die sich wie eine ZIP-Datei öffnen, mit einer Liste zur Auswahl, wenn mehrere enthalten sind (`.rar`)
 * reStructuredText-Dokumente (`.rst`, `.rest`)
 * RTF-Dokumente (`.rtf`)
 * Windows-Write-Dokumente (`.wri`)
 * WinHelp-Dateien (`.hlp`)
+* XPS- und OpenXPS-Dokumente (`.xps`, `.oxps`)
 * Reine Textdateien und Logdateien (`.txt`, `.log`)
 
 ## Tastenkombinationen
@@ -75,6 +81,8 @@ Paperback unterstützt die folgenden Formate und Dateitypen:
 Paperback ist für die Verwendung mit der Tastatur ausgerichtet. Hier sind die aktuellen Tastenkombinationen.
 
 Die folgenden Tastenkombinationen sind für Windows. Wo sich macOS unterscheidet, ist das Äquivalent in Klammern vermerkt — hauptsächlich, weil `Ctrl+G`, `Ctrl+W` und `Alt+Left`/`Alt+Right` auf dieser Plattform bereits von anderen System- oder App-Konventionen belegt sind.
+
+Sonderzeichentastenkombinationen sind nach den Tasten einer US-Tastatur benannt. Bei einer anderen Belegung drücke die Taste an derselben Stelle, unabhängig davon, wie sie beschriftet ist: Bei einer ungarischen Tastatur funktioniert die Taste mit der Beschriftung `é` als `;` und die mit `á` beschriftete als `'`, daher bedeutet `Ctrl+'` Strg und die `á`-Taste. Menüs zeigen weiterhin die US-Namen. Auf macOS zeigen Menüs stattdessen die Tasten deiner eigenen Belegung an.
 
 ### Menü „Datei"
 
@@ -86,6 +94,7 @@ Die folgenden Tastenkombinationen sind für Windows. Wo sich macOS unterscheidet
 * `Ctrl+R`: Zeigt den Dialog „Alle Dokumente" an (aus „Zuletzt verwendet").
 * `Ctrl+Shift+C`: Enthaltenden Ordner öffnen.
 * `Ctrl+Shift+E`: Dokumentdaten exportieren (`.paperback`).
+* `Ctrl+Alt+E`: Lesezeichen und Notizen als lesbaren Text oder HTML-Datei exportieren.
 * `Ctrl+Shift+I`: Dokumentdaten importieren (`.paperback`).
 * `Ctrl+E`: Aktuelles Dokument als Klartext exportieren.
 * `Ctrl+Q`: Beendet Paperback (nur Windows; auf macOS befindet sich diese Option stattdessen im App-Menü).
@@ -103,7 +112,7 @@ Die folgenden Tastenkombinationen sind für Windows. Wo sich macOS unterscheidet
 
 * `F5`: Liest das aktuelle Dokument von der Festplatte neu ein, oder lädt es erneut herunter, wenn es von einem Link aus geöffnet wurde. Funktioniert unabhängig davon, ob „Geänderte Dokumente automatisch neu laden" in den Einstellungen aktiviert ist.
 * `Ctrl+Alt+W`: Wortumbruch umschalten.
-* `F11` (macOS: `RawCtrl+Ctrl+F`, d. h. Strg+Cmd+F): Vollbild umschalten.
+* `F11` (macOS: `Control+Cmd+F`, d. h. Strg+Cmd+F): Vollbild umschalten.
 * `Ctrl+Shift+V`: Aktuellen Inhalt in der Webansicht öffnen.
 * `Ctrl+U`: Dokumentquelle in einem neuen Tab anzeigen.
 
@@ -114,7 +123,7 @@ Die folgenden Tastenkombinationen sind für Windows. Wo sich macOS unterscheidet
 * `Ctrl+G` (macOS: `Cmd+L`): Zur Zeile gehen.
 * `Ctrl+Shift+G` (macOS: `Cmd+Shift+L`): Zum Prozentsatz gehen.
 * `Ctrl+P`: Zur Seite gehen (wenn vom aktuellen Dokument unterstützt).
-* `=`: Ankündigung des aktuellen Leseprozentsatzes und der Seitenzahl, z. B. „15 %, Seite 30". Die Seitenzahl wird bei Dokumenten ohne Seitenzahlen weggelassen.
+* `=`: Ankündigung des aktuellen Leseprozentsatzes und der Seitenzahl, z. B. „15 %, Seite 30". Die Seitenzahl wird bei Dokumenten ohne Seitenzahlen weggelassen. In einem Hörbuch werden danach angekündigt, wie weit du fortgeschritten bist und wie lange es dauert, z. B. „15 %, 1:02:03 von 10:30:00".
 * `Alt+Left` (macOS: `Cmd+[`): Zurück in der Navigationshistorie.
 * `Alt+Right` (macOS: `Cmd+]`): Vorwärts in der Navigationshistorie.
 * `[`: Vorheriger Abschnitt.
@@ -152,7 +161,7 @@ Die folgenden Tastenkombinationen sind für Windows. Wo sich macOS unterscheidet
 * `B`: Nächstes Lesezeichen.
 * `Shift+N`: Vorherige Notiz.
 * `N`: Nächste Notiz.
-* `Ctrl+Shift+W` (macOS: `RawCtrl+Shift+W`, d. h. die physische Strg-Taste statt Cmd): Notiztext an der aktuellen Position anzeigen.
+* `Ctrl+Shift+W` (macOS: `Control+Shift+W`, d. h. die physische Strg-Taste statt Cmd): Notiztext an der aktuellen Position anzeigen.
 * `Ctrl+B`: Zu allen Lesezeichen und Notizen springen.
 * `Ctrl+Alt+B`: Nur zu Lesezeichen springen.
 * `Ctrl+Alt+M`: Nur zu Notizen springen.
@@ -161,7 +170,9 @@ Die folgenden Tastenkombinationen sind für Windows. Wo sich macOS unterscheidet
 
 ### Menü „Audio"
 
-* `Ctrl+Space` (macOS: `RawCtrl+Space`, d. h. die physische Strg-Taste, da Cmd+Space Spotlight öffnet): Audioerzählung abspielen/pausieren.
+* `Ctrl+Space` (macOS: `Control+Space`, d. h. die physische Strg-Taste, da Cmd+Space Spotlight öffnet): Audioerzählung abspielen/pausieren.
+* `Ctrl+J`: Zu einer Zeit in der Aufzeichnung gehen. Gib es ein als `1:23:45`, `23:45` oder `45` Sekunden, oder stell `+` oder `-` voran, um dich von deiner aktuellen Position aus zu bewegen, z. B. `+5:00`. Das Dialogfeld zeigt, wie weit du fortgeschritten bist und wie lange das Buch dauert.
+* `Shift+=`: Sagt an, wie weit du in diesem Kapitel vorangekommen bist und wie viel davon noch übrig ist, z. B. „Kapitel 3, 4:10 von 12:00, 7:50 verbleibend".
 * `'`: Audioerzählung vorwärts spulen.
 * `;`: Audioerzählung rückwärts spulen.
 * `Shift+'`: Spulmenge der Audioerzählung erhöhen.
@@ -173,9 +184,10 @@ Die folgenden Tastenkombinationen sind für Windows. Wo sich macOS unterscheidet
 
 ### Menü „Werkzeuge"
 
-* `Ctrl+W` (macOS: `RawCtrl+W`, d. h. die physische Strg-Taste statt Cmd): Wortanzahl für das aktuelle Dokument anzeigen.
+* `Ctrl+W` (macOS: `Control+W`, d. h. die physische Strg-Taste statt Cmd): Wortanzahl für das aktuelle Dokument anzeigen.
 * `Ctrl+I`: Dokumentinfo anzeigen.
 * `Ctrl+Shift+O`: Einen Bereich gescannter PDF-Seiten mit Texterkennung erkennen.
+* `Ctrl+Shift+R`: Erkennt die PDF- oder Comic-Buchseite, auf der sich der Cursor befindet, mit Texterkennung und ersetzt vorhandenen Text.
 * `Ctrl+Shift+S`: Schlaf-Timer umschalten.
 * `Ctrl+,`: Einstellungen öffnen (macOS: im App-Menü).
 
@@ -194,7 +206,8 @@ Die folgenden Tastenkombinationen sind für Windows. Wo sich macOS unterscheidet
 * `Ctrl+Tab` und `Ctrl+Shift+Tab`: Gehe zum nächsten oder vorherigen offenen Dokument und wechsle am Ende zur anderen Seite.
 * `Enter` oder `Space` im Dokumenttext: Folgt einem Link oder öffnet eine Tabellen- oder Formelansicht an der Cursorposition.
 * `Enter` auf einer gescannten PDF-Seite: Erkennt die Seite mit Texterkennung.
-* `Shift+F10` oder die Menü-/Anwendungstaste im Dokumenttext: Öffnet das Kontextmenü. Bei einem Bild in einem EPUB, HTML, Markdown, CHM, FB2 oder Comic-Buch bietet es auch an, das Bild in eine Datei zu speichern.
+* `Enter` auf einem Bild, das kein Link ist: Zeigt den im Bild erkannten Text in einer Ansicht an, die `Escape` schließt. Das Bild selbst bleibt unverändert, und der Text des Dokuments wird nicht geändert.
+* `Shift+F10` oder die Menü-/Anwendungstaste im Dokumenttext: Öffnet das Kontextmenü. Bei einem Bild in einem PDF, EPUB, HTML, Markdown, CHM, FB2 oder Comic-Buch bietet es auch an, das Bild in eine Datei zu speichern, und unter Windows und macOS den Text darin zu lesen – das ist die Möglichkeit, ein Bild zu lesen, das auch ein Link ist.
 
 ## iOS und Android
 
@@ -233,7 +246,7 @@ Das Menü „Weitere Optionen" enthält alles Übrige. Einige Einträge verhalte
 * **Gehe zu:** springe zu einer Zeile, einer Seite oder einer Prozentzahl im Dokument. Wähle mit der Modusauswahl aus.
 * **Zuletzt geöffnete Dokumente:** alle Dokumente, die du geöffnet hast, jeweils gekennzeichnet als zurzeit offen, geschlossen oder Datei fehlt. Jedes Dokument hat zwei Aktionen des Bildschirmlesers: „Entfernen" nimmt es aus der Liste, und „Suchen" ermöglicht es dir, ein Dokument zu finden, dessen Datei verschoben wurde. „Zuletzt geöffnete Dokumente löschen" leert die Liste, ohne Dokumente zu löschen.
 * **Wortanzahl:** die Anzahl der Wörter im Dokument.
-* **Dokument-Info:** Titel, Autor, Dateiname und unter iOS auch die Zeilen- und Zeichenanzahl.
+* **Dokumentinfo:** Titel, Autor, Dateiname, deine Position im Dokument und die Wort-, Zeilen- und Zeichenanzahl. Bei einem Audiobuch zeigt es auch an, wie viele Dateien es hat, und wenn Paperback das erkennen kann, wie lange sie insgesamt und im Durchschnitt laufen.
 * **Exportieren:** speichert das Dokument als reinen Text, HTML oder Markdown.
 * **Schlaf-Timer:** beendet die Wiedergabe nach 5, 10, 15, 30, 45 oder 60 Minuten oder zu einer selbst festgelegten Zeit. Öffne es erneut während der Ausführung, um zu sehen, wie lange es noch dauert, oder um es abzubrechen.
 * **Hilfe:** öffnet diese Anleitung.
@@ -302,6 +315,132 @@ Hinweis: Ich betrachte ein öffentliches GitHub-Sponsoring als Grund für die au
 * Tyler Rodick
 
 ## Änderungsprotokoll
+
+### Version 1.1
+
+1.1 bringt eine neue PDF-Engine, einen neu aufgebauten iOS-Textmodus, Texterkennung unter Linux, Dokumente von Links, Unterstützung für Jahrzehnte alte Word-, Write- und PowerPoint-Dateien und vieles mehr.
+
+#### Hinzugefügt
+
+##### Allgemein
+* Eine ungarische Übersetzung und Anleitung.
+* Öffne ein Dokument von einem Link auf jeder Plattform. `F5` lädt es erneut herunter.
+* `F5` lädt das Dokument erneut.
+* `Ctrl+1` bis `Ctrl+9` springen zu deinen ersten neun geöffneten Dokumenten.
+* `Ctrl+Tab` und `Ctrl+Shift+Tab` wechseln Dokumente unter macOS und Linux.
+* Der Dialog „Dokument öffnen" und „Alle Dokumente" öffnen jedes Dokument, das du auswählst, jeweils in seinem eigenen Tab.
+* Speichere ein Bild aus dem Kontextmenü.
+* Exportiere Lesezeichen und Notizen als Text oder HTML.
+* Einstellungen für das Protokollierungsniveau und ob „Suchen" seine Treffer auswählt.
+* Die Fenster-Hotkey kann eine beliebige Taste sein, die auf der neuen Registerkarte „Systemweit" unter „Tastenkombinationen anpassen" eingestellt ist.
+* Kopieren sagt, wie viel es kopiert hat, und der Text bleibt in der Zwischenablage, nachdem Paperback geschlossen wird.
+* Jedes Menüelement hat in jeder Sprache seine eigene Zugriffstaste.
+* Ein unlesbares ZIP öffnet sich als Liste der Dokumente darin.
+
+##### Neue Formate
+* Word für Windows 1 und 2, Word für DOS, Word für Mac 4 und 5 sowie die Unicode-Editionen von Word 6 und 95.
+* PowerPoint 95.
+* Gezipptes FictionBook (`.fb2.zip`).
+* DAISY-3-Bücher, die nur ein DTBook in einem ZIP sind, oder nur Audio.
+
+##### Texterkennung
+* Texterkennung unter Linux durch Tesseract.
+* „Aktuelle Seite erkennen" (`Ctrl+Shift+R`) liest die Seite, auf der du bist, erneut, auch wenn sie Text enthält.
+* `Enter` auf einem Bild liest seinen Text.
+* Erkannter Text folgt dem Layout der Seite und wird gespeichert, sodass ein gescanntes Dokument mit seinem Text geöffnet wird.
+* „Texterkennung (Stapelverarbeitung)" kann Seiten mit Text erneut verarbeiten, liest mehrere Seiten auf einmal und stoppt, wenn du das Dokument schließt.
+
+##### Hörbücher
+* Geschwindigkeiten bis 4x überall, über Sitzungen hinweg gespeichert.
+* Lautstärkeregler.
+
+##### PDF-Dokumente
+* Eine neue PDF-Engine: schneller, nutzt jeden CPU-Kern und benötigt keine pdfium-Bibliothek.
+* In ungetaggten Seiten gefundene Überschriften und bessere Titel.
+* Eine Einstellung, um wiederholte Seitenkopfzeilen und Fußzeilen beizubehalten.
+
+##### Andere Dokumente
+* Word: nummerierte und Aufzählungslisten, Fußnoten, Endnoten, Kommentare, Bildalt-Text, Listennavigation und Seiten von Word selbst.
+* OpenDocument: Fußnoten und Kommentare nach dem Text.
+* Titel und Autoren aus den Metadaten des Dokuments in Word, PowerPoint, OpenDocument, RTF, Markdown und reStructuredText.
+* Comics: Titel, Autor, Seitentypen und Lesezeichen aus ComicInfo.xml.
+* FB2: Überschriften, ein Inhaltsverzeichnis und separate Verszeilen.
+* Bilder in MOBI-, KF8- und gezippten DAISY-Büchern können gespeichert und mit Texterkennung gelesen werden.
+* Dollarbegrenzte Mathematik in Markdown.
+* Sphinx-Direktiven in reStructuredText.
+* Bilder ohne Beschreibung werden als [Bild] angezeigt.
+
+##### iOS und Android
+* Eine Sprachreihe in „Einstellungen".
+* „Dokumentinfo" zeigt deinen Fortschritt und die Anzahl der Dateien und die Laufzeit eines Hörbuchs.
+* Der Textmodus wird gespeichert.
+* Fortsetzen des kontinuierlichen Lesens nach einer Suche.
+* iOS: Textmodus neu aufgebaut für VoiceOver. „Alles lesen" durchläuft das ganze Buch, die Rotoren erreichen alles davon, Listen und Tabellen sind echte Listen und Tabellen, Drei-Finger-Wischen blättern Seiten um, und das Drei-Finger-Tippen gibt Seite und Prozentsatz.
+* iOS: eine Stimme, Sprechgeschwindigkeit und Tonhöhe pro Buch aus „Sprachausgabe für dieses Buch".
+* iOS: passwortgeschützte Dokumente.
+* iOS: teile gezippte DAISY-Bücher und MP3-Hörbücher mit Paperback.
+* iOS: Der Schlaf-Timer stoppt Hörbücher.
+* iOS: Slowakisch und Ukrainisch.
+* Android: Sprechgeschwindigkeit und Tonhöhenänderungen gelten für den gerade gelesenen Absatz und funktionieren mit der Standard-Engine des Systems.
+* Android: läuft auf x86_64-Geräten.
+
+##### macOS
+* Eine universelle App, nativ auf Intel und Apple-Silizium.
+* pb ist in der App enthalten.
+
+##### pb
+* Konvertiere nach Seite, einen ganzen Ordner, eine Liste von Dateien (`--files-from`) oder einen Link.
+
+#### Geändert
+* Die Menüleiste wird in acht Menüs reorganisiert.
+* Die Statusleiste sagt „Fortschritt" statt „Lesen".
+* Menübefehle kündigen an, was sie getan haben, statt beim Schließen des Menüs überlagert zu werden.
+* Aktualisierungen schließen Paperback ordnungsgemäß und bringen es nach vorne zurück.
+* Riesige Textdateien öffnen sich mit einem Bruchteil des Speichers, und die 4-GB-Grenze ist weg.
+* MOBI-, Word- und HTML-Konvertierung, „Alles finden" und „Alle Dokumente"-Suche sind schneller.
+* Die Windows-Programmdatei ist 3 MB kleiner.
+
+#### Behoben
+
+##### Allgemein
+* Interpunktions-Tastenkombinationen auf Tastaturlayouts, die Shift dafür benötigen; „Tastenkombinationen anpassen" kennzeichnet alle, die dein Layout nicht eingeben kann.
+* Der Fokus kehrt nach `Win+D` zum Dokument zurück.
+* Abstürze beim Öffnen von Lesezeichen für ein neues Dokument, in „Alles finden" und bei einigen beschädigten MOBI-Dateien.
+* Regex-Suche wählt die gesamte Übereinstimmung aus.
+* Die Statusleiste eines Hörbuchs wechselt nicht mehr zwischen Audio- und Textfortschritt.
+* Die Wortanzahl enthält Text, der mit Texterkennung gelesen wurde.
+* Gescannte Seiten kündigen ihr eigenes Bild nicht mehr an.
+* Die PATH-Option des Installers.
+* Linux-Updates finden ihre Downloads, und ein AppImage wird als AppImage aktualisiert.
+* Die Kommentarzeile in Word- und OpenDocument-Dateien wird übersetzt.
+
+##### Dokumente
+* Windows-Write-Dateien, die als Binärdatei geöffnet wurden.
+* PDF: Text, der an Seitenumbrüchen in gekennzeichneten PDFs wiederholt wird, zweite Spalten werden zuerst gelesen, verloren gegangene Leerzeichen und Trennstriche am Zeilenende, Text in Type-3-Schriftarten und Inhalts-Punktführer.
+* RTF: nackte CR-Zeilenumbrüche, Bindestrich-Aufzählungslisten, Text vor dem ersten Absatz, akzentuierter und CJK-Text, Text, der nach einem Escapezeichen-Backslash verloren ging, und RTF, das als `.doc` gespeichert wurde.
+* Word- und PowerPoint-Dateien mit beschädigten Behältern, die Word immer noch öffnet.
+* Word-Text in nachverfolgten Änderungen, Feldern und Tabellenzellen.
+* PowerPoint-Links, Folien ohne Text und Emoji.
+* `<` und `&` in Word-, PowerPoint- und OpenDocument-Tabellenzellen.
+* Passwortgeschützte OpenDocument-Dateien von aktuellem LibreOffice.
+* CHM-Dateien in ihrer Codepage und HTML- und DAISY-Dateien in ihrer deklarierten Codierung.
+* Gezippte DAISY-Bücher, deren Referenzen die falsche Groß-/Kleinschreibung verwenden, und DAISY-2.02-Bücher, die nur die erste Phrase eines Abschnitts lesen.
+* Manpages, die mit `.so` umleiten.
+* Markdown-Präambel, die als Text gelesen wird.
+
+##### macOS
+* Zeilenstart-Navigation, Tastaturaktivierung und Kopier-Ankündigungen.
+* VoiceOvers Kontextmenübefehl öffnet Paperbacks eigenes.
+* Menü-Tastenkombinationen werden nicht mehr über dem angekündigt, was sie tun.
+
+##### iOS und Android
+* iOS: Start wird nicht mehr unterbrochen, während große Bücher wiederhergestellt werden.
+* iOS: öffnet erneut auf der Registerkarte, auf der du warst, das Schließen einer Registerkarte liest das vorherige Buch nicht mehr, und „Zuletzt geöffnete Dokumente" behalten ihre Reihenfolge.
+* iOS: Hörbücher werden nicht mehr bei jedem Start extrahiert.
+* iOS: Sprachverzeichnis-Regex-Regeln akzeptieren `\1`.
+* Android: Vorlesen aus passwortgeschützten Dokumenten.
+* Android: „Zurück" oben liest nicht mehr den ersten Absatz erneut, und der Textmodus springt sein Scroll nicht mehr.
+* Android: weniger Batteriegebrauch beim Lesen und Pausieren.
 
 ### Version 1.0
 

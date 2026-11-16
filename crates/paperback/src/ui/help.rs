@@ -16,17 +16,14 @@ use wxdragon::prelude::*;
 use super::document_manager::DocumentManager;
 use crate::translation_manager::TranslationManager;
 
-/// Materializes the readme for the current UI language and returns its path. Every readme is
-/// embedded at build time, so this reads nothing from the install directory; languages without a
-/// translated readme fall back to English rather than to no help at all.
 pub fn readme_path() -> Option<PathBuf> {
 	let lang = TranslationManager::instance().lock().unwrap().current_language();
-	let (lang, bytes) = match lang_readmes::readme_for_lang(&lang) {
-		Some(bytes) => (lang, bytes),
+	let (lang, html) = match lang_readmes::readme_for_lang(&lang) {
+		Some(html) => (lang, html),
 		None => ("en".to_string(), lang_readmes::readme_for_lang("en")?),
 	};
 	let tmp = env::temp_dir().join(format!("paperback-readme-{lang}.html"));
-	match fs::write(&tmp, bytes) {
+	match fs::write(&tmp, html) {
 		Ok(()) => Some(tmp),
 		Err(e) => {
 			tracing::warn!(path = %tmp.display(), error = %e, "failed to write readme temp file");
@@ -137,6 +134,12 @@ mod tests {
 	use std::{ffi::OsStr, path::Path};
 
 	use super::finder_reveal_command;
+
+	#[test]
+	fn the_embedded_readme_is_an_html_page() {
+		let html = super::lang_readmes::readme_for_lang("en").expect("the English readme is embedded");
+		assert!(html.starts_with(b"<!DOCTYPE html>"));
+	}
 
 	#[test]
 	fn finder_reveal_command_preserves_paths_with_spaces() {

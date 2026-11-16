@@ -31,7 +31,6 @@ final class AppViewModel {
 	@ObservationIgnored private var cancellables = Set<AnyCancellable>()
 
 	init() {
-		setPdfiumLibraryPath(path: Bundle.main.bundlePath + "/Frameworks/libpdfium.framework")
 		_ = configManager.initialize(configPath: configFilePath())
 		configManager.syncStartFfi(device: "iphone", store: ICloudSyncStore())
 		swipeUpMovesForward = configManager.getAppBool(key: "swipe_up_moves_forward", defaultValue: true)

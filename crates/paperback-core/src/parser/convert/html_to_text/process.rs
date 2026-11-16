@@ -1,24 +1,31 @@
-//! The actual tree-walk: [`HtmlToText::process_node`] and everything it dispatches to per tag.
-
-use std::fmt::Write;
+use std::{collections::HashSet, fmt::Write};
 
 use ego_tree::NodeRef;
 use scraper::{ElementRef, Html, Node, node};
 
 use super::{HtmlToText, ProcessingFlags};
 use crate::{
+	document::{DocLen, DocPos},
 	parser::convert::{
 		block_elements::is_block_element,
 		format_spans::FormatKind,
-		formula::{formula_text, is_dom_formula},
+		formula::{LinkFormula, formula_text, is_dom_formula, place_in_collapsed},
+		image_text,
+		layout_table::is_layout_table,
 		line_builder::LineBuilder,
 		list_style::ListStyle,
 		table_text::{collect_dom_text, table_render_bundle},
 	},
-	t,
 	types::{FormulaInfo, HeadingInfo, ImageInfo, LinkInfo, ListInfo, ListItemInfo, SeparatorInfo, TableInfo},
-	util::text::{collapse_whitespace, display_len, format_list_item, remove_soft_hyphens, trim_string},
+	util::text::{collapse_whitespace, format_list_item, remove_soft_hyphens, trim_string},
 };
+
+enum Step<'a> {
+	Visit(NodeRef<'a, Node>),
+	Close(&'a str),
+	/// Written out as markup rather than read.
+	Verbatim(NodeRef<'a, Node>),
+}
 
 impl HtmlToText {
 	const fn get_bullet_for_level(level: i32) -> &'static str {
@@ -30,43 +37,63 @@ impl HtmlToText {
 		}
 	}
 
-	pub(super) fn process_node(&mut self, node: NodeRef<'_, Node>, document: &Html) {
-		match node.value() {
-			Node::Element(element) => {
-				let tag_name = element.name();
-				if is_dom_formula(element) {
-					if self.flags.contains(ProcessingFlags::IN_BODY) {
-						self.handle_formula(node);
+	/// Walked with a stack of what's left rather than by recursion: unclosed tags nest some real pages thousands deep, which overflowed the main thread's stack on Windows.
+	pub(super) fn process_node(&mut self, root: NodeRef<'_, Node>, document: &Html) {
+		let mut pending = vec![Step::Visit(root)];
+		while let Some(step) = pending.pop() {
+			let node = match step {
+				Step::Visit(node) => node,
+				Step::Close(tag_name) => {
+					self.handle_element_closing(tag_name);
+					continue;
+				}
+				Step::Verbatim(node) => {
+					let html = Self::serialize_node(node, document);
+					self.text.push_str(&html);
+					continue;
+				}
+			};
+			match node.value() {
+				Node::Element(element) => {
+					let tag_name = element.name();
+					if is_dom_formula(element) {
+						if self.flags.contains(ProcessingFlags::IN_BODY) {
+							self.handle_formula(node);
+						}
+						continue;
 					}
-					return;
-				}
-				if tag_name == "table" {
-					if self.flags.contains(ProcessingFlags::IN_BODY)
-						&& let Some(id) = element.attr("id").or_else(|| element.attr("name"))
-					{
-						self.id_positions.insert(id.to_string(), self.text.get_current_text_position());
+					// A table laying out the page is read as the blocks in its cells, which the usual handling below does.
+					if tag_name == "table" && !is_layout_table(node) {
+						if self.flags.contains(ProcessingFlags::IN_BODY)
+							&& let Some(id) = element.attr("id").or_else(|| element.attr("name"))
+						{
+							self.id_positions.insert(id.to_string(), self.text.get_current_text_position());
+						}
+						self.handle_table(node, document);
+						continue;
 					}
-					self.handle_table(node, document);
-					return;
+					self.handle_element_opening(tag_name, node, document);
+					self.handle_list_item(tag_name, node, document);
+					self.handle_list_start(tag_name, node);
+					self.handle_heading(tag_name, node, document);
+					// An <object> stays in: its content is the fallback a reader wants, and a page that forgets </object> has the rest of its body inside one.
+					if matches!(tag_name, "script" | "style" | "noscript" | "iframe" | "embed") {
+						continue;
+					}
+					pending.push(Step::Close(tag_name));
+					// Markdown's code keeps its inline markup as text, which is what the reader of a code sample expects to see.
+					let verbatim = self.source_mode_markdown
+						&& self.flags.contains(ProcessingFlags::IN_CODE)
+						&& self.text.is_preserving_whitespace()
+						&& tag_name == "code";
+					for child in node.children().rev() {
+						let as_markup = verbatim && matches!(child.value(), Node::Element(_));
+						pending.push(if as_markup { Step::Verbatim(child) } else { Step::Visit(child) });
+					}
 				}
-				self.handle_element_opening(tag_name, node, document);
-				self.handle_list_item(tag_name, node, document);
-				self.handle_list_start(tag_name, node);
-				self.handle_heading(tag_name, node, document);
-				if matches!(tag_name, "script" | "style" | "noscript" | "iframe" | "object" | "embed") {
-					return;
-				}
-				self.process_element_children(node, document, tag_name);
-				self.handle_element_closing(tag_name);
-			}
-			Node::Text(text) => {
-				self.handle_text_node(text);
-			}
-			Node::Comment(_) => {}
-			_ => {
-				for child in node.children() {
-					self.process_node(child, document);
-				}
+				Node::Text(text) => self.handle_text_node(text),
+				Node::Comment(_) => {}
+				_ => pending.extend(node.children().rev().map(Step::Visit)),
 			}
 		}
 	}
@@ -78,8 +105,17 @@ impl HtmlToText {
 			return;
 		};
 		if self.flags.contains(ProcessingFlags::IN_LINK) {
-			// Link text is buffered separately. Formula markers await shared inline position tracking.
+			// Link text is buffered until the link closes, which is when the formula's place is known.
+			let raw_start = self.current_link_text.len();
+			let ids = node
+				.descendants()
+				.filter_map(|descendant| match descendant.value() {
+					Node::Element(element) => element.attr("id").or_else(|| element.attr("name")).map(str::to_string),
+					_ => None,
+				})
+				.collect();
 			self.current_link_text.push_str(&rendered);
+			self.current_link_formulas.push(LinkFormula { raw_start, text: rendered, mathml, ids });
 			return;
 		}
 		let block = element.attr("display") == Some("block");
@@ -95,8 +131,8 @@ impl HtmlToText {
 				self.id_positions.insert(id.to_string(), offset);
 			}
 		}
-		let length = display_len(&rendered);
-		self.text.current_line.push_str(&rendered);
+		let length = DocLen::of(&rendered);
+		self.text.push_str(&rendered);
 		if block {
 			self.text.finalize_current_line();
 		}
@@ -105,67 +141,50 @@ impl HtmlToText {
 
 	fn handle_table(&mut self, node: NodeRef<'_, Node>, document: &Html) {
 		self.text.finalize_current_line();
+		self.blocks.drop_break_at(self.text.get_current_text_position());
 		let table_html = Self::serialize_node(node, document);
 		let start_offset = self.text.get_current_text_position();
-		// Emit the table's on-screen text via the shared helper instead of recursing children to
-		// emit one cell per line. The helper output may contain tabs and span multiple lines; push
-		// each line verbatim so tab separators and empty cells survive whitespace collapsing.
+		// Lines are pushed verbatim so tab separators and empty cells survive whitespace collapsing.
 		let render = table_render_bundle(&table_html, self.render_tables_inline);
 		for line in render.lines {
-			self.text.push_finalized_line(line);
+			self.text.push_finalized_line(&line);
+		}
+		for formula in render.formulas {
+			let offset = start_offset + formula.offset;
+			for id in formula.ids {
+				self.id_positions.insert(id, offset);
+			}
+			let length = DocLen::of(&formula.text);
+			self.formulas.push(FormulaInfo { offset, text: formula.text, mathml: formula.mathml, length });
 		}
 		let table_caption = render.caption;
-		let display_length = render.display_length;
-		self.tables.push(TableInfo {
-			offset: start_offset,
-			text: table_caption,
-			html_content: table_html,
-			length: display_length,
-		});
+		let length = render.length;
+		self.tables.push(TableInfo { offset: start_offset, text: table_caption, html_content: table_html, length });
 	}
 
 	fn handle_element_opening(&mut self, tag_name: &str, node: NodeRef<'_, Node>, document: &Html) {
+		if is_block_element(tag_name) {
+			self.blocks.drop_break_at(self.text.get_current_text_position());
+		}
+		if self.flags.contains(ProcessingFlags::IN_BODY) {
+			self.blocks.open(tag_name, self.text.get_current_text_position());
+		}
 		if let Node::Element(element) = node.value() {
 			if self.flags.contains(ProcessingFlags::IN_BODY) {
 				if let Some(id) = element.attr("id").or_else(|| element.attr("name")) {
 					self.id_positions.insert(id.to_string(), self.text.get_current_text_position());
 				}
-				if tag_name == "img" || tag_name == "image" || tag_name == "figure" {
-					let mut description = element
-						.attr("alt")
-						.or_else(|| element.attr("aria-label"))
-						.or_else(|| element.attr("aria-description"))
-						.or_else(|| element.attr("title"))
-						.map(collapse_whitespace)
-						.unwrap_or_default();
-					if description.is_empty() && tag_name == "figure" {
-						for child in node.children() {
-							if let Node::Element(child_elem) = child.value()
-								&& child_elem.name() == "figcaption"
-							{
-								description = collapse_whitespace(&Self::collect_text(child));
-								break;
-							}
-						}
-					}
-					if !description.is_empty() {
-						let is_figure = tag_name == "figure";
-						// TRANSLATORS: Label inserted before a figure or image's description, e.g. "[Figure: a cat sleeping]"
-						let label = if is_figure { t("Figure") } else { t("Image") };
-						let image_text = format!("[{label}: {description}]");
-						let offset = self.text.get_current_text_position();
-						self.text.current_line.push_str(&image_text);
-						let info = ImageInfo {
-							offset,
-							alt_text: description,
-							length: display_len(&image_text),
-							source: Self::image_source(node),
-						};
-						if is_figure {
-							self.figures.push(info);
-						} else {
-							self.images.push(info);
-						}
+				if let Some((image_text, mut info, is_figure)) =
+					Self::described_image(tag_name, node, &self.content_images)
+				{
+					if self.flags.contains(ProcessingFlags::IN_LINK) {
+						// Placed once the link's text is known, since collapsing its whitespace can move it.
+						self.current_link_text.push_str(&image_text);
+						self.current_link_images.push((image_text, info, is_figure));
+					} else {
+						info.offset = self.text.get_current_text_position();
+						self.text.push_str(&image_text);
+						self.push_image(info, is_figure);
 					}
 				}
 			}
@@ -182,6 +201,10 @@ impl HtmlToText {
 				self.format_spans.open(&FormatKind::Italic, self.text.get_current_text_position());
 			} else if tag_name == "u" {
 				self.format_spans.open(&FormatKind::Underline, self.text.get_current_text_position());
+			} else if tag_name == "sup" {
+				self.format_spans.open(&FormatKind::Superscript, self.text.get_current_text_position());
+			} else if tag_name == "sub" {
+				self.format_spans.open(&FormatKind::Subscript, self.text.get_current_text_position());
 			}
 		}
 		if tag_name == "title" && self.title.is_empty() {
@@ -191,19 +214,39 @@ impl HtmlToText {
 			self.flags.insert(ProcessingFlags::IN_BODY);
 		} else if tag_name == "pre" {
 			self.text.finalize_current_line();
+			self.format_spans.open(&FormatKind::Preformatted, self.text.get_current_text_position());
 			self.text.start_preserve_whitespace();
 		} else if tag_name == "hr" && self.flags.contains(ProcessingFlags::IN_BODY) {
 			self.text.finalize_current_line();
 			let offset = self.text.get_current_text_position();
 			let line = LineBuilder::separator_line();
-			self.text.current_line.push_str(line);
+			self.text.push_str(line);
 			self.text.finalize_current_line();
-			self.separators.push(SeparatorInfo { offset, length: display_len(line) });
+			self.separators.push(SeparatorInfo { offset, length: DocLen::of(line) });
 		} else if tag_name == "code" {
 			self.flags.insert(ProcessingFlags::IN_CODE);
+			// Code inside a <pre> is already marked by it.
+			if !self.text.is_preserving_whitespace() {
+				self.format_spans.open(&FormatKind::Code, self.text.get_current_text_position());
+			}
 			self.text.start_preserve_whitespace();
 		} else if tag_name == "br" {
+			let in_link = self.flags.contains(ProcessingFlags::IN_LINK) && !self.text.is_preserving_whitespace();
+			let ends_text = !self.text.current_line().trim().is_empty();
 			self.text.finalize_current_line();
+			if in_link {
+				// A link's text is held back until it closes, so the line this ended is the one before the link, and the words either side of the break would otherwise join.
+				self.link_start_pos = self.text.get_current_text_position();
+				if !self.current_link_text.trim().is_empty() {
+					self.current_link_text.push(' ');
+				}
+			}
+			if !ends_text && !in_link {
+				// Two in a row leave a gap, which reads as a new paragraph.
+				self.blocks.drop_break_at(self.text.get_current_text_position());
+			} else if ends_text && self.flags.contains(ProcessingFlags::IN_BODY) {
+				self.blocks.line_break(self.text.get_current_text_position());
+			}
 		}
 	}
 
@@ -211,27 +254,27 @@ impl HtmlToText {
 		if tag_name == "li" {
 			self.text.finalize_current_line();
 			let li_text = Self::get_element_text(node, document);
-			self.list_items.push(ListItemInfo {
-				offset: self.text.get_current_text_position(),
-				level: self.list_level,
-				text: li_text,
-			});
+			let offset = self.text.get_current_text_position();
+			let mut number = None;
 			for _ in 0..self.list_level {
-				self.text.current_line.push_str("  ");
+				self.text.push_str("  ");
 			}
 			if let Some(style) = self.list_style_stack.last_mut() {
 				if style.ordered {
 					let item_text = format_list_item(style.item_number, &style.list_type);
-					let _ = write!(&mut self.text.current_line, "{item_text}. ");
+					let _ = write!(&mut self.text, "{item_text}. ");
+					number = Some(style.item_number);
 					style.item_number += 1;
 				} else {
-					self.text.current_line.push_str(Self::get_bullet_for_level(self.list_level));
-					self.text.current_line.push(' ');
+					self.text.push_str(Self::get_bullet_for_level(self.list_level));
+					self.text.push(' ');
 				}
 			} else {
-				self.text.current_line.push_str(Self::get_bullet_for_level(self.list_level));
-				self.text.current_line.push(' ');
+				self.text.push_str(Self::get_bullet_for_level(self.list_level));
+				self.text.push(' ');
 			}
+			let prefix_length = self.text.get_current_text_position().since(offset);
+			self.list_items.push(ListItemInfo { offset, level: self.list_level, text: li_text, prefix_length, number });
 		}
 	}
 
@@ -242,6 +285,7 @@ impl HtmlToText {
 			let start_attr = element.and_then(|e| e.attr("start"));
 			let type_attr = element.and_then(|e| e.attr("type"));
 			let style = ListStyle::new(tag_name == "ol", start_attr, type_attr);
+			let opening_tag = style.opening_tag();
 			self.list_style_stack.push(style);
 			let mut item_count = 0;
 			for child in node.children() {
@@ -254,7 +298,12 @@ impl HtmlToText {
 			if item_count > 0 {
 				self.text.finalize_current_line();
 				self.open_lists.push(Some(self.lists.len()));
-				self.lists.push(ListInfo { offset: self.text.get_current_text_position(), item_count, length: 0 });
+				self.lists.push(ListInfo {
+					offset: self.text.get_current_text_position(),
+					item_count,
+					length: DocLen::ZERO,
+					opening_tag,
+				});
 			} else {
 				self.open_lists.push(None);
 			}
@@ -280,45 +329,56 @@ impl HtmlToText {
 		}
 	}
 
-	fn process_element_children(&mut self, node: NodeRef<'_, Node>, document: &Html, tag_name: &str) {
-		let is_markdown_code = self.source_mode_markdown
-			&& self.flags.contains(ProcessingFlags::IN_CODE)
-			&& self.text.is_preserving_whitespace()
-			&& tag_name == "code";
-		if is_markdown_code {
-			for child in node.children() {
-				if let Node::Element(_) = child.value() {
-					let html_str = Self::serialize_node(child, document);
-					self.text.current_line.push_str(&html_str);
-				} else {
-					self.process_node(child, document);
-				}
-			}
-		} else {
-			for child in node.children() {
-				self.process_node(child, document);
-			}
-		}
-	}
-
 	fn handle_element_closing(&mut self, tag_name: &str) {
 		if tag_name == "a" && self.flags.contains(ProcessingFlags::IN_LINK) {
 			self.flags.remove(ProcessingFlags::IN_LINK);
 			if !self.current_link_text.is_empty() {
 				let collapsed_text = collapse_whitespace(&self.current_link_text);
+				let mut searched = 0;
+				for (image_text, mut info, is_figure) in std::mem::take(&mut self.current_link_images) {
+					let Some(found) = collapsed_text[searched..].find(&image_text) else { continue };
+					let start = searched + found;
+					info.offset = self.link_start_pos + DocLen::of(&collapsed_text[..start]);
+					searched = start + image_text.len();
+					self.push_image(info, is_figure);
+				}
 				self.links.push(LinkInfo {
 					offset: self.link_start_pos,
 					text: collapsed_text.clone(),
 					reference: self.current_link_href.clone(),
 				});
-				self.text.current_line.push_str(&collapsed_text);
+				let written_from = self.text.get_current_text_position();
+				self.text.push_str(&collapsed_text);
+				// Leading spaces the text before already ends with aren't written again, so a formula is that much earlier than its place in `collapsed_text`.
+				let written = self.text.get_current_text_position().since(written_from);
+				let leading = DocLen::of(&collapsed_text[..collapsed_text.len() - collapsed_text.trim_start().len()]);
+				let dropped = DocLen::of(&collapsed_text).saturating_sub(written).min(leading);
+				for formula in std::mem::take(&mut self.current_link_formulas) {
+					let Some(start) =
+						place_in_collapsed(&self.current_link_text, formula.raw_start, &collapsed_text, &formula.text)
+					else {
+						continue;
+					};
+					let offset = (written_from + DocLen::of(&collapsed_text[..start])).saturating_sub(dropped);
+					for id in formula.ids {
+						self.id_positions.insert(id, offset);
+					}
+					let length = DocLen::of(&formula.text);
+					self.formulas.push(FormulaInfo { offset, text: formula.text, mathml: formula.mathml, length });
+				}
 			}
 			self.current_link_href.clear();
 			self.current_link_text.clear();
+			self.current_link_images.clear();
+			self.current_link_formulas.clear();
 		}
 		if tag_name == "code" {
 			self.flags.remove(ProcessingFlags::IN_CODE);
 			self.text.stop_preserve_whitespace();
+			// After stopping, since the line will be collapsed and the position has to count it that way.
+			if !self.text.is_preserving_whitespace() {
+				self.format_spans.close(&FormatKind::Code, self.text.get_current_text_position());
+			}
 		}
 		if tag_name == "ul" || tag_name == "ol" {
 			self.list_level -= 1;
@@ -326,18 +386,19 @@ impl HtmlToText {
 			if let Some(open) = self.open_lists.pop().flatten() {
 				self.text.finalize_current_line();
 				let offset = self.lists[open].offset;
-				self.lists[open].length = self.text.get_current_text_position().saturating_sub(offset);
+				self.lists[open].length = self.text.get_current_text_position().since(offset);
 			}
 		}
 		if tag_name == "pre" {
 			let has_preserved_trailing_whitespace =
-				self.text.is_preserving_whitespace() && self.text.current_line.trim().is_empty();
+				self.text.is_preserving_whitespace() && self.text.current_line().trim().is_empty();
 			if has_preserved_trailing_whitespace {
-				self.text.current_line.clear();
+				self.text.clear_current_line();
 			} else {
 				self.text.finalize_current_line();
 			}
 			self.text.stop_preserve_whitespace();
+			self.format_spans.close(&FormatKind::Preformatted, self.text.get_current_text_position());
 		} else if is_block_element(tag_name) {
 			self.text.finalize_current_line();
 		}
@@ -347,7 +408,15 @@ impl HtmlToText {
 			self.format_spans.close(&FormatKind::Italic, self.text.get_current_text_position());
 		} else if tag_name == "u" {
 			self.format_spans.close(&FormatKind::Underline, self.text.get_current_text_position());
+		} else if tag_name == "sup" {
+			self.format_spans.close(&FormatKind::Superscript, self.text.get_current_text_position());
+		} else if tag_name == "sub" {
+			self.format_spans.close(&FormatKind::Subscript, self.text.get_current_text_position());
 		}
+		if is_block_element(tag_name) || tag_name == "body" {
+			self.blocks.drop_break_at(self.text.get_current_text_position());
+		}
+		self.blocks.close(tag_name, self.text.get_current_text_position());
 	}
 
 	fn handle_text_node(&mut self, text: &node::Text) {
@@ -358,11 +427,11 @@ impl HtmlToText {
 		if text_content.is_empty() {
 			return;
 		}
-		let processed_text = remove_soft_hyphens(&text_content);
+		let processed_text = remove_soft_hyphens(text_content);
 		if self.text.is_preserving_whitespace() {
 			let lines: Vec<&str> = processed_text.split('\n').collect();
 			for (i, line) in lines.iter().enumerate() {
-				self.text.current_line.push_str(line);
+				self.text.push_str(line);
 				if i < lines.len() - 1 {
 					self.text.finalize_current_line();
 				}
@@ -370,11 +439,51 @@ impl HtmlToText {
 		} else if self.flags.contains(ProcessingFlags::IN_LINK) {
 			self.current_link_text.push_str(&collapse_whitespace(&processed_text));
 		} else {
-			self.text.current_line.push_str(&collapse_whitespace(&processed_text));
+			self.text.push_str(&collapse_whitespace(&processed_text));
 		}
 	}
 
-	/// Where an image element's picture lives. A `<figure>` has none of its own, so it takes the first picture inside it. SVG writes `href` as `xlink:href` in older markup, which is why the attribute is matched by local name.
+	fn described_image(
+		tag_name: &str,
+		node: NodeRef<'_, Node>,
+		content_images: &HashSet<String>,
+	) -> Option<(String, ImageInfo, bool)> {
+		if tag_name != "img" && tag_name != "image" && tag_name != "figure" {
+			return None;
+		}
+		let element = ElementRef::wrap(node)?;
+		let attribute = |name: &str| element.attr(name).map(str::to_string);
+		let mut description = image_text::description(&attribute);
+		let is_figure = tag_name == "figure";
+		if description.is_empty() && is_figure {
+			for child in node.children() {
+				if let Node::Element(child_elem) = child.value()
+					&& child_elem.name() == "figcaption"
+				{
+					description = collapse_whitespace(&Self::collect_text(child));
+					break;
+				}
+			}
+		}
+		// A figure with no caption says nothing itself: the picture inside it is announced instead.
+		let source = Self::image_source(node);
+		if description.is_empty() && (is_figure || image_text::is_decorative(&attribute, &source, content_images)) {
+			return None;
+		}
+		let image_text = image_text::placeholder(is_figure, &description);
+		let info = ImageInfo { offset: DocPos::ZERO, alt_text: description, length: DocLen::of(&image_text), source };
+		Some((image_text, info, is_figure))
+	}
+
+	fn push_image(&mut self, info: ImageInfo, is_figure: bool) {
+		if is_figure {
+			self.figures.push(info);
+		} else {
+			self.images.push(info);
+		}
+	}
+
+	/// Older SVG markup writes `href` as `xlink:href`, so the attribute is matched by local name.
 	pub(crate) fn image_source(node: NodeRef<'_, Node>) -> String {
 		node.descendants()
 			.find_map(|descendant| {

@@ -4,8 +4,6 @@ use super::{ListLabel, Numbering, format_number};
 
 const W: &str = r#"xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main""#;
 
-/// A decimal outline (`1.`, `1.1.`), a bullet level and a lettered level, with two instances
-/// of the outline so a restart can be tested.
 fn numbering_xml() -> String {
 	format!(
 		r#"<w:numbering {W}>
@@ -35,7 +33,6 @@ fn styles_xml() -> String {
 	)
 }
 
-/// The label for a `<w:pPr>` written inline, as each paragraph of a document would ask.
 fn label(numbering: &mut Numbering, ppr_inner: &str) -> Option<String> {
 	let xml = format!("<w:pPr {W}>{ppr_inner}</w:pPr>");
 	let doc = XmlDocument::parse(&xml).expect("test pPr parses");
@@ -67,6 +64,54 @@ fn a_restarting_instance_begins_the_shared_count_again() {
 	// numId 3 shares abstract list 0 but restarts level 0.
 	assert_eq!(label(&mut numbering, &item(3, 0)).as_deref(), Some("1."));
 	assert_eq!(label(&mut numbering, &item(3, 0)).as_deref(), Some("2."));
+}
+
+#[test]
+fn restarting_two_levels_at_once_numbers_the_same_every_time() {
+	let xml = format!(
+		r#"<w:numbering {W}>
+			<w:abstractNum w:abstractNumId="0">
+				<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl>
+				<w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1.%2."/></w:lvl>
+			</w:abstractNum>
+			<w:num w:numId="1"><w:abstractNumId w:val="0"/>
+				<w:lvlOverride w:ilvl="1"><w:startOverride w:val="5"/></w:lvlOverride>
+				<w:lvlOverride w:ilvl="0"><w:startOverride w:val="3"/></w:lvlOverride>
+			</w:num>
+		</w:numbering>"#
+	);
+	// Each load hashes differently, so a hash-ordered restart disagreed with itself within a few tries.
+	let labels: std::collections::HashSet<Option<String>> = (0..32)
+		.map(|_| {
+			let mut numbering = Numbering::load(Some(&xml), None);
+			label(&mut numbering, &item(1, 1))
+		})
+		.collect();
+	assert_eq!(labels.len(), 1, "{labels:?}");
+	assert_eq!(
+		labels.into_iter().next().flatten().as_deref(),
+		Some("3.5."),
+		"the outer level shows its restart, not one below it"
+	);
+}
+
+#[test]
+fn a_restarted_level_counts_on_from_its_restart() {
+	let xml = format!(
+		r#"<w:numbering {W}>
+			<w:abstractNum w:abstractNumId="0">
+				<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl>
+				<w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="decimal"/><w:lvlText w:val="%1.%2."/></w:lvl>
+			</w:abstractNum>
+			<w:num w:numId="1"><w:abstractNumId w:val="0"/>
+				<w:lvlOverride w:ilvl="0"><w:startOverride w:val="3"/></w:lvlOverride>
+			</w:num>
+		</w:numbering>"#
+	);
+	let mut numbering = Numbering::load(Some(&xml), None);
+	let labels: Vec<_> =
+		[(1, 1), (1, 0), (1, 1), (1, 0)].iter().map(|&(n, l)| label(&mut numbering, &item(n, l))).collect();
+	assert_eq!(labels, [Some("3.1."), Some("3."), Some("3.1."), Some("4.")].map(|s| s.map(String::from)));
 }
 
 #[test]

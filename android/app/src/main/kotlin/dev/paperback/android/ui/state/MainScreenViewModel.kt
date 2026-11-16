@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Environment
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.core.net.toUri
@@ -11,6 +12,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.paperback.android.assetLocaleTags
 import dev.paperback.android.bestLocaleMatch
+import dev.paperback.android.saveNow
+import dev.paperback.android.saveSoon
 import dev.paperback.android.t
 import dev.paperback.android.tts.TtsManager
 import dev.paperback.android.ui.dialogs.GO_TO_LINE
@@ -41,10 +44,7 @@ private const val ACTIVE_DOCUMENT_KEY = "active_document"
 class MainScreenViewModel(application: Application) : AndroidViewModel(application) {
 	private val context get() = getApplication<Application>()
 
-	// Loaded here rather than from the coroutine below, because every `ConfigManagerFfi` read
-	// before `initialize` returns the caller's default: `ReaderSettings` is built further down
-	// this same constructor, so a later load would leave it publishing defaults for the whole
-	// session and the reader's text size would come up wrong on every launch.
+	// Initialized here, not in a coroutine: reads before `initialize` return defaults, and ReaderSettings is built later in this constructor.
 	private val config = ConfigManagerFfi().apply {
 		initialize(application.filesDir.absolutePath + "/config.toml")
 	}
@@ -62,9 +62,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 	private var currentActiveIndex = -1
 	private var recentDocumentsList = emptyList<RecentDocumentItem>()
 
-	// The active tab's document URI as of the last `updateTtsMetadata` call, so that function can
-	// tell a real tab switch (clear the active search) apart from a no-op call, e.g. closing a
-	// background tab that leaves the active one unchanged.
+	// Lets updateTtsMetadata tell a real tab switch from closing a background tab, which leaves the active one unchanged.
 	private var lastMetadataDocumentUri: String? = null
 
 	private fun emitTabsState() {
@@ -74,7 +72,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 	private fun persistActiveDocument(docKey: String) {
 		viewModelScope.launch(Dispatchers.IO) {
 			config.setAppString(ACTIVE_DOCUMENT_KEY, docKey)
-			config.flush()
+			config.saveSoon()
 		}
 	}
 
@@ -101,10 +99,15 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 
 	val navigation = NavigationRouter()
 
+	/** Downloads go where file managers can reach them, falling back to private storage when shared storage is missing. */
+	val links = LinkOpener(
+		viewModelScope,
+		folder = { context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: File(context.filesDir, "downloads") },
+		onSaved = { openDocument(Uri.fromFile(it)) }
+	)
+
 	val toc = TocState()
 
-	/** Points the table of contents at wherever the reader currently is, for the screen that is
-	 * about to show it. */
 	fun prepareToc() {
 		val tab = uiState.value.activeTab
 		toc.pointAt(tab?.toc.orEmpty(), reading.ttsPosition.value)
@@ -158,10 +161,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 				}
 				val initialRecents = getRecentDocumentsListIO()
 				withContext(Dispatchers.Main) {
-					// A VIEW intent opens its document as soon as the screen composes, which is while
-					// this restore is still parsing the saved set. That tab is therefore already here,
-					// and adding the saved set wholesale would list its document a second time and
-					// then pull the reader off it onto whichever document was last active.
+					// A VIEW intent can open its tab while this restore is still parsing, so don't duplicate it or pull the reader off it.
 					val openedBeforeRestore = currentTabs.isNotEmpty()
 					for (restored in restoredTabs) {
 						if (currentTabs.none { it.docKey == restored.docKey }) {
@@ -232,8 +232,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 		}
 	}
 
-	/** Empties the recent documents list. The open tabs are left alone: a document being read
-	 * is not a document the reader is finished with. */
+	/** Open tabs are left alone: a document being read is not one the reader is finished with. */
 	fun clearRecentDocuments() {
 		viewModelScope.launch(Dispatchers.IO) {
 			config.clearRecentDocuments()
@@ -247,7 +246,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 	fun removeRecentDocument(uriString: String) {
 		viewModelScope.launch(Dispatchers.IO) {
 			config.removeDocumentHistory(uriString)
-			config.flush()
+			config.saveSoon()
 			updateRecentDocuments()
 			withContext(Dispatchers.Main) {
 				emitTabsState()
@@ -263,7 +262,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 			} catch (_: SecurityException) {
 			}
 			config.renameDocumentPath(oldUriString, newUriString)
-			config.flush()
+			config.saveSoon()
 			updateRecentDocuments()
 			withContext(Dispatchers.Main) {
 				emitTabsState()
@@ -285,9 +284,9 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 				if (track) {
 					config.addRecentDocument(uriString)
 					config.addOpenedDocument(uriString)
-					config.flush()
+					config.saveSoon()
 				}
-				loadDocument(uri, true)
+				loadDocument(uri)
 			}
 		}
 	}
@@ -298,7 +297,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 			viewModelScope.launch(Dispatchers.IO) {
 				config.removeOpenedDocument(closedTab.documentUri)
 				config.setDocumentOpened(closedTab.documentUri, false)
-				config.flush()
+				config.saveSoon()
 				documentCache.directoryFor(closedTab.documentUri).deleteRecursively()
 				updateRecentDocuments()
 				withContext(Dispatchers.Main) {
@@ -333,11 +332,10 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 	}
 
 	override fun onCleared() {
-		super.onCleared()
 		reading.shutdown()
 		Thread {
 			try {
-				config.flush()
+				config.saveNow()
 			} catch (_: Exception) {
 			}
 		}.start()
@@ -390,7 +388,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 			val session = DocumentSession.newFfi(absolutePath, password, "", false)
 			if (providedPassword != null) {
 				config.setDocumentPassword(uriString, providedPassword)
-				config.flush()
+				config.saveSoon()
 			}
 			val initialScrollIndex = if (savedPosition > 0L) {
 				(session.lineFromPosition(savedPosition) - 1L).toInt().coerceAtLeast(0)
@@ -423,14 +421,16 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 		}
 	}
 
-	private suspend fun loadDocument(uri: Uri, makeActive: Boolean) = withContext(Dispatchers.IO) {
+	private suspend fun loadDocument(uri: Uri, password: String? = null) = withContext(Dispatchers.IO) {
 		if (currentTabs.isEmpty()) {
 			_uiState.value = MainScreenUiState.Loading
 		}
-		val tabState = prepareDocumentTabIO(uri)
+		val tabState = prepareDocumentTabIO(uri, password)
 		if (tabState == null) {
 			withContext(Dispatchers.Main) {
-				if (uri.scheme == "file" && needsAllFilesAccessPermission()) {
+				if (password != null) {
+					_uiState.value = MainScreenUiState.Error("Failed to open file or incorrect password")
+				} else if (uri.scheme == "file" && needsAllFilesAccessPermission()) {
 					navigation.permissionRationaleDialog.open()
 				} else {
 					_uiState.value = MainScreenUiState.Error("Failed to open file")
@@ -442,7 +442,6 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 			return@withContext
 		}
 		val recentDocsUpdated = getRecentDocumentsListIO()
-		val activeDocKey = config.getAppString(ACTIVE_DOCUMENT_KEY, "")
 		withContext(Dispatchers.Main) {
 			recentDocumentsList = recentDocsUpdated
 			val existingIndex = currentTabs.indexOfFirst { it.docKey == tabState.docKey }
@@ -452,34 +451,20 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 					viewModelScope.launch(Dispatchers.IO) {
 						config.removeOpenedDocument(oldTab.documentUri)
 						config.addOpenedDocument(uri.toString())
-						config.flush()
+						config.saveSoon()
 					}
 					currentTabs[existingIndex] = tabState
 				}
-				if (makeActive) {
-					currentActiveIndex = existingIndex
-					persistActiveDocument(tabState.docKey)
-				} else if (activeDocKey == tabState.docKey && !makeActive) {
-					currentActiveIndex = existingIndex
-				}
+				currentActiveIndex = existingIndex
 			} else {
 				currentTabs.add(tabState)
-				if (makeActive) {
-					currentActiveIndex = currentTabs.size - 1
-					persistActiveDocument(tabState.docKey)
-				} else if (activeDocKey == tabState.docKey) {
-					currentActiveIndex = currentTabs.size - 1
-					persistActiveDocument(tabState.docKey)
-				} else if (currentActiveIndex == -1) {
-					currentActiveIndex = 0
-				}
+				currentActiveIndex = currentTabs.size - 1
 			}
+			persistActiveDocument(tabState.docKey)
 			emitTabsState()
-			if (makeActive) {
-				reading.setPosition(tabState.savedPosition)
-				updateTtsMetadata()
-				reading.refreshSegmentPreview()
-			}
+			reading.setPosition(tabState.savedPosition)
+			updateTtsMetadata()
+			reading.refreshSegmentPreview()
 		}
 	}
 
@@ -517,12 +502,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 	}
 
 	private fun updateTtsMetadata() {
-		// A search's matches belong to the document it ran against; carrying it over to whatever
-		// tab becomes active next (including the Find nav unit it puts on the slider) is never
-		// correct, and is actively wrong for an audio-only tab, which has no real searchable text.
-		// This function also runs when closing a tab that wasn't the active one, though, which
-		// doesn't change what's active at all — guard on the active document's identity actually
-		// changing so that case doesn't wipe an in-progress search on the tab still being read.
+		// A search belongs to its document, but closing a background tab also lands here and must not wipe the active tab's search.
 		val activeDocumentUri = currentTabs.getOrNull(currentActiveIndex)?.documentUri
 		if (activeDocumentUri != lastMetadataDocumentUri) {
 			lastMetadataDocumentUri = activeDocumentUri
@@ -532,24 +512,20 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 	}
 
 	fun openExportDocumentDialog() {
-		// There is nothing to export with no document open. The menu hides the entry then; this
-		// keeps the Ctrl+E shortcut from arming a dialog that would appear over whatever document
-		// is opened next.
+		// The menu hides the entry, but Ctrl+E would otherwise arm a dialog that appears over the next document opened.
 		if (uiState.value.activeTab == null) return
 		navigation.exportDocumentDialog.open()
 	}
 
 	fun openWordCountDialog() {
-		// Nothing to count in an audio-only book. The menu hides the entry for one; this keeps
-		// the Ctrl+W shortcut from opening a dialog full of zeroes anyway.
+		// The menu hides the entry, but Ctrl+W would otherwise open a dialog full of zeroes.
 		if (uiState.value.activeTab?.isAudioOnly == true) return
 		navigation.wordCountDialog.open()
 	}
 
 	fun openElements() {
 		val tab = uiState.value.activeTab ?: return
-		// An audio-only book has no text spine, so both tabs would come up empty. The menu hides
-		// the entry for one; this keeps the F7 shortcut from opening it anyway.
+		// The menu hides the entry, but F7 would otherwise open two empty lists for an audio-only book.
 		if (tab.isAudioOnly) return
 		viewModelScope.launch(Dispatchers.IO) {
 			val pos = reading.ttsPosition.value
@@ -558,14 +534,12 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 			withContext(Dispatchers.Main) {
 				_currentHeadings.value = headings
 				_currentLinks.value = links
-				// Requested once the lists are in hand, so the screen never appears empty and
-				// then fills in.
+				// Only once the lists are in hand, so the screen never appears empty and then fills in.
 				navigation.elementsRequest.request()
 			}
 		}
 	}
 
-	/** Drops the heading and link lists once the elements screen is gone. */
 	fun clearElements() {
 		_currentHeadings.value = null
 		_currentLinks.value = null
@@ -578,8 +552,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 	fun openGoToDialog(initialMode: String = GO_TO_LINE) {
 		val tab = uiState.value.activeTab
 		var mode = initialMode
-		// Line and page mean nothing in a book whose text is one blank line per audio file,
-		// so the shortcuts for them land on the one mode it does have.
+		// Line and page mean nothing when the text is one blank line per audio file.
 		if (tab != null && tab.isAudioOnly) {
 			mode = GO_TO_PERCENTAGE
 		} else if (tab != null && mode == GO_TO_PAGE && tab.session.pageCountFfi() == 0) {
@@ -593,47 +566,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 	fun submitPassword(password: String) {
 		val uri = _passwordPromptUri.value ?: return
 		_passwordPromptUri.value = null
-		viewModelScope.launch(Dispatchers.IO) {
-			if (currentTabs.isEmpty()) {
-				_uiState.value = MainScreenUiState.Loading
-			}
-			val tabState = prepareDocumentTabIO(uri, password)
-			if (tabState == null) {
-				withContext(Dispatchers.Main) {
-					_uiState.value = MainScreenUiState.Error("Failed to open file or incorrect password")
-					if (currentTabs.isNotEmpty()) {
-						emitTabsState()
-					}
-				}
-				return@launch
-			}
-			val recentDocsUpdated = getRecentDocumentsListIO()
-			val activeDocKey = config.getAppString(ACTIVE_DOCUMENT_KEY, "")
-			withContext(Dispatchers.Main) {
-				recentDocumentsList = recentDocsUpdated
-				val existingIndex = currentTabs.indexOfFirst { it.docKey == tabState.docKey }
-				if (existingIndex != -1) {
-					val oldTab = currentTabs[existingIndex]
-					if (oldTab.documentUri != uri.toString()) {
-						viewModelScope.launch(Dispatchers.IO) {
-							config.removeOpenedDocument(oldTab.documentUri)
-							config.addOpenedDocument(uri.toString())
-							config.flush()
-						}
-						currentTabs[existingIndex] = tabState
-					}
-					currentActiveIndex = existingIndex
-					persistActiveDocument(tabState.docKey)
-				} else {
-					currentTabs.add(tabState)
-					currentActiveIndex = currentTabs.size - 1
-					persistActiveDocument(tabState.docKey)
-				}
-				emitTabsState()
-				reading.setPosition(tabState.savedPosition)
-				reading.refreshSegmentPreview()
-			}
-		}
+		viewModelScope.launch { loadDocument(uri, password) }
 	}
 
 	fun cancelPasswordPrompt() {
@@ -643,7 +576,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 			if (uriStr != null) {
 				config.removeOpenedDocument(uriStr)
 				config.setDocumentOpened(uriStr, false)
-				config.flush()
+				config.saveSoon()
 				updateRecentDocuments()
 			}
 			withContext(Dispatchers.Main) {
@@ -653,10 +586,7 @@ class MainScreenViewModel(application: Application) : AndroidViewModel(applicati
 	}
 
 	fun openHelpDocument() {
-		// Matched against the readmes actually shipped rather than a hardcoded language list,
-		// which drifts out of sync, and by the same rule as the string catalogue: the files are
-		// named for the po files ("readme-zh_CN.html"), not for the bare language code a device
-		// reports, so asking for readme-zh.html only ever found the English fallback.
+		// Readmes are named for the po files (readme-zh_CN.html), so asking for the bare device language (readme-zh.html) only ever found English.
 		val lang = bestLocaleMatch(assetLocaleTags(context, "readmes", "readme-", ".html"), Locale.getDefault())
 		viewModelScope.launch(Dispatchers.IO) {
 			try {

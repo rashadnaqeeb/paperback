@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: paperback 1.0.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-19 00:35+0000\n"
-"PO-Revision-Date: 2026-10-17 12:00+0200\n"
+"POT-Creation-Date: 2026-11-13 12:52+0000\n"
+"PO-Revision-Date: 2026-10-21 12:00+0200\n"
 "Last-Translator: Torma Zsolt <torma.zsolt@gmail.com>\n"
 "Language-Team: Torma Zsolt <torma.zsolt@gmail.com>\n"
 "Language: hu\n"
@@ -17,9 +17,151 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#. TRANSLATORS: Follows text typed into Open from URL that is not an http or https link
-msgid "this is not a web link"
-msgstr "ez nem webhivatkozás"
+#. TRANSLATORS: Title of the question asked after the app closed unexpectedly
+#. TRANSLATORS: Title of the dialog for sending a problem report to the developer
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+#, fuzzy
+msgid "Report a Problem"
+msgstr "Problémajelentés"
+
+#. TRANSLATORS: Asked at startup after the app crashed or was closed unexpectedly. %s is the app's name.
+#, fuzzy
+msgid "%s closed unexpectedly the last time it ran. Would you like to report the problem?"
+msgstr "A %s váratlanul bezárult az utolsó futtatáskor. Szeretne jelentést küldeni a problémáról?"
+
+#. TRANSLATORS: Check box in the question asked after a crash, which stops the question being asked again
+#, fuzzy
+msgid "&Don't ask again"
+msgstr "&Ne kérdezzen rá többet"
+
+#. TRANSLATORS: Shown at the top of the Report a Problem dialog after a crash. %s is the app's name.
+#, fuzzy
+msgid "%s closed unexpectedly the last time it ran. Describe what you were doing when it happened."
+msgstr "A %s váratlanul bezárult az utolsó futtatáskor. Írja le, mit csinált, amikor megtörtént."
+
+#. TRANSLATORS: Shown at the top of the Report a Problem dialog
+#, fuzzy
+msgid "Describe the problem, and what you were doing when it happened."
+msgstr "Írja le a problémát, és mit csinált, amikor megtörtént."
+
+#. TRANSLATORS: Label of the field for describing the problem in the Report a Problem dialog
+#, fuzzy
+msgid "&What happened:"
+msgstr "&Mi történt:"
+
+#, fuzzy
+msgid "&Your email address, if you'd like a reply:"
+msgstr "Az &Ön e-mail-címe, ha választ szeretne:"
+
+#. TRANSLATORS: Check box in the Report a Problem dialog that attaches the app's log to the report
+#, fuzzy
+msgid "&Include the log"
+msgstr "A &napló mellékletezése"
+
+#. TRANSLATORS: Explains what a problem report contains, in the Report a Problem dialog. %s is the app's name.
+#, fuzzy
+msgid "The report also includes %s's version and your operating system. Select Preview to see everything that will be sent."
+msgstr "A jelentés tartalmazza a %s verzióját és az operációs rendszert is. A Megtekintés lehetőség kiválasztásával megtekintheti, mit fogunk elküldeni."
+
+#. TRANSLATORS: Button in the Report a Problem dialog that shows the report before it is sent
+#, fuzzy
+msgid "&Preview"
+msgstr "&Megtekintés"
+
+#. TRANSLATORS: Button in the Report a Problem dialog that sends the report
+#, fuzzy
+msgid "&Send"
+msgstr "Küldé&s"
+
+#. TRANSLATORS: Label for the cancellation button
+#. TRANSLATORS: Cancel button that closes the Find dialog
+#. TRANSLATORS: Label for the cancellation button
+msgid "Cancel"
+msgstr "Mégse"
+
+#. TRANSLATORS: Title of the window that shows a problem report before it is sent
+#, fuzzy
+msgid "Report Preview"
+msgstr "Jelentés megtekintése"
+
+#. TRANSLATORS: Title of an error message
+#. TRANSLATORS: Generic error dialog title
+msgid "Error"
+msgstr "Hiba"
+
+#. TRANSLATORS: Shown when Send is pressed in the Report a Problem dialog with the description empty
+#, fuzzy
+msgid "Describe the problem before sending the report."
+msgstr "Írja le a problémát, mielőtt elküldi a jelentést."
+
+#. TRANSLATORS: Shown when a problem report breaks a limit, such as being too long. %s is the reason, in English.
+#, fuzzy
+msgid "The report can't be sent: %s"
+msgstr "A jelentés nem küldhető el: %s"
+
+#. TRANSLATORS: Message in the progress window shown while a problem report is sent
+#, fuzzy
+msgid "Sending the report..."
+msgstr "A jelentés küldése folyamatban..."
+
+#. TRANSLATORS: Shown after a problem report was sent
+#. TRANSLATORS: Title of a message saying something worked
+#, fuzzy
+msgid "Thank you. Your report was sent."
+msgstr "Köszönjük. A jelentés elküldve."
+
+#, fuzzy
+msgid "Success"
+msgstr "Siker"
+
+#, fuzzy
+msgid "Email can't be delivered to that address. Check it for typing mistakes, or leave it blank."
+msgstr "Az e-mail nem küldhető el erre a címre. Ellenőrizze helyesírását, vagy hagyja üresen."
+
+#. TRANSLATORS: Shown when the report server has taken as many reports as it will for the day
+#, fuzzy
+msgid "Too many reports have been sent today."
+msgstr "Túl sok jelentés lett elküldve ma."
+
+#. TRANSLATORS: Shown when sending a problem report failed. %s is the reason, in English.
+#, fuzzy
+msgid "The report couldn't be sent: %s"
+msgstr "A jelentés nem lett elküldve: %s"
+
+#. TRANSLATORS: Asked after a problem report couldn't be sent. %s explains what went wrong.
+#, fuzzy
+msgid ""
+"%s\n"
+"\n"
+"Would you like to save the report to a file, so you can send it another way?"
+msgstr ""
+"%s\n"
+"\n"
+"Szeretné a jelentést egy fájlba menteni, hogy másképp elküldhesse?"
+
+#. TRANSLATORS: Title of the dialog for saving a problem report to a file
+#, fuzzy
+msgid "Save Report"
+msgstr "Jelentés mentése"
+
+#. TRANSLATORS: Default file name for a saved problem report
+#, fuzzy
+msgid "Problem report"
+msgstr "Problémajelentés"
+
+#. TRANSLATORS: File type filter in the dialog for saving a problem report
+#, fuzzy
+msgid "Text files (*.txt)|*.txt"
+msgstr "Szövegfájlok (*.txt)|*.txt"
+
+#. TRANSLATORS: Shown after a problem report was saved to a file
+#, fuzzy
+msgid "The report was saved."
+msgstr "A jelentés mentve lett."
+
+#, fuzzy
+msgid "The report couldn't be saved: %s"
+msgstr "A jelentés nem lett mentve: %s"
 
 #. TRANSLATORS: Download window message while Paperback asks a web server about a link; %s is the link
 msgid "Checking %s"
@@ -37,21 +179,6 @@ msgstr "Letöltés: %s"
 msgid "Downloading %d of %d: %s"
 msgstr "Letöltés (%d/%d): %s"
 
-#. TRANSLATORS: Security warning before downloading a document from a link; %s is the type the server gave, such as text/html
-msgid "The server sends a web page (%s) instead of the document the link names."
-msgstr "A kiszolgáló a hivatkozott dokumentum helyett weblapot (%s) küld."
-
-msgid "The server sends %s, which is not a format Paperback reads."
-msgstr "A kiszolgáló %s típusú tartalmat küld, amelyet a Paperback nem tud megnyitni."
-
-#. TRANSLATORS: Security warning before downloading a document from a link whose server gave no type
-msgid "The server does not say what it sends."
-msgstr "A kiszolgáló nem adja meg, mit küld."
-
-#. TRANSLATORS: Question at the end of the security warning before downloading a document from a link
-msgid "Download it anyway?"
-msgstr "Mégis letölti?"
-
 #. TRANSLATORS: Checkbox label in the Linux setup dialog, offering to make the `pb`
 #. command-line tool (Paperback's headless document-to-text/HTML converter) runnable
 #. from a shell. Mirrors the Windows installer's "Add Paperback directory to PATH" task.
@@ -64,9 +191,9 @@ msgstr "A pb parancssori eszköz hozzáadása a PATH változóhoz"
 msgid "ZIP Archives (.zip)"
 msgstr "ZIP-archívumok (.zip)"
 
-#. TRANSLATORS: Announced when OCR can't run because the system has no OCR language installed
-msgid "No OCR language is installed. Add one in your system language settings."
-msgstr "Nincs telepítve szövegfelismerési nyelv. Adjon hozzá egyet a rendszer nyelvi beállításaiban."
+#. TRANSLATORS: Announced on Linux when OCR is requested but the Tesseract OCR engine isn't installed
+msgid "OCR needs Tesseract. Install it from your package manager."
+msgstr "A szövegfelismeréshez a Tesseract szükséges. Telepítse a csomagkezelővel."
 
 #. TRANSLATORS: Announced when the OCR engine fails on a page
 msgid "OCR failed."
@@ -76,17 +203,25 @@ msgstr "A szövegfelismerés nem sikerült."
 msgid "OCR is not available on this system."
 msgstr "Ezen a rendszeren nem érhető el szövegfelismerés."
 
-#. TRANSLATORS: Error message shown when another app instance's IPC pipe already exists and a new one can't be created
-msgid "Failed to create IPC server"
-msgstr "Nem sikerült létrehozni az IPC-kiszolgálót"
+#. TRANSLATORS: Announced when OCR can't run because the system has no OCR language installed
+msgid "No OCR language is installed. Add one in your system language settings."
+msgstr "Nincs telepítve szövegfelismerési nyelv. Adjon hozzá egyet a rendszer nyelvi beállításaiban."
 
-#. TRANSLATORS: Title of a warning dialog
-msgid "Warning"
-msgstr "Figyelmeztetés"
+#. TRANSLATORS: Announced on Linux when Tesseract is installed but has no language data for OCR
+msgid "No OCR language is installed. Install a Tesseract language package from your package manager."
+msgstr "Nincs telepítve szövegfelismerési nyelv. Telepítsen egy Tesseract-nyelvcsomagot a csomagkezelővel."
 
-#. TRANSLATORS: Announced when trying to play/pause audio on a document that has none
+#. TRANSLATORS: Announced when skipping forward while read aloud is on the last paragraph
+#, fuzzy
+msgid "No next paragraph."
+msgstr "Nincs következő bekezdés."
+
+#. TRANSLATORS: Announced when skipping back while read aloud is on the first paragraph
+#, fuzzy
+msgid "No previous paragraph."
+msgstr "Nincs előző bekezdés."
+
 #. TRANSLATORS: Announced when trying to seek audio on a document that has none
-#. TRANSLATORS: Announced when trying to change audio playback speed on a document that has none
 #. TRANSLATORS: Announced when trying to change audio volume on a document that has none
 msgid "This document has no audio."
 msgstr "Ehhez a dokumentumhoz nem tartozik hang."
@@ -95,14 +230,30 @@ msgstr "Ehhez a dokumentumhoz nem tartozik hang."
 msgid "Audio hasn't started playing yet."
 msgstr "A hang lejátszása még nem indult el."
 
+#, fuzzy
+msgid "This book doesn't say how long its audio runs, so Paperback can't go to a time in it."
+msgstr "Ez a könyv nem közli, meddig tart az audionarráció, így a Paperback nem tud egy adott időpontra ugrani."
+
+#. TRANSLATORS: Announced when asking for the time in an audiobook's chapter while the length of its files isn't known, such as in many DAISY books
+#, fuzzy
+msgid "This book doesn't say how long its audio runs."
+msgstr "A könyv nem adja meg, meddig tart az audioanyaga."
+
+#. TRANSLATORS: Announced when the read aloud rate changes; {} is the rate from 0 to 100, where 50 is the voice's normal speed
+#, fuzzy
+msgid "Rate {}"
+msgstr "Sebesség: {}"
+
 #. TRANSLATORS: Announced when the audio speed is already at its fastest; {} is the current speed, e.g. "2x"
 #. TRANSLATORS: Announced when the audio volume is already at its loudest; {} is the current volume, e.g. "200%"
+#. TRANSLATORS: Announced when a setting is already at its highest; {} is its value
 #. TRANSLATORS: Announced when the audio seek amount is already at its largest preset; {} is the current amount, e.g. "1 hour"
 msgid "{} (maximum)"
 msgstr "{} (maximum)"
 
 #. TRANSLATORS: Announced when the audio speed is already at its slowest; {} is the current speed, e.g. "0.5x"
 #. TRANSLATORS: Announced when the audio volume is already at its quietest; {} is the current volume, e.g. "10%"
+#. TRANSLATORS: Announced when a setting is already at its lowest; {} is its value
 #. TRANSLATORS: Announced when the audio seek amount is already at its smallest preset; {} is the current amount, e.g. "5 seconds"
 msgid "{} (minimum)"
 msgstr "{} (minimum)"
@@ -602,6 +753,26 @@ msgstr "&Lejátszás/szüneteltetés"
 msgid "Play or pause this document's audio narration"
 msgstr "Az audionarráció lejátszása vagy szüneteltetése"
 
+#. TRANSLATORS: Menu item in the Audio menu to jump to a time typed in, such as 1:23:45.
+#, fuzzy
+msgid "Go to &Time..."
+msgstr "Ugrás az &időpontra..."
+
+#. TRANSLATORS: Status-bar help text for the Go to Time menu item.
+#, fuzzy
+msgid "Go to a time in the recording"
+msgstr "Ugrás a felvétel egy adott időpontjára"
+
+#. TRANSLATORS: Menu item in the Audio menu that says how far into the current chapter of an audiobook the reader is, and how much of it is left.
+#, fuzzy
+msgid "Announce &Chapter Time"
+msgstr "Fejezet i&dejének bejelentése"
+
+#. TRANSLATORS: Status-bar help text for the Announce Chapter Time menu item.
+#, fuzzy
+msgid "Say how far into this chapter you are and how much is left"
+msgstr "Bejelentés, hogy meddig jutott ebben a fejezetben, és mennyi van még hátra"
+
 #. TRANSLATORS: Menu item in the Audio menu to skip the audio narration forward.
 msgid "Seek Audio &Forward"
 msgstr "&Előretekerés"
@@ -737,6 +908,7 @@ msgstr "Ö&sszes eltávolítása"
 #. TRANSLATORS: Label for a button that closes the View Note dialog
 #. TRANSLATORS: Label for a button that closes the Web View dialog
 #. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+#. TRANSLATORS: Button that closes a window showing text
 msgid "Close"
 msgstr "Bezárás"
 
@@ -818,6 +990,7 @@ msgid "Bookmarks"
 msgstr "Könyvjelzők"
 
 #. TRANSLATORS: Option in the filter dropdown to show notes only
+#. TRANSLATORS: Heading over the footnotes and endnotes of a document, written after its text
 msgid "Notes"
 msgstr "Jegyzetek"
 
@@ -849,10 +1022,6 @@ msgstr "üres"
 #. TRANSLATORS: Error message shown when the user attempts to jump without selecting any bookmark
 msgid "Please select a bookmark to jump to."
 msgstr "Válassza ki, melyik könyvjelzőre szeretne ugrani."
-
-#. TRANSLATORS: Generic error dialog title
-msgid "Error"
-msgstr "Hiba"
 
 #. TRANSLATORS: Label/prompt in the Note editor dialog
 msgid "Edit bookmark note:"
@@ -957,16 +1126,44 @@ msgstr "Névtelen"
 msgid "OK"
 msgstr "OK"
 
+#. TRANSLATORS: Title of the dialog asking what to include when exporting notes and bookmarks as text or HTML
+#. TRANSLATORS: Title of the file save dialog when exporting a document's notes and bookmarks
+#. TRANSLATORS: Title of the dialog asking what to include when exporting notes and bookmarks as text or HTML
+msgid "Export notes and bookmarks"
+msgstr "Jegyzetek és könyvjelzők exportálása"
+
+#. TRANSLATORS: Label for the dropdown choosing which entries to export
+msgid "&Export:"
+msgstr "&Exportálás:"
+
+#. TRANSLATORS: Option to export both bookmarks and notes
+msgid "Bookmarks and notes"
+msgstr "Könyvjelzők és jegyzetek"
+
+#. TRANSLATORS: Option to export only bookmarks that have no note
+msgid "Bookmarks only"
+msgstr "Csak könyvjelzők"
+
+#. TRANSLATORS: Option to export only bookmarks that have a note
+msgid "Notes only"
+msgstr "Csak jegyzetek"
+
+#. TRANSLATORS: Checkbox to include the bookmarked text next to each note
+msgid "Include the &passage each note is attached to"
+msgstr "A jegyzethez tartozó &szövegrész is kerüljön bele"
+
+#. TRANSLATORS: Checkbox to number the exported entries
+msgid "&Number the entries"
+msgstr "&Bejegyzések sorszámozása"
+
+#. TRANSLATORS: Label for the button that continues to the save dialog
+msgid "Export"
+msgstr "Exportálás"
+
 #. TRANSLATORS: Label for the button that jumps to the entered position (a line, page, or percentage, depending on the dialog)
 #. TRANSLATORS: Name of the "Go" (navigation) category of keyboard shortcuts, shown as a tab label in the Customize Keyboard Shortcuts dialog
 msgid "Go"
 msgstr "Ugrás"
-
-#. TRANSLATORS: Label for the cancellation button
-#. TRANSLATORS: Cancel button that closes the Find dialog
-#. TRANSLATORS: Label for the cancellation button
-msgid "Cancel"
-msgstr "Mégse"
 
 #. TRANSLATORS: Title of the Go to Line dialog
 msgid "Go to Line"
@@ -1007,6 +1204,29 @@ msgstr "&Százalék"
 #. TRANSLATORS: Announced when the entered percentage is outside the 0 to 100 range
 msgid "Percent out of range."
 msgstr "A százalékérték a tartományon kívül esik."
+
+#. TRANSLATORS: Title of the Go to Time dialog, which jumps to a time typed in, in an audiobook
+#, fuzzy
+msgid "Go to Time"
+msgstr "Ugrás az időpontra"
+
+#, fuzzy
+msgid "Go to time ({}/{}):"
+msgstr "Ugrás az időpontra ({}/{}):"
+
+#. TRANSLATORS: Announced when what was typed in the Go to Time dialog is not a time
+#, fuzzy
+msgid "Type a time like 1:23:45, 23:45 or 45."
+msgstr "Adjon meg egy időpontot, például 1:23:45, 23:45 vagy 45."
+
+#. TRANSLATORS: Announced when the time typed in the Go to Time dialog is past the end of the recording, or before its start
+#, fuzzy
+msgid "Time out of range."
+msgstr "Az időpont a megengedett tartományon kívül van."
+
+#. TRANSLATORS: Title of the view showing the text recognized in a picture
+msgid "Image Text"
+msgstr "Képből felismert szöveg"
 
 #. TRANSLATORS: Title of the one-time dialog offering to associate Paperback with file types, shown the first time it's run from an AppImage
 msgid "Set Up Paperback"
@@ -1056,6 +1276,216 @@ msgstr "Hivatkozás:"
 msgid "Security Warning"
 msgstr "Biztonsági figyelmeztetés"
 
+#. TRANSLATORS: Label for the update channel selection dropdown
+msgid "Update Channel:"
+msgstr "Frissítési csatorna:"
+
+#. TRANSLATORS: Stable update channel option
+msgid "Stable"
+msgstr "Stabil"
+
+#. TRANSLATORS: Developer/development update channel option
+msgid "Dev"
+msgstr "Fejlesztői"
+
+#. TRANSLATORS: Label for the dropdown choosing how much Paperback writes to its log file
+msgid "Log Level:"
+msgstr "Naplózási szint:"
+
+#. TRANSLATORS: Log level choice that turns logging off, so Paperback writes no log file at all
+msgid "Off"
+msgstr "Ki"
+
+#. TRANSLATORS: Log level choice that records only errors
+msgid "Errors"
+msgstr "Hibák"
+
+#. TRANSLATORS: Log level choice that records warnings and errors
+msgid "Warnings"
+msgstr "Figyelmeztetések"
+
+#. TRANSLATORS: Log level choice that records general activity, warnings and errors
+msgid "Information"
+msgstr "Információk"
+
+#. TRANSLATORS: Log level choice with the detail useful for reporting a bug; the default
+msgid "Debug"
+msgstr "Hibakeresés"
+
+#. TRANSLATORS: Log level choice that records everything Paperback can, which makes a very large log
+msgid "Trace"
+msgstr "Nyomkövetés"
+
+#. TRANSLATORS: Option to toggle word wrapping of text
+msgid "&Word wrap"
+msgstr "&Sortörés"
+
+#. TRANSLATORS: Label/header for the Font options section
+msgid "Font"
+msgstr "Betűtípus"
+
+#. TRANSLATORS: Button label to pick a font
+msgid "Choose &Font..."
+msgstr "&Betűtípus kiválasztása..."
+
+#. TRANSLATORS: Button label to restore font settings to default values
+msgid "&Reset to Default Font"
+msgstr "&Alapértelmezett betűtípus visszaállítása"
+
+#. TRANSLATORS: Label/header for the Background Color options section
+msgid "Background Color"
+msgstr "Háttérszín"
+
+#. TRANSLATORS: Button label to pick a background color
+msgid "Choose &Background Color..."
+msgstr "&Háttérszín kiválasztása..."
+
+#. TRANSLATORS: Button label to restore background color to default values
+msgid "Reset to &Default Background"
+msgstr "Alapértelmezett hát&tér visszaállítása"
+
+msgid "&Line spacing:"
+msgstr "S&orköz:"
+
+#. TRANSLATORS: Default spacing option (as opposed to relaxed/wide), shown in the line, paragraph, and letter spacing dropdowns
+msgid "Normal"
+msgstr "Normál"
+
+#. TRANSLATORS: 1.5x line spacing option
+msgid "1.5×"
+msgstr "1,5×"
+
+#. TRANSLATORS: Double line spacing option
+msgid "Double"
+msgstr "Dupla"
+
+msgid "&Paragraph spacing:"
+msgstr "Bekez&désköz:"
+
+#. TRANSLATORS: Relaxed paragraph spacing option
+msgid "Relaxed"
+msgstr "Tágas"
+
+#. TRANSLATORS: Wide spacing option, shown in the paragraph and letter spacing dropdowns
+msgid "Wide"
+msgstr "Széles"
+
+msgid "L&etter spacing:"
+msgstr "Betű&köz:"
+
+#. TRANSLATORS: Very Wide letter spacing option
+msgid "Very Wide"
+msgstr "Nagyon széles"
+
+msgid "Text &alignment:"
+msgstr "Szöveg &igazítása:"
+
+#. TRANSLATORS: Left text alignment option
+msgid "Left"
+msgstr "Balra"
+
+#. TRANSLATORS: Center text alignment option
+msgid "Center"
+msgstr "Középre"
+
+#. TRANSLATORS: Right text alignment option
+msgid "Right"
+msgstr "Jobbra"
+
+#. TRANSLATORS: Justified text alignment option
+msgid "Justify"
+msgstr "Sorkizárt"
+
+#. TRANSLATORS: Title of the system dialog for picking a background colour
+msgid "Choose a colour"
+msgstr "Szín kiválasztása"
+
+#. TRANSLATORS: Option to play sound effects when bookmarks or notes are encountered
+msgid "Play &sounds on bookmarks and notes"
+msgstr "&Hangjelzés könyvjelzőknél és jegyzeteknél"
+
+#. TRANSLATORS: Option to move the reading caret to follow along with audio narration as it plays
+msgid "&Sync caret to audio playback"
+msgstr "&Kurzor szinkronizálása a hanglejátszással"
+
+#. TRANSLATORS: Label for the audio seek amount dropdown, used when skipping audio narration backward/forward
+msgid "&Audio seek amount:"
+msgstr "&Léptetési időegység:"
+
+#. TRANSLATORS: Option controlling whether seeking audio narration past the end of a chapter's file continues into the next chapter, or stops at the end of the current one
+msgid "Seeking &past the end of a chapter continues into the next"
+msgstr "Fejezet végén túltekerve &folytatás a következő fejezettel"
+
+#. TRANSLATORS: Label of the group of read aloud settings on the Audio tab of Settings: engine, voice, rate, pitch and pauses
+msgid "Read Aloud"
+msgstr "Felolvasás"
+
+#. TRANSLATORS: Label of the list of speech engines, such as OneCore or SAPI 5, on the Audio tab of Settings
+#, fuzzy
+msgid "&Engine:"
+msgstr "&Motor:"
+
+#. TRANSLATORS: Label of the list of voices on the Audio tab of Settings
+#, fuzzy
+msgid "&Voice:"
+msgstr "&Beszédhang:"
+
+#. TRANSLATORS: Label of the speech rate slider on the Audio tab of Settings
+#, fuzzy
+msgid "&Rate:"
+msgstr "&Beszédsebesség:"
+
+#. TRANSLATORS: Label of the speech pitch slider on the Audio tab of Settings
+#, fuzzy
+msgid "Pi&tch:"
+msgstr "Han&gmagasság:"
+
+#, fuzzy
+msgid "Pause after each para&graph (milliseconds):"
+msgstr "Szünet minden bekezd&és után (ezredmásodpercben):"
+
+#, fuzzy
+msgid "Use this voice, rate and pitch for this &book only"
+msgstr "Ezen a &könyven ezt a beszédhanget, sebességet és hangmagasságot használja"
+
+#. TRANSLATORS: Button on the Audio tab of Settings that speaks a sample with the chosen voice, rate and pitch
+#, fuzzy
+msgid "Play Sa&mple"
+msgstr "Minta le&játszása"
+
+#. TRANSLATORS: First choice in the voice list on the Audio tab of Settings, which leaves the choice of voice to the system
+#, fuzzy
+msgid "System default"
+msgstr "Rendszer alapértelmezése"
+
+#. TRANSLATORS: Note at the top of the Documents tab of Settings, whose options change how a file is read
+#, fuzzy
+msgid "Changing these reads your open documents again when you press OK."
+msgstr "Ezen beállítások módosítása az OK gombra kattintáskor újra beolvassa a megnyitott dokumentumokat."
+
+#. TRANSLATORS: Option to render tables inline rather than showing a placeholder link
+msgid "Render tables &inline"
+msgstr "Táblázatok megjelenítése a s&zövegben"
+
+#. TRANSLATORS: Option to join the wrapped lines of a page back into paragraphs, in documents laid out as pages, such as PDFs, taking away the hyphen at a line break that split a word. Turning it off keeps every line and every hyphen as they are, which suits poetry and anything whose line breaks are the content.
+#, fuzzy
+msgid "&Join wrapped lines into paragraphs"
+msgstr "&Zárt sorok bekezdésekké összekapcsolása"
+
+#. TRANSLATORS: Option to take the headers and footers a document repeats on every page out of the text, in documents laid out as pages, such as PDFs. Turning it off keeps them, which suits a document whose page-edge lines are content.
+#, fuzzy
+msgid "Remove repeated page &headers and footers"
+msgstr "Ismétlődő lap- és &láblécek eltávolítása"
+
+#. TRANSLATORS: Option to read text between dollar signs in Markdown documents, such as $x^2$, as a math formula. Turning it off keeps the dollar signs as plain text, which suits documents that use them for other things, such as shell variables or prices.
+msgid "Read text between dollar signs as &math in Markdown"
+msgstr "Dollárjelek közötti szöveg olvasása &matematikai képletként Markdown-dokumentumokban"
+
+#. TRANSLATORS: Label for the dropdown choosing the braille code that Braille Ready Files (BRF) and PEF books are written in, so Paperback can turn their braille back into print
+#, fuzzy
+msgid "&Braille code of BRF and PEF books:"
+msgstr "A BRF- és PEF-könyvek &braille-kódja:"
+
 #. TRANSLATORS: Description text shown when the background color is set to default
 msgid "Background: Default"
 msgstr "Háttér: alapértelmezett"
@@ -1096,47 +1526,6 @@ msgstr "Áthúzott"
 msgid "Choose a font"
 msgstr "Betűtípus kiválasztása"
 
-#. TRANSLATORS: Title of the hotkey customization dialog
-msgid "Window Hotkey"
-msgstr "Az ablak billentyűparancsa"
-
-#. TRANSLATORS: Checkbox label for Control modifier key
-#. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Ctrl modifier in the shortcut.
-msgid "&Ctrl"
-msgstr "&Ctrl"
-
-#. TRANSLATORS: Checkbox label for Alt modifier key
-#. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Alt modifier in the shortcut.
-msgid "&Alt"
-msgstr "&Alt"
-
-#. TRANSLATORS: Checkbox label for Shift modifier key
-#. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Shift modifier in the shortcut.
-msgid "&Shift"
-msgstr "&Shift"
-
-#. TRANSLATORS: Checkbox label for Windows modifier key
-#. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Windows logo key in a system-wide shortcut.
-msgid "&Win"
-msgstr "&Win"
-
-#. TRANSLATORS: Label for the hotkey key selection input field
-#. TRANSLATORS: Label next to the key field in the Set Shortcut dialog.
-msgid "&Key:"
-msgstr "&Billentyű:"
-
-#. TRANSLATORS: Button label to clear the current hotkey selection
-msgid "Clear"
-msgstr "Törlés"
-
-#. TRANSLATORS: Representation of the Spacebar key
-msgid "Space"
-msgstr "Space"
-
-#. TRANSLATORS: Title of the Settings dialog
-msgid "Settings"
-msgstr "Beállítások"
-
 #. TRANSLATORS: Option to restore documents that were open when the app was last closed
 msgid "&Restore previously opened documents on startup"
 msgstr "&Korábban megnyitott dokumentumok visszaállítása indításkor"
@@ -1144,6 +1533,10 @@ msgstr "&Korábban megnyitott dokumentumok visszaállítása indításkor"
 #. TRANSLATORS: Option to automatically reload an open document when its file changes on disk
 msgid "&Automatically reload changed documents"
 msgstr "Módosult dokumentumok &automatikus újratöltése"
+
+#. TRANSLATORS: Label for the number of recently opened documents to keep in history
+msgid "Number of &recent documents to show:"
+msgstr "Megjelenítendő &legutóbbi dokumentumok száma:"
 
 #. TRANSLATORS: Option to start the app maximized
 msgid "&Start maximized"
@@ -1153,25 +1546,17 @@ msgstr "Indítás &teljes méretű ablakban"
 msgid "&Minimize to system tray"
 msgstr "Kis méret a &rendszertálcára"
 
-#. TRANSLATORS: Option to toggle word wrapping of text
-msgid "&Word wrap"
-msgstr "&Sortörés"
+#. TRANSLATORS: Option to check for app updates automatically on startup
+msgid "Check for &updates on startup"
+msgstr "&Frissítések keresése indításkor"
 
-#. TRANSLATORS: Option to render tables inline rather than showing a placeholder link
-msgid "Render tables &inline"
-msgstr "Táblázatok megjelenítése a s&zövegben"
+#. TRANSLATORS: Label for the language selection dropdown
+msgid "&Language:"
+msgstr "&Nyelv:"
 
-#. TRANSLATORS: Option to join the wrapped lines of a PDF page back into paragraphs, taking away the hyphen at a line break that split a word. Turning it off keeps every line and every hyphen as they are, which suits poetry and anything whose line breaks are the content.
-msgid "&Join wrapped lines into paragraphs in PDFs"
-msgstr "Tördelt sorok &egyesítése bekezdésekké PDF-ekben"
-
-#. TRANSLATORS: Option to take the headers and footers a PDF repeats on every page out of the text. Turning it off keeps them, which suits a document whose page-edge lines are content.
-msgid "Remove repeated page &headers and footers in PDFs"
-msgstr "Ismétlődő élő&fejek és élőlábak eltávolítása PDF-ekben"
-
-#. TRANSLATORS: Option to read text between dollar signs in Markdown documents, such as $x^2$, as a math formula. Turning it off keeps the dollar signs as plain text, which suits documents that use them for other things, such as shell variables or prices.
-msgid "Read text between dollar signs as &math in Markdown"
-msgstr "Dollárjelek közötti szöveg olvasása &matematikai képletként Markdown-dokumentumokban"
+#. TRANSLATORS: Button label to open the Keyboard Shortcuts customization dialog
+msgid "Customize &Keyboard Shortcuts..."
+msgstr "Billentyű&parancsok testreszabása..."
 
 #. TRANSLATORS: Option to show a compact Go navigation menu in the menu bar
 msgid "Show compact &go menu"
@@ -1189,182 +1574,46 @@ msgstr "Ugrás a sor &elejére"
 msgid "&Highlight found text"
 msgstr "&Talált szöveg kiemelése"
 
-#. TRANSLATORS: Option to play sound effects when bookmarks or notes are encountered
-msgid "Play &sounds on bookmarks and notes"
-msgstr "&Hangjelzés könyvjelzőknél és jegyzeteknél"
-
-#. TRANSLATORS: Option to move the reading caret to follow along with audio narration as it plays
-msgid "&Sync caret to audio playback"
-msgstr "&Kurzor szinkronizálása a hanglejátszással"
-
-#. TRANSLATORS: Label for the audio seek amount dropdown, used when skipping audio narration backward/forward
-msgid "&Audio seek amount:"
-msgstr "&Léptetési időegység:"
-
-#. TRANSLATORS: Option controlling whether seeking audio narration past the end of a chapter's file continues into the next chapter, or stops at the end of the current one
-msgid "Seeking &past the end of a chapter continues into the next"
-msgstr "Fejezet végén túltekerve &folytatás a következő fejezettel"
-
-#. TRANSLATORS: Option to check for app updates automatically on startup
-msgid "Check for &updates on startup"
-msgstr "&Frissítések keresése indításkor"
-
-#. TRANSLATORS: Label for the update channel selection dropdown
-msgid "Update Channel:"
-msgstr "Frissítési csatorna:"
-
-#. TRANSLATORS: Stable update channel option
-msgid "Stable"
-msgstr "Stabil"
-
-#. TRANSLATORS: Developer/development update channel option
-msgid "Dev"
-msgstr "Fejlesztői"
-
-#. TRANSLATORS: Label for the dropdown choosing how much Paperback writes to its log file
-msgid "Log Level:"
-msgstr "Naplózási szint:"
-
-#. TRANSLATORS: Button label to open the hotkey customization dialog
-msgid "Customize &Window Hotkey..."
-msgstr "Az ablak billentyűparancsának testre&szabása..."
-
-#. TRANSLATORS: Button label to open the Keyboard Shortcuts customization dialog
-msgid "Customize &Keyboard Shortcuts..."
-msgstr "&Billentyűparancsok testreszabása..."
-
 #. TRANSLATORS: Label for the reading speed input field (Words Per Minute)
 msgid "&Reading speed (words per minute):"
 msgstr "&Olvasási sebesség (szó/perc):"
 
-#. TRANSLATORS: Label for the number of recently opened documents to keep in history
-msgid "Number of &recent documents to show:"
-msgstr "Megjelenítendő &legutóbbi dokumentumok száma:"
-
-#. TRANSLATORS: Label for the language selection dropdown
-msgid "&Language:"
-msgstr "&Nyelv:"
-
-#. TRANSLATORS: Label/header for the Font options section
-msgid "Font"
-msgstr "Betűtípus"
-
-#. TRANSLATORS: Button label to pick a font
-msgid "Choose &Font..."
-msgstr "&Betűtípus kiválasztása..."
-
-#. TRANSLATORS: Button label to restore font settings to default values
-msgid "&Reset to Default Font"
-msgstr "&Alapértelmezett betűtípus visszaállítása"
-
-#. TRANSLATORS: Label/header for the Background Color options section
-msgid "Background Color"
-msgstr "Háttérszín"
-
-#. TRANSLATORS: Button label to pick a background color
-msgid "Choose &Background Color..."
-msgstr "&Háttérszín kiválasztása..."
-
-#. TRANSLATORS: Button label to restore background color to default values
-msgid "Reset to &Default Background"
-msgstr "Alapértelmezett hát&tér visszaállítása"
-
-#. TRANSLATORS: Label for the line spacing dropdown
-msgid "&Line spacing:"
-msgstr "S&orköz:"
-
-#. TRANSLATORS: Default spacing option (as opposed to relaxed/wide), shown in the line, paragraph, and letter spacing dropdowns
-msgid "Normal"
-msgstr "Normál"
-
-#. TRANSLATORS: 1.5x line spacing option
-msgid "1.5×"
-msgstr "1,5×"
-
-#. TRANSLATORS: Double line spacing option
-msgid "Double"
-msgstr "Dupla"
-
-#. TRANSLATORS: Label for the paragraph spacing dropdown
-msgid "&Paragraph spacing:"
-msgstr "Bekez&désköz:"
-
-#. TRANSLATORS: Relaxed paragraph spacing option
-msgid "Relaxed"
-msgstr "Tágas"
-
-#. TRANSLATORS: Wide spacing option, shown in the paragraph and letter spacing dropdowns
-msgid "Wide"
-msgstr "Széles"
-
-#. TRANSLATORS: Label for the letter spacing dropdown
-msgid "L&etter spacing:"
-msgstr "Betű&köz:"
-
-#. TRANSLATORS: Very Wide letter spacing option
-msgid "Very Wide"
-msgstr "Nagyon széles"
-
-#. TRANSLATORS: Label for the text alignment dropdown
-msgid "Text &alignment:"
-msgstr "Szöveg &igazítása:"
-
-#. TRANSLATORS: Left text alignment option
-msgid "Left"
-msgstr "Balra"
-
-#. TRANSLATORS: Center text alignment option
-msgid "Center"
-msgstr "Középre"
-
-#. TRANSLATORS: Right text alignment option
-msgid "Right"
-msgstr "Jobbra"
-
-#. TRANSLATORS: Justified text alignment option
-msgid "Justify"
-msgstr "Sorkizárt"
+#. TRANSLATORS: Title of the Settings dialog
+msgid "Settings"
+msgstr "Beállítások"
 
 #. TRANSLATORS: Tab label for the General options panel
 msgid "General"
 msgstr "Általános"
 
-#. TRANSLATORS: Tab label for the Reading options panel
-#. TRANSLATORS: Status bar label for the reading progress percentage, e.g. "Line 5, Character 120, Reading 45%"
+#. TRANSLATORS: Tab label for the Reading options panel, about moving through and searching a document
 msgid "Reading"
 msgstr "Olvasás"
 
-#. TRANSLATORS: Tab label for the Readability options panel
-msgid "Readability"
-msgstr "Olvashatóság"
+#. TRANSLATORS: Tab label for the Settings panel about playing audio books and narration
+#. TRANSLATORS: Name of the "Audio" category of keyboard shortcuts, shown as a tab label in the Customize Keyboard Shortcuts dialog
+msgid "Audio"
+msgstr "Hang"
 
-#. TRANSLATORS: Title of the system dialog for picking a background colour
-msgid "Choose a colour"
-msgstr "Szín kiválasztása"
+#. TRANSLATORS: Tab label for the Settings panel about how text looks: font, colour, spacing and alignment
+msgid "Appearance"
+msgstr "Megjelenés"
 
-#. TRANSLATORS: Log level choice that turns logging off, so Paperback writes no log file at all
-msgid "Off"
-msgstr "Ki"
+#. TRANSLATORS: Tab label for the Settings panel about how a file is read, such as whether tables are shown inline
+#, fuzzy
+msgid "Documents"
+msgstr "Dokumentumok"
 
-#. TRANSLATORS: Log level choice that records only errors
-msgid "Errors"
-msgstr "Hibák"
+#. TRANSLATORS: Tab label for the Settings panel with options most people never need, such as the update channel and log level
+#, fuzzy
+msgid "Advanced"
+msgstr "Speciális"
 
-#. TRANSLATORS: Log level choice that records warnings and errors
-msgid "Warnings"
-msgstr "Figyelmeztetések"
+msgid "System-Wide"
+msgstr "Rendszerszintű"
 
-#. TRANSLATORS: Log level choice that records general activity, warnings and errors
-msgid "Information"
-msgstr "Információk"
-
-#. TRANSLATORS: Log level choice with the detail useful for reporting a bug; the default
-msgid "Debug"
-msgstr "Hibakeresés"
-
-#. TRANSLATORS: Log level choice that records everything Paperback can, which makes a very large log
-msgid "Trace"
-msgstr "Nyomkövetés"
+msgid "Show or Hide Paperback"
+msgstr "A Paperback megjelenítése vagy elrejtése"
 
 #. TRANSLATORS: Title of the Sleep Timer dialog
 msgid "Sleep Timer"
@@ -1428,6 +1677,18 @@ msgstr "Az archívum &dokumentumai:"
 msgid "{} to {}"
 msgstr "{} – {}"
 
+#. TRANSLATORS: Announced when Enter is pressed on a picture while its text is already being recognized
+#. TRANSLATORS: Announced when Enter is pressed on an OCR placeholder while OCR is already running
+msgid "OCR in progress."
+msgstr "Szövegfelismerés folyamatban."
+
+#. TRANSLATORS: Announced when the picture under the caret cannot be read out of the document
+msgid "The picture could not be read."
+msgstr "A képet nem sikerült beolvasni."
+
+msgid "No text was found in the picture."
+msgstr "A képen nem található szöveg."
+
 #. TRANSLATORS: Error message shown when the requested document file does not exist; {} is the file path
 msgid "File not found: {}"
 msgstr "A fájl nem található: {}"
@@ -1464,18 +1725,20 @@ msgstr "Fájl: {}"
 msgid "Details: {}"
 msgstr "Részletek: {}"
 
-#. TRANSLATORS: Announced when Enter is pressed on an OCR placeholder while OCR is already running
-msgid "OCR in progress."
-msgstr "Szövegfelismerés folyamatban."
-
+#. TRANSLATORS: Announced when Recognize Current Page is chosen with no document open
 #. TRANSLATORS: Announced when batch OCR is triggered with no document open
 #. TRANSLATORS: Announced when Batch OCR is chosen with no document open
 msgid "No document open."
 msgstr "Nincs megnyitott dokumentum."
 
+#. TRANSLATORS: Announced when Recognize Current Page is chosen while OCR is already running
 #. TRANSLATORS: Announced when batch OCR is started while another OCR job is running
 msgid "OCR already in progress."
 msgstr "Már folyamatban van egy szövegfelismerés."
+
+#. TRANSLATORS: Announced when Recognize Current Page is chosen in a document that is not a PDF or a comic book
+msgid "Only PDF and comic book pages can be recognized."
+msgstr "Csak PDF-oldal és képregénylap szövege ismerhető fel."
 
 #. TRANSLATORS: Announced when the chosen batch OCR range contains no image-only pages
 msgid "No image-only pages in the given range."
@@ -1524,6 +1787,20 @@ msgstr "Ideiglenes könyvjelző."
 #. TRANSLATORS: Announced by the shortcut that reports the reading position. %s is how far through the document the reader is, e.g. "15%"; %d is the page number.
 msgid "%s, page %d"
 msgstr "%s, %d. oldal"
+
+#. TRANSLATORS: Announced when read aloud is started with nothing left to read after the caret
+msgid "End of document"
+msgstr "A dokumentum vége"
+
+#. TRANSLATORS: Spoken by the Play Sample button on the Audio tab of Settings
+#, fuzzy
+msgid "This is a sample of the current voice and speed settings."
+msgstr "Ez egy minta az aktuális beszédhang- és sebességbeállításokról."
+
+#. TRANSLATORS: Announced when read aloud is asked for on a system Paperback has no speech engine for yet
+#, fuzzy
+msgid "Read aloud isn't available on this system yet."
+msgstr "A felolvasás ezen a rendszeren még nem érhető el."
 
 #. TRANSLATORS: Announcement read by screen readers after following an internal link within the document
 msgid "Navigated to internal link."
@@ -1609,6 +1886,10 @@ msgstr "Nem sikerült megnyitni az adományozási oldalt a böngészőben."
 msgid "Paperback cannot perform any actions while Web View is open."
 msgstr "Amíg a webes nézet nyitva van, a Paperback nem tud műveletet végrehajtani."
 
+#. TRANSLATORS: Title of a warning dialog
+msgid "Warning"
+msgstr "Figyelmeztetés"
+
 #. TRANSLATORS: First message in the window that downloads documents from links, before the first server answers
 msgid "Connecting..."
 msgstr "Csatlakozás..."
@@ -1628,8 +1909,8 @@ msgid "Could not copy to the clipboard."
 msgstr "Nem sikerült a vágólapra másolni."
 
 #. TRANSLATORS: Announced after Select All, from the Edit menu or with Ctrl+A. The %d placeholder is replaced with the number of characters in the document. Plural form is chosen by that count.
-msgid "Selected %d character."
-msgid_plural "Selected %d characters."
+msgid "%d character selected."
+msgid_plural "%d characters selected."
 msgstr[0] "%d karakter kijelölve."
 msgstr[1] "%d karakter kijelölve."
 
@@ -1679,10 +1960,6 @@ msgstr "dokumentum"
 msgid "Paperback files (*.paperback)|*.paperback"
 msgstr "Paperback-fájlok (*.paperback)|*.paperback"
 
-#. TRANSLATORS: Title of the file save dialog when exporting a document's notes and bookmarks
-msgid "Export notes and bookmarks"
-msgstr "Jegyzetek és könyvjelzők exportálása"
-
 #. TRANSLATORS: Success message shown after exporting a document's notes and bookmarks
 msgid "Notes and bookmarks exported successfully."
 msgstr "A jegyzetek és könyvjelzők exportálása sikerült."
@@ -1690,6 +1967,14 @@ msgstr "A jegyzetek és könyvjelzők exportálása sikerült."
 #. TRANSLATORS: Title of the export-succeeded dialog
 msgid "Export Successful"
 msgstr "Sikeres exportálás"
+
+#. TRANSLATORS: File filter shown in the "Export notes and bookmarks" save dialog
+msgid "Text files (*.txt)|*.txt|HTML files (*.html)|*.html"
+msgstr "Szövegfájlok (*.txt)|*.txt|HTML-fájlok (*.html)|*.html"
+
+#. TRANSLATORS: Error dialog shown when exporting notes and bookmarks as text or HTML fails
+msgid "Failed to export notes and bookmarks."
+msgstr "Nem sikerült exportálni a jegyzeteket és könyvjelzőket."
 
 #. TRANSLATORS: Title of the file open dialog when importing a document's notes and bookmarks
 msgid "Import notes and bookmarks"
@@ -1704,17 +1989,14 @@ msgid "Import Successful"
 msgstr "Sikeres importálás"
 
 #. TRANSLATORS: Title of the file save dialog when saving a picture from the document
-#, fuzzy
 msgid "Save image"
 msgstr "Kép mentése"
 
 #. TRANSLATORS: File filter shown in the "Save image" dialog
-#, fuzzy
 msgid "All files (*.*)|*.*"
 msgstr "Minden fájl (*.*)|*.*"
 
 #. TRANSLATORS: Error dialog shown when saving a picture from the document fails
-#, fuzzy
 msgid "Failed to save image."
 msgstr "Nem sikerült menteni a képet."
 
@@ -1868,6 +2150,14 @@ msgstr "&Dokumentumadatok exportálása..."
 #. TRANSLATORS: Status-bar help text for the Export Document Data menu item.
 msgid "Export bookmarks and position"
 msgstr "Könyvjelzők és pozíció exportálása"
+
+#. TRANSLATORS: Menu item in the File menu to export bookmarks and notes as a readable text or HTML file.
+msgid "Export &Notes and Bookmarks as Text or HTML..."
+msgstr "&Jegyzetek és könyvjelzők exportálása szövegként vagy HTML-ként..."
+
+#. TRANSLATORS: Status-bar help text for the Export Notes and Bookmarks menu item.
+msgid "Export bookmarks and notes in a readable format"
+msgstr "Könyvjelzők és jegyzetek exportálása olvasható formátumban"
 
 #. TRANSLATORS: Menu item in the File menu to reveal the document's file in the system file manager.
 msgid "Reveal &File in Folder"
@@ -2049,6 +2339,16 @@ msgstr "&Frissítések keresése"
 msgid "Check for updates"
 msgstr "Frissítések keresése"
 
+#. TRANSLATORS: Menu item in the Help menu that opens a dialog for sending a problem report to the developer.
+#, fuzzy
+msgid "&Report a Problem..."
+msgstr "&Problémajelentés..."
+
+#. TRANSLATORS: Status-bar help text for the Help > Report a Problem menu item.
+#, fuzzy
+msgid "Send a problem report to the developer"
+msgstr "Problémajelentés küldése a fejlesztőnek"
+
 #. TRANSLATORS: Menu item in the Help menu to open the donation page for the application.
 msgid "&Donate"
 msgstr "&Adományozás"
@@ -2084,6 +2384,10 @@ msgstr "&Beállítások"
 #. TRANSLATORS: Tools menu item that opens the Batch OCR dialog for image-only PDF pages
 msgid "&Batch OCR..."
 msgstr "&Kötegelt szövegfelismerés..."
+
+#. TRANSLATORS: Tools menu item that recognizes the page the cursor is on with OCR, replacing any text it already has
+msgid "&Recognize Current Page"
+msgstr "&Aktuális oldal szövegfelismerése"
 
 #. TRANSLATORS: Checkable menu item in the View menu that toggles whether word wrap is enabled.
 msgid "W&ord wrap"
@@ -2331,17 +2635,21 @@ msgid "Table View"
 msgstr "Táblázatnézet"
 
 #. TRANSLATORS: Right-click context menu item and status text to save the picture under the caret to a file
-#, fuzzy
 msgid "Save &image as..."
 msgstr "Kép mentése &másként..."
 
-#, fuzzy
 msgid "Save image as"
 msgstr "Kép mentése másként"
 
+msgid "Read &text in picture"
+msgstr "Kép szövegének &felismerése"
+
+msgid "Read the text in the picture"
+msgstr "A képen lévő szöveg felismerése és megjelenítése"
+
 #. TRANSLATORS: Right-click context menu item and status text to bookmark the current position
 msgid "Create &bookmark"
-msgstr "&Könyvjelző létrehozása"
+msgstr "Könyvjelző &létrehozása"
 
 msgid "Create bookmark"
 msgstr "Könyvjelző létrehozása"
@@ -2362,7 +2670,7 @@ msgstr "Szöveg keresése"
 
 #. TRANSLATORS: Right-click context menu item and status text to repeat the last search forward
 msgid "Find &next"
-msgstr "&Következő keresése"
+msgstr "Kö&vetkező keresése"
 
 msgid "Find next match"
 msgstr "A következő találat keresése"
@@ -2393,8 +2701,8 @@ msgid "Go to percent"
 msgstr "Ugrás adott százalékra"
 
 #. TRANSLATORS: Announced after text is copied, with Ctrl+C or from the marked beginning of a selection. The %d placeholder is replaced with the number of characters copied. Plural form is chosen by that count.
-msgid "Copied %d character."
-msgid_plural "Copied %d characters."
+msgid "%d character copied."
+msgid_plural "%d characters copied."
 msgstr[0] "%d karakter másolva."
 msgstr[1] "%d karakter másolva."
 
@@ -2423,13 +2731,17 @@ msgid_plural "Sleep timer set for %d minutes."
 msgstr[0] "Elalvási időzítő beállítva %d percre."
 msgstr[1] "Elalvási időzítő beállítva %d percre."
 
-#. TRANSLATORS: Status bar label for the current line number, e.g. "Line 5, Character 120, Reading 45%"
+#. TRANSLATORS: Status bar label for the current line number, e.g. "Line 5, Character 120, Progress 45%"
 msgid "Line"
 msgstr "Sor"
 
 #. TRANSLATORS: Status bar label for the current character offset within the line
 msgid "Character"
 msgstr "Karakter"
+
+#. TRANSLATORS: Status bar label for how far through the document the reader has got, e.g. "Line 5, Character 120, Progress 45%"
+msgid "Progress"
+msgstr "Haladás"
 
 #. TRANSLATORS: Status bar label prefixed before the remaining sleep timer countdown, e.g. "Sleep timer: 04:32"
 msgid "Sleep timer"
@@ -2716,6 +3028,16 @@ msgid "Play/Pause Audio"
 msgstr "Lejátszás/szüneteltetés"
 
 #. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+#, fuzzy
+msgid "Go to Time..."
+msgstr "Ugrás az időpontra..."
+
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+#, fuzzy
+msgid "Announce Chapter Time"
+msgstr "Fejezet idejének bejelentése"
+
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
 msgid "Seek Audio Forward"
 msgstr "Előretekerés"
 
@@ -2764,6 +3086,10 @@ msgid "Batch OCR..."
 msgstr "Kötegelt szövegfelismerés..."
 
 #. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+msgid "Recognize Current Page"
+msgstr "Aktuális oldal szövegfelismerése"
+
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
 msgid "Customize Keyboard Shortcuts..."
 msgstr "Billentyűparancsok testreszabása..."
 
@@ -2774,6 +3100,10 @@ msgstr "Dokumentumadatok importálása..."
 #. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
 msgid "Export Document Data..."
 msgstr "Dokumentumadatok exportálása..."
+
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+msgid "Export Notes and Bookmarks as Text or HTML..."
+msgstr "Jegyzetek és könyvjelzők exportálása szövegként vagy HTML-ként..."
 
 #. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
 msgid "Export to Plain Text..."
@@ -2819,10 +3149,6 @@ msgstr "Szerkesztés"
 msgid "View"
 msgstr "Nézet"
 
-#. TRANSLATORS: Name of the "Audio" category of keyboard shortcuts, shown as a tab label in the Customize Keyboard Shortcuts dialog
-msgid "Audio"
-msgstr "Hang"
-
 #. TRANSLATORS: Name of the "Tools" category of keyboard shortcuts, shown as a tab label in the Customize Keyboard Shortcuts dialog
 msgid "Tools"
 msgstr "Eszközök"
@@ -2867,6 +3193,25 @@ msgstr "a biztonságos hivatkozás nem biztonságos címre irányít át, ezért
 msgid "the document is larger than {} MB, so it was not downloaded"
 msgstr "a dokumentum nagyobb, mint {} MB, ezért a Paperback nem töltötte le"
 
+#. TRANSLATORS: Follows text typed into Open from URL that is not an http or https link
+msgid "this is not a web link"
+msgstr "ez nem webhivatkozás"
+
+#. TRANSLATORS: Security warning before downloading a document from a link; %s is the type the server gave, such as text/html
+msgid "The server sends a web page (%s) instead of the document the link names."
+msgstr "A kiszolgáló a hivatkozott dokumentum helyett weblapot (%s) küld."
+
+msgid "The server sends %s, which is not a format Paperback reads."
+msgstr "A kiszolgáló %s típusú tartalmat küld, amelyet a Paperback nem tud megnyitni."
+
+#. TRANSLATORS: Security warning before downloading a document from a link whose server gave no type
+msgid "The server does not say what it sends."
+msgstr "A kiszolgáló nem adja meg, mit küld."
+
+#. TRANSLATORS: Question at the end of the security warning before downloading a document from a link
+msgid "Download it anyway?"
+msgstr "Mégis letölti?"
+
 #. TRANSLATORS: Line shown in place of a scanned PDF page with no text layer; Enter on it runs OCR
 msgid "[Image only. Press enter to OCR.]"
 msgstr "[Csak kép. A szövegfelismeréshez nyomja le az Enter billentyűt.]"
@@ -2875,23 +3220,58 @@ msgstr "[Csak kép. A szövegfelismeréshez nyomja le az Enter billentyűt.]"
 msgid "[Image only. This page has no text to read.]"
 msgstr "[Csak kép. Ezen az oldalon nincs olvasható szöveg.]"
 
-#. TRANSLATORS: Error shown when opening a comic book archive packed with RAR (.cbr), which Paperback cannot read
-msgid "Paperback cannot read RAR comic archives. Repack it as a .cbz to read it here."
-msgstr "A Paperback nem tudja olvasni a RAR formátumú képregényarchívumokat. Csomagolja újra .cbz formátumba, hogy itt olvashassa."
+#. TRANSLATORS: A table of contents entry for one volume of a braille book; {} is the volume's number
+#, fuzzy
+msgid "Volume {}"
+msgstr "{}. kötet"
 
 #. TRANSLATORS: Error shown when a comic book archive (.cbz) cannot be opened; {} is the underlying error
 msgid "Failed to parse comic archive: {}"
 msgstr "Nem sikerült feldolgozni a képregényarchívumot: {}"
 
+#. TRANSLATORS: Spoken for a comic book page that is its front cover
+msgid "Front cover"
+msgstr "Első borító"
+
+#. TRANSLATORS: Spoken for a comic book page that is an inside cover
+msgid "Inside cover"
+msgstr "Belső borító"
+
+#. TRANSLATORS: Spoken for a comic book page that recaps the story so far
+msgid "Recap"
+msgstr "Az eddig történtek"
+
+#. TRANSLATORS: Spoken for a comic book page that is an advertisement
+msgid "Advertisement"
+msgstr "Hirdetés"
+
+#. TRANSLATORS: Spoken for a comic book page written by the editors
+msgid "Editorial"
+msgstr "Szerkesztői oldal"
+
+#. TRANSLATORS: Spoken for a comic book page of letters from readers
+msgid "Letters"
+msgstr "Olvasói levelek"
+
+#. TRANSLATORS: Spoken for a comic book page previewing another comic
+msgid "Preview"
+msgstr "Előzetes"
+
+#. TRANSLATORS: Spoken for a comic book page that is its back cover
+msgid "Back cover"
+msgstr "Hátsó borító"
+
 #. TRANSLATORS: Error shown when a comic book archive holds no page images at all
 msgid "This comic archive contains no pages."
 msgstr "Ez a képregényarchívum nem tartalmaz oldalakat."
 
+#. TRANSLATORS: Label inserted before a figure or image's description, e.g. "[Figure: a cat sleeping]", and on its own, "[Image]", for a picture with none
 #. TRANSLATORS: Label inserted before a figure or image's description, e.g. "[Figure: a cat sleeping]"
 msgid "Figure"
 msgstr "Ábra"
 
 #. TRANSLATORS: Label standing in for a picture in a WinHelp topic, shown as "[Image]"
+#. TRANSLATORS: Label standing in for a picture in an OS/2 help panel, shown as "[Image]"
 msgid "Image"
 msgstr "Kép"
 
@@ -2915,10 +3295,6 @@ msgstr "A ZIP-archívum nem tűnik érvényes DAISY 3 vagy DAISY 2.02 könyvnek"
 msgid "rootfile not found in container.xml"
 msgstr "a rootfile nem található a container.xml fájlban"
 
-#. TRANSLATORS: Error shown when an EPUB spine item's content type cannot be converted
-msgid "unsupported content"
-msgstr "nem támogatott tartalom"
-
 #. TRANSLATORS: Error shown when an EPUB's OPF document has no <package> element
 msgid "OPF package element missing"
 msgstr "hiányzik az OPF package eleme"
@@ -2934,6 +3310,10 @@ msgstr "nem sikerült átalakítani a spine-elemeket: {}"
 #. TRANSLATORS: Error shown when an EPUB has no readable content; {} is the specific reason (see the two messages above)
 msgid "EPUB has no readable content ({})"
 msgstr "Az EPUB-fájlban nincs olvasható tartalom ({})"
+
+#. TRANSLATORS: Error shown when a ZIP file contains no readable Word document content
+msgid "No readable content found in the ZIP archive"
+msgstr "A ZIP-archívumban nem található olvasható tartalom"
 
 #. TRANSLATORS: Error shown when an FB2 (FictionBook) file's XML fails to convert to plain text
 msgid "Failed to convert FB2 XML to text"
@@ -2951,13 +3331,10 @@ msgstr "{}. témakör"
 msgid "HTML file is empty: {}"
 msgstr "A HTML-fájl üres: {}"
 
-#. TRANSLATORS: Error shown when an HTML file fails to convert to plain text; {} is the file path
-msgid "Failed to convert HTML to text: {}"
-msgstr "Nem sikerült szöveggé alakítani a HTML-t: {}"
-
-#. TRANSLATORS: Error shown when a Markdown file fails to convert to plain text; {} is the file path
-msgid "Failed to convert Markdown to text: {}"
-msgstr "Nem sikerült szöveggé alakítani a Markdownt: {}"
+#. TRANSLATORS: Error shown when an OS/2 help file (.inf or .hlp) cannot be read; {} is the underlying error
+#, fuzzy
+msgid "Failed to parse OS/2 help file: {}"
+msgstr "Nem sikerült az OS/2 súgófájlt feldolgozni: {}"
 
 #. TRANSLATORS: Error shown when a MOBI file's header is missing Huffman compression parameters
 msgid "Missing HUFF parameters in header"
@@ -3068,6 +3445,18 @@ msgstr "Ez a dokumentum olyan titkosítást használ, amelyet a Paperback nem tu
 msgid "ODP file does not contain any pages"
 msgstr "Az ODP-fájl nem tartalmaz oldalakat"
 
+#. TRANSLATORS: Written after a presentation slide's text, before the presenter's notes for that slide; {} is the notes
+msgid "Speaker notes: {}"
+msgstr "Előadói jegyzetek: {}"
+
+#. TRANSLATORS: Written after a presentation slide, for a comment a reviewer left on it without a name; {} is the comment
+msgid "Comment: {}"
+msgstr "Megjegyzés: {}"
+
+#. TRANSLATORS: Written after a presentation slide, for a comment a reviewer left on it: the first {} is the reviewer, the second the comment
+msgid "Comment from {}: {}"
+msgstr "{} megjegyzése: {}"
+
 #. TRANSLATORS: Error shown when a flat-XML ODP presentation file has no pages/slides
 msgid "FODP file does not contain any pages"
 msgstr "Az FODP-fájl nem tartalmaz oldalakat"
@@ -3110,6 +3499,26 @@ msgstr "Nem sikerült feldolgozni az RTF-dokumentumot: {}"
 msgid "Chapter {}"
 msgstr "{}. fejezet"
 
+#. TRANSLATORS: Heading over the comments reviewers left on a document, written after its text
+msgid "Comments"
+msgstr "Megjegyzések"
+
+#. TRANSLATORS: Names a comment's author when the document does not say who wrote it
+msgid "Comment"
+msgstr "Megjegyzés"
+
+#. TRANSLATORS: One comment, after the document's text: the first {} is its author, the second the words it was made on, and the third the comment
+msgid "{} on “{}”: {}"
+msgstr "{} („{}”): {}"
+
+#. TRANSLATORS: One comment made on a point rather than on words, after the document's text: the first {} is its author, the second the comment
+msgid "{}: {}"
+msgstr "{}: {}"
+
+#. TRANSLATORS: Shown in place of a presentation slide that has no text, such as one holding only pictures
+msgid "This slide has no text."
+msgstr "A dián nincs szöveg."
+
 #. TRANSLATORS: Error shown when a legacy DOC file is missing required header fields
 msgid "DOC file is missing required FIB fields"
 msgstr "A DOC-fájlból hiányoznak a szükséges FIB-mezők"
@@ -3126,21 +3535,29 @@ msgstr "A DOC-fájl titkosított, és jelszó szükséges a megnyitásához"
 msgid "DOC decryption failed (wrong password?): {}"
 msgstr "A DOC-fájl visszafejtése nem sikerült (helytelen jelszó?): {}"
 
+#. TRANSLATORS: Error shown when a DOC file from Word for Windows 1.x or 2.0 has no readable text
+#. TRANSLATORS: Error shown when a DOC file's fallback content has no readable text
+#. TRANSLATORS: Error shown when a Windows Write or Word for DOS file has no readable text
+msgid "No readable text content found"
+msgstr "Nem található olvasható szöveges tartalom"
+
 #. TRANSLATORS: Error shown when a DOC file's fallback content doesn't look like plain text
 msgid "File content does not look like plain text"
 msgstr "A fájl tartalma nem tűnik egyszerű szövegnek"
 
-#. TRANSLATORS: Error shown when a DOC file's fallback content has no readable text
-msgid "No readable text content found"
-msgstr "Nem található olvasható szöveges tartalom"
-
-#. TRANSLATORS: Error shown when a ZIP file contains no readable Word document content
-msgid "No readable content found in the ZIP archive"
-msgstr "A ZIP-archívumban nem található olvasható tartalom"
-
 #. TRANSLATORS: Error shown when both DOC parsing strategies fail; the two {} are the underlying error details
 msgid "Legacy DOC parse failed: {}. OOXML fallback failed: {}"
 msgstr "A régi DOC formátum feldolgozása nem sikerült: {}. Az OOXML formátummal való próbálkozás sem sikerült: {}"
+
+#. TRANSLATORS: Error shown when an XPS document has no pages
+#, fuzzy
+msgid "XPS file contains no pages"
+msgstr "Az XPS-fájl nem tartalmaz oldalakat"
+
+#. TRANSLATORS: Shown in place of an XPS page that has no text, such as a scanned one
+#, fuzzy
+msgid "This page has no text."
+msgstr "Ezen az oldalon nincs szöveg."
 
 #. TRANSLATORS: Error shown when a file has no extension to determine its format; {} is the file path
 msgid "No file extension found for: {}"
@@ -3154,13 +3571,84 @@ msgstr "Nincs feldolgozó ehhez a kiterjesztéshez: .{}"
 msgid "All parsers failed for extension: .{}"
 msgstr "Egyik feldolgozó sem tudta megnyitni ezt a kiterjesztést: .{}"
 
-#. TRANSLATORS: File name stem offered when saving a picture that has no file name of its own
+#. TRANSLATORS: Announced with how far into an audiobook's chapter the reader is: the time left in it; {} is written like 12:05
 #, fuzzy
+msgid "{} left"
+msgstr "{} van még hátra"
+
+#. TRANSLATORS: Announced for how far into an audiobook the reader is: the first {} is the time played so far and the second how long it runs, both written like 1:02:03
+#, fuzzy
+msgid "{} of {}"
+msgstr "{} a(z) {}ből"
+
+#. TRANSLATORS: File name stem offered when saving a picture that has no file name of its own
 msgid "image"
 msgstr "kép"
 
+#, fuzzy
+msgid "Paperback can't open a RAR archive split into parts. Join the parts into one archive to read it here."
+msgstr "A Paperback nem tudja megnyitni a több részre felosztott RAR-archívumot. A dokumentum olvasásához egyesítse az archívum részfájljait."
+
+msgid "Current version is not a valid semver."
+msgstr "Az aktuális verziószám érvénytelen."
+
+#, fuzzy
+msgid "No release has a valid semver tag."
+msgstr "Nincs érvényes szeminverzióval rendelkező kiadás."
+
+msgid "Latest release tag is not a valid semver."
+msgstr "A legújabb kiadás címkéje nem érvényes verziószám."
+
+msgid "Invalid public key"
+msgstr "Érvénytelen nyilvános kulcs"
+
+msgid "Failed to read signature"
+msgstr "Nem sikerült beolvasni az aláírást"
+
+msgid "Invalid signature"
+msgstr "Érvénytelen aláírás"
+
+msgid "Failed to create private download directory"
+msgstr "Nem sikerült létrehozni a privát letöltési mappát"
+
+msgid "Failed to create file"
+msgstr "Nem sikerült létrehozni a fájlt"
+
+msgid "Failed to write file"
+msgstr "Nem sikerült írni a fájlba"
+
+msgid "Failed to read file for verification"
+msgstr "Nem sikerült beolvasni a fájlt az ellenőrzéshez"
+
+msgid "Signature verification failed"
+msgstr "Az aláírás ellenőrzése nem sikerült"
+
+msgid "Failed to rename verified file"
+msgstr "Nem sikerült átnevezni az ellenőrzött fájlt"
+
+msgid "Failed to parse release JSON"
+msgstr "Nem sikerült feldolgozni a kiadás JSON-adatait"
+
+msgid "Latest release does not include downloadable assets."
+msgstr "A legújabb kiadás nem tartalmaz letölthető fájlokat."
+
+msgid "Update is available but no matching download asset or signature was found."
+msgstr "Frissítés érhető el, de nem található hozzá megfelelő letöltendő fájl vagy aláírás."
+
 msgid "Not running from an AppImage; cannot self-update."
 msgstr "A program nem AppImage-ből fut, ezért nem tudja frissíteni önmagát."
+
+msgid "Failed to determine exe path"
+msgstr "Nem sikerült meghatározni a program elérési útját"
+
+msgid "Failed to get exe directory"
+msgstr "Nem sikerült lekérdezni a program mappáját"
+
+msgid "Could not determine a cache directory: neither XDG_CACHE_HOME nor HOME is set"
+msgstr "Nem sikerült meghatározni a gyorsítótármappát: sem az XDG_CACHE_HOME, sem a HOME nincs beállítva"
+
+msgid "Failed to create cache directory"
+msgstr "Nem sikerült létrehozni a gyorsítótármappát"
 
 msgid "Failed to get current exe path"
 msgstr "Nem sikerült lekérdezni a futó program elérési útját"
@@ -3273,9 +3761,6 @@ msgstr "A %s frissítése"
 msgid "Downloading update..."
 msgstr "A frissítés letöltése..."
 
-msgid "Update failed"
-msgstr "A frissítés nem sikerült"
-
 msgid "Preparing update..."
 msgstr "A frissítés előkészítése..."
 
@@ -3296,6 +3781,12 @@ msgstr "A biztonsági ellenőrzés nem sikerült. Lehet, hogy a frissítést ill
 
 msgid "Security Error"
 msgstr "Biztonsági hiba"
+
+msgid "The update server returned HTTP error %s."
+msgstr "A frissítési kiszolgáló HTTP-hibával válaszolt (%s)."
+
+msgid "Could not reach the update server: %s"
+msgstr "Nem sikerült elérni a frissítési kiszolgálót: %s"
 
 #. TRANSLATORS: Duration segment for hours (for example, "1 hour" or "5 hours"). The %d placeholder is replaced with the count.
 msgid "%d hour"
@@ -3330,6 +3821,26 @@ msgstr "&Cmd"
 #. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Option modifier in the shortcut, on macOS.
 msgid "&Option"
 msgstr "&Option"
+
+#. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Ctrl modifier in the shortcut.
+msgid "&Ctrl"
+msgstr "&Ctrl"
+
+#. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Alt modifier in the shortcut.
+msgid "&Alt"
+msgstr "&Alt"
+
+#. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Shift modifier in the shortcut.
+msgid "&Shift"
+msgstr "&Shift"
+
+#. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Windows logo key in a system-wide shortcut.
+msgid "&Win"
+msgstr "&Win"
+
+#. TRANSLATORS: Label next to the key field in the Set Shortcut dialog.
+msgid "&Key:"
+msgstr "&Billentyű:"
 
 msgid "Tip: click in the key field and press the key combination you want."
 msgstr "Tipp: kattintson a billentyűmezőbe, és nyomja le a kívánt billentyűkombinációt."
@@ -3398,6 +3909,10 @@ msgstr "Visszaállítja ezen a lapon az összes billentyűparancsot az alapérte
 #. TRANSLATORS: Title of the confirmation dialog for resetting keyboard shortcuts to their defaults.
 msgid "Reset Shortcuts"
 msgstr "Billentyűparancsok visszaállítása"
+
+#. TRANSLATORS: A shortcut in the Customize Keyboard Shortcuts list whose key is not on the keyboard layout in use, so it cannot be pressed. The {} placeholder is replaced with the shortcut, for example "Ctrl+;".
+msgid "{} (not on this keyboard layout)"
+msgstr "{} (ezen a billentyűzetkiosztáson nem érhető el)"
 
 #: kt swift
 msgid "Export Document Data"
@@ -3534,7 +4049,6 @@ msgstr "A megnyitott dokumentumok itt jelennek meg."
 msgid "Text to Speech"
 msgstr "Szövegfelolvasás"
 
-#. TRANSLATORS: Row label for the current TTS voice, navigates to the voice picker
 #: kt swift
 msgid "Voice"
 msgstr "Beszédhang"
@@ -3559,7 +4073,6 @@ msgstr "Hangmagasság"
 msgid "Speech Dictionary"
 msgstr "Kiejtési szótár"
 
-#. TRANSLATORS: Button that reads a sample sentence aloud using the current voice/rate/pitch settings
 #: kt swift
 msgid "Play Sample"
 msgstr "Minta lejátszása"
@@ -3858,11 +4371,6 @@ msgstr "Lejátszás"
 
 #. TRANSLATORS: Accessibility announcement spoken when trying to navigate past the start or end of the document
 #: swift
-msgid "End of document"
-msgstr "A dokumentum vége"
-
-#. TRANSLATORS: Accessibility announcement spoken when trying to navigate past the start or end of the document
-#: swift
 msgid "Beginning of document"
 msgstr "A dokumentum eleje"
 
@@ -4100,11 +4608,6 @@ msgstr "További lehetőségek"
 msgid "Pause Read Aloud"
 msgstr "Felolvasás szüneteltetése"
 
-#. TRANSLATORS: Menu item / accessibility action toggling text-to-speech playback; label names the action that tapping it performs
-#: swift kt
-msgid "Read Aloud"
-msgstr "Felolvasás"
-
 #. TRANSLATORS: Menu item / accessibility action to open the export document dialog
 #: kt
 msgid "Export As"
@@ -4249,11 +4752,11 @@ msgstr "Hiba a dokumentum betöltésekor: {}"
 msgid "Speech Engine"
 msgstr "Beszédmotor"
 
-#: kt swift
+#: kt
 msgid "1 book"
 msgstr "1 könyv"
 
-#: kt swift
+#: kt
 msgid "{} books"
 msgstr "{} könyv"
 
@@ -4348,17 +4851,17 @@ msgstr "Fájlkezelő"
 #. TRANSLATORS: How far through the document the reader has got, shown under the read-aloud progress bar; {} is a whole-number percentage
 #: swift kt
 msgid "{}% through"
-msgstr "Haladás: {}%"
+msgstr "{}%-nál tart"
 
 #. TRANSLATORS: Footer explaining the "Swipe up moves forward" toggle above it
 #: swift
 msgid "With VoiceOver, swipe up on the play button to move forward, or down to move back."
-msgstr "VoiceOverrel a lejátszás gombon felfelé legyintve előre, lefelé legyintve visszafelé léphet."
+msgstr "VoiceOver használata esetén a lejátszás gombon felfelé legyintve előre, lefelé legyintve visszafelé léphet."
 
 #. TRANSLATORS: Explanation shown under the "Swipe up moves forward" switch
 #: kt
 msgid "With TalkBack, swipe up on the play button to move forward, or down to move back."
-msgstr "TalkBackkel a lejátszás gombon felfelé legyintve előre, lefelé legyintve visszafelé léphet."
+msgstr "TalkBack használata esetén a lejátszás gombon felfelé legyintve előre, lefelé legyintve visszafelé léphet."
 
 #. TRANSLATORS: TalkBack description of the folder the file browser is showing; {} is its path
 #: kt
@@ -4370,7 +4873,7 @@ msgid "{}, {}, modified {}{}"
 msgstr "{}, {}, módosítva: {}{}"
 
 #. TRANSLATORS: TalkBack state of a slider; {} is the number it is set to
-#: kt
+#: swift kt
 msgid "{} percent"
 msgstr "{} százalék"
 
@@ -4427,11 +4930,6 @@ msgstr "Képlet"
 #: kt swift
 msgid "No matches."
 msgstr "Nincs találat."
-
-#. TRANSLATORS: Label for the picker choosing whether the app follows the system light/dark setting or is pinned to one of them
-#: swift
-msgid "Appearance"
-msgstr "Megjelenés"
 
 #. TRANSLATORS: Appearance option following the phone's own light/dark setting
 #: swift
@@ -4558,13 +5056,141 @@ msgstr "Felolvasás leállítása a keresési találatok után"
 msgid "Turn off to continue reading while navigating by search matches."
 msgstr "Kapcsolja ki, ha a keresési találatok közötti navigálás közben folytatni szeretné a felolvasást."
 
-#. TRANSLATORS: 1.5x line spacing option
-#: swift
-msgid "1.5\\u{00d7}"
-msgstr "1,5\\u{00d7}"
+#. TRANSLATORS: VoiceOver label for the read-aloud bar's control that speeds up or slows down a book's recorded audio
+#: kt swift
+msgid "Audio Speed"
+msgstr "Lejátszási sebesség"
 
-#. TRANSLATORS: Row label in the Document Info sheet for how far through the document the reader has got
 #: swift
+msgid "Speech for This Book"
+msgstr "A könyv felolvasási beállításai"
+
+#. TRANSLATORS: Spoken on entering a list in text mode; {} is how many items it has. Which of the three forms is used depends on the language's plural rule, and the "many" form's trailing character isn't a typo.
+#: swift
+msgid "{} item"
+msgstr "{} elem"
+
+#. TRANSLATORS: Spoken on entering a list in text mode; {} is how many items it has. Which of the three forms is used depends on the language's plural rule, and the "many" form's trailing character isn't a typo.
+#: swift
+msgid "{} items"
+msgstr "{} elem"
+
+#. TRANSLATORS: Spoken on entering a list in text mode; {} is how many items it has. Which of the three forms is used depends on the language's plural rule, and the "many" form's trailing character isn't a typo.
+#: swift
+msgid "{} items⁣"
+msgstr "{} elem⁣"
+
+#. TRANSLATORS: Spoken for an empty table cell in text mode
+#: swift
+msgid "Blank"
+msgstr "Üres"
+
+#. TRANSLATORS: Name of the VoiceOver rotor setting that moves between the entries of a document's table of contents in text mode
+#: swift
+msgid "Sections"
+msgstr "Szakaszok"
+
+#. TRANSLATORS: Switch in Speech for This Book giving the open book a voice of its own instead of the one in Settings
+#: swift
+msgid "Own Voice"
+msgstr "Saját beszédhang"
+
+#. TRANSLATORS: Switch in Speech for This Book giving the open book a speech rate of its own instead of the one in Settings
+#: swift
+msgid "Own Rate"
+msgstr "Saját beszédsebesség"
+
+#. TRANSLATORS: Switch in Speech for This Book giving the open book a pitch of its own instead of the one in Settings
+#: swift
+msgid "Own Pitch"
+msgstr "Saját hangmagasság"
+
+#. TRANSLATORS: Footer in Speech for This Book explaining what a switch left off does
+#: swift
+msgid "Whatever is switched off follows Settings."
+msgstr "Ami ki van kapcsolva, az a Beállításokat követi."
+
+#. TRANSLATORS: Button that empties the recent documents list
+#: kt swift
+msgid "Clear"
+msgstr "Törlés"
+
+#. TRANSLATORS: Row label for the number of audio files in the document
+#: kt swift
+msgid "Number of files"
+msgstr "Fájlok száma"
+
+#. TRANSLATORS: Row label for the total playback duration across all of the document's audio files
+#: kt swift
+msgid "Total duration"
+msgstr "Teljes lejátszási idő"
+
+#. TRANSLATORS: Row label for the average playback duration per audio file in the document
+#: kt swift
+msgid "Average duration"
+msgstr "Átlagos lejátszási idő"
+
+#. TRANSLATORS: TalkBack action on the read-aloud bar's audio speed control, which opens the list of speeds
+#: kt
+msgid "Select audio speed"
+msgstr "Lejátszási sebesség kiválasztása"
+
+#. TRANSLATORS: Section header in Settings grouping controls for how document text is displayed
+#: kt swift
+msgid "Readability"
+msgstr "Olvashatóság"
+
+#. TRANSLATORS: Go To mode option: navigate to a time in an audiobook, such as 1:23:45
+#: kt swift
 #, fuzzy
-msgid "Progress"
-msgstr "Olvasási pozíció"
+msgid "Time"
+msgstr "Időpontjára"
+
+#~ msgid "Paperback cannot read RAR comic archives. Repack it as a .cbz to read it here."
+#~ msgstr "A Paperback nem tudja olvasni a RAR formátumú képregényarchívumokat. Csomagolja újra .cbz formátumba, hogy itt olvashassa."
+
+#~ msgid "&Join wrapped lines into paragraphs in PDFs"
+#~ msgstr "Tördelt sorok &egyesítése bekezdésekké PDF-ekben"
+
+#~ msgid "Remove repeated page &headers and footers in PDFs"
+#~ msgstr "Ismétlődő élő&fejek és élőlábak eltávolítása PDF-ekben"
+
+#~ msgid "Failed to create IPC server"
+#~ msgstr "Nem sikerült létrehozni az IPC-kiszolgálót"
+
+#~ msgid "Window Hotkey"
+#~ msgstr "Az ablak billentyűparancsa"
+
+#~ msgid "Space"
+#~ msgstr "Space"
+
+#~ msgid "Customize &Window Hotkey..."
+#~ msgstr "Az ablak billentyűparancsának testre&szabása..."
+
+#~ msgid "unsupported content"
+#~ msgstr "nem támogatott tartalom"
+
+#~ msgid "Failed to convert HTML to text: {}"
+#~ msgstr "Nem sikerült szöveggé alakítani a HTML-t: {}"
+
+#~ msgid "Failed to convert Markdown to text: {}"
+#~ msgstr "Nem sikerült szöveggé alakítani a Markdownt: {}"
+
+#~ msgid "{} on \\u{201c}{}\\u{201d}: {}"
+#~ msgstr "{} („{}”): {}"
+
+#~ msgid "1.5\\u{00d7}"
+#~ msgstr "1,5\\u{00d7}"
+
+#~ msgid "Update failed"
+#~ msgstr "A frissítés nem sikerült"
+
+#~ msgid "Selected %d character."
+#~ msgid_plural "Selected %d characters."
+#~ msgstr[0] "%d karakter kijelölve."
+#~ msgstr[1] "%d karakter kijelölve."
+
+#~ msgid "Copied %d character."
+#~ msgid_plural "Copied %d characters."
+#~ msgstr[0] "%d karakter másolva."
+#~ msgstr[1] "%d karakter másolva."

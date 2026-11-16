@@ -1,10 +1,16 @@
-//! Playing a document's recorded narration, and the size of a seek through it.
-
 use super::Ctx;
 use crate::ui::audio;
 
 pub fn toggle_play_pause(ctx: &Ctx) {
 	audio::handle_toggle_play_pause_audio(ctx.dm, ctx.live_region_label, ctx.from_keyboard);
+}
+
+pub fn go_to_time(ctx: &Ctx) {
+	audio::handle_go_to_time(ctx.frame, ctx.dm, ctx.config, ctx.live_region_label, ctx.from_keyboard);
+}
+
+pub fn announce_chapter_progress(ctx: &Ctx) {
+	audio::handle_announce_chapter_progress(ctx.dm, ctx.live_region_label, ctx.from_keyboard);
 }
 
 pub fn seek_forward(ctx: &Ctx) {
@@ -24,11 +30,11 @@ pub fn decrease_seek_amount(ctx: &Ctx) {
 }
 
 pub fn increase_speed(ctx: &Ctx) {
-	audio::handle_change_audio_speed(ctx.dm, ctx.live_region_label, true, ctx.from_keyboard);
+	audio::handle_change_audio_speed(ctx.dm, ctx.config, ctx.live_region_label, true, ctx.from_keyboard);
 }
 
 pub fn decrease_speed(ctx: &Ctx) {
-	audio::handle_change_audio_speed(ctx.dm, ctx.live_region_label, false, ctx.from_keyboard);
+	audio::handle_change_audio_speed(ctx.dm, ctx.config, ctx.live_region_label, false, ctx.from_keyboard);
 }
 
 pub fn increase_volume(ctx: &Ctx) {

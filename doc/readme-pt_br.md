@@ -1,6 +1,6 @@
-<!-- machine-translated from doc/readme.md (source-hash: cc466634600b58b4; sections: 84030068,db723a70,df2f4c18,e9b82d46,1387e8b7,3887c286,0ee39028,3a4c3efe,d3762a01,e9860ee8,80b9b9ca); please review and edit as needed -->
+<!-- machine-translated from doc/readme.md (source-hash: ba700ddfbaf3e99f; sections: 64167837,db723a70,df2f4c18,aa6b9ca2,1387e8b7,b8a00464,74f0c8e7,490ed50c,d3762a01,e9860ee8,15aeaaed); please review and edit as needed -->
 
-# Paperback - versão 1.0
+# Paperback - versão 1.1
 
 ## Introdução
 
@@ -22,11 +22,11 @@ Paperback funciona no Windows 10/11, em todas as versões modernas de ARM macOS,
 * Pode ser executado totalmente portátil ou instalado com associações de arquivo configuradas automaticamente.
 * Suporta uma grande variedade de formatos de arquivo comuns.
 * Reproduz audiolivros, com velocidade ajustável e marcadores que lembram o tempo exato.
-* Lê páginas PDF digitalizadas com o OCR integrado no Windows e macOS.
+* Lê páginas PDF digitalizadas com o OCR integrado no Windows e macOS, ou com Tesseract no Linux.
 * Marcadores e notas, para que você possa marcar seu lugar e voltar a ele.
 * Todos os atalhos de teclado podem ser alterados.
 * Abre documentos diretamente de links http e https, e os baixa novamente quando você os reabre ou pressiona `F5`, mantendo sua posição de leitura e Favoritos. Ao restaurar os documentos que você tinha abertos, ele baixa novamente os dos links que eram 2 MB ou menores.
-* Vem com `pb`, uma ferramenta de linha de comando que converte qualquer documento suportado para HTML, Markdown ou texto simples. Ele aceita quantos documentos você fornecer, expande `*.pdf` e similares por conta própria para que o mesmo comando funcione no Windows, e pode escrever um arquivo por documento em uma pasta. Também pode ler uma lista de documentos de um arquivo ou de stdin com `--files-from`, e converter documentos diretamente de links http e https.
+* Vem com `pb`, uma ferramenta de linha de comando que converte qualquer documento suportado para HTML, Markdown ou texto simples. Ele aceita quantos documentos você fornecer, expande `*.pdf` e similares por conta própria para que o mesmo comando funcione no Windows, e pode escrever um arquivo por documento em uma pasta, convertendo vários de uma vez (`--jobs` define quantos). Ele também pode ler uma lista de documentos de um arquivo ou de stdin com `--files-from`, e converter documentos diretamente de links http e https.
 
 ## Compatibilidade com Leitores de Tela
 
@@ -48,11 +48,14 @@ Se o JAWS não disser nada quando você pressionar uma tecla que deveria relatar
 
 O Paperback oferece suporte aos seguintes formatos e extensões:
 
-* Arquivos de histórias em quadrinhos (`.cbz`)
+* Arquivos Braille Ready e livros Portable Embosser Format, retrotraduzidos para impressão com a tabela braille que você escolher (`.brf`, `.pef`)
+* Arquivos de histórias em quadrinhos (`.cbz`, `.cbr`)
 * Arquivos de ajuda CHM (`.chm`)
 * Livros DAISY (`.opf`, `.zip`)
-* Livros EPUB (`.epub`)
+* Livros eBraille, lidos em impressão quando incluem, e caso contrário retrotraduzidos com o código braille que nomeiam (`.ebrl`, ou o `.opf` de um que não esteja compactado)
+* Livros EPUB (`.epub`, ou o `.opf` de um que não esteja compactado)
 * E-books FB2 (`.fb2`)
+* Manuais GNU Info (`.info`, compactados ou não, e manuais divididos abertos de qualquer uma de suas partes)
 * Documentos HTML (`.htm`, `.html`, `.xhtml`)
 * Páginas de manual, tanto `man` quanto BSD `mdoc` (`.1` a `.9`, `.man`, `.roff` e as formas compactadas de cada um)
 * Documentos Markdown (`.md`, `.markdown`, `.mdx`, `.mdown`, `.mdwn`, `.mkd`, `.mkdn`, `.mkdown`, `.ronn`)
@@ -62,12 +65,15 @@ O Paperback oferece suporte aos seguintes formatos e extensões:
 * Audiolivros MP3 (`.mp3`)
 * Apresentações OpenDocument (`.odp`, `.fodp`)
 * Arquivos de texto OpenDocument (`.odt`, `.fodt`)
+* Arquivos de ajuda e livros OS/2, com suas imagens (`.inf`, `.hlp`)
 * Documentos PDF (`.pdf`)
 * Apresentações PowerPoint (`.pptx`, `.pptm`, `.ppt`)
+* Arquivos RAR de livros, que abrem como um zip, com uma lista para escolher quando há vários (`.rar`)
 * Documentos reStructuredText (`.rst`, `.rest`)
 * Documentos RTF (`.rtf`)
 * Documentos Windows Write (`.wri`)
 * Arquivos WinHelp (`.hlp`)
+* Documentos XPS e OpenXPS (`.xps`, `.oxps`)
 * Arquivos de texto simples e arquivos de log (`.txt`, `.log`)
 
 ## Atalhos de teclado
@@ -75,6 +81,8 @@ O Paperback oferece suporte aos seguintes formatos e extensões:
 O Paperback foi projetado para uso com teclado em primeiro lugar. Aqui estão os atalhos atuais.
 
 Os atalhos abaixo são para Windows. Quando o macOS difere, o equivalente é anotado entre parênteses — principalmente porque Ctrl+G, Ctrl+W e Alt+Left/Right já são utilizados por outras convenções de sistema ou aplicativos nessa plataforma.
+
+Os atalhos de pontuação são nomeados conforme as teclas de um teclado dos EUA. Em outro layout, pressione a tecla no mesmo lugar, seja qual for o rótulo: em um teclado húngaro, a tecla rotulada `é` funciona como `;` e a rotulada `á` como `'`, portanto `Ctrl+'` significa Ctrl e a tecla `á`. Os menus ainda mostram os nomes dos EUA. No macOS, os menus mostram as teclas do seu próprio layout.
 
 ### Menu Arquivo
 
@@ -86,6 +94,7 @@ Os atalhos abaixo são para Windows. Quando o macOS difere, o equivalente é ano
 * `Ctrl+R`: Mostrar o diálogo "Todos os Documentos" (de Documentos Recentes).
 * `Ctrl+Shift+C`: Abrir pasta contendo.
 * `Ctrl+Shift+E`: Exportar dados do documento (`.paperback`).
+* `Ctrl+Alt+E`: Exportar marcadores e notas como arquivo de texto legível ou HTML.
 * `Ctrl+Shift+I`: Importar dados do documento (`.paperback`).
 * `Ctrl+E`: Exportar o documento atual para texto simples.
 * `Ctrl+Q`: Sair (apenas Windows; no macOS está no menu do aplicativo).
@@ -103,7 +112,7 @@ Os atalhos abaixo são para Windows. Quando o macOS difere, o equivalente é ano
 
 * `F5`: Reler o documento atual do disco ou baixá-lo novamente se foi aberto a partir de um link. Funciona independentemente de "Recarregar automaticamente documentos alterados" estar ativado em Configurações.
 * `Ctrl+Alt+W`: Alternar quebra de linha.
-* `F11` (macOS: `RawCtrl+Ctrl+F`, ou seja, Control+Command+F): Alternar para tela cheia.
+* `F11` (macOS: `Control+Cmd+F`, ou seja, Control+Command+F): Alternar para tela cheia.
 * `Ctrl+Shift+V`: Abrir conteúdo atual na Visualização da Web.
 * `Ctrl+U`: Ver a fonte do documento em uma nova aba.
 
@@ -114,7 +123,7 @@ Os atalhos abaixo são para Windows. Quando o macOS difere, o equivalente é ano
 * `Ctrl+G` (macOS: `Cmd+L`): Ir para linha.
 * `Ctrl+Shift+G` (macOS: `Cmd+Shift+L`): Ir para percentual.
 * `Ctrl+P`: Ir para página (quando suportado pelo documento atual).
-* `=`: Anunciar seu percentual de leitura atual e página, por exemplo, "15%, página 30". A página é omitida para documentos que não possuem números de página.
+* `=`: Anunciar seu percentual de leitura atual e página, por exemplo, "15%, página 30". A página é omitida para documentos que não possuem números de página. Em um audiolivro, quanto tempo você já ouviu e quanto tempo ele dura aparecem depois, por exemplo, "15%, 1:02:03 de 10:30:00".
 * `Alt+Left` (macOS: `Cmd+[`): Voltar no histórico de navegação.
 * `Alt+Right` (macOS: `Cmd+]`): Avançar no histórico de navegação.
 * `[`: Seção anterior.
@@ -152,7 +161,7 @@ Os atalhos abaixo são para Windows. Quando o macOS difere, o equivalente é ano
 * `B`: Próximo marcador.
 * `Shift+N`: Nota anterior.
 * `N`: Próxima nota.
-* `Ctrl+Shift+W` (macOS: `RawCtrl+Shift+W`, ou seja, a tecla Control física em vez de Cmd): Ver texto da nota na posição atual.
+* `Ctrl+Shift+W` (macOS: `Control+Shift+W`, ou seja, a tecla Control física em vez de Cmd): Ver texto da nota na posição atual.
 * `Ctrl+B`: Ir para todos os marcadores e notas.
 * `Ctrl+Alt+B`: Ir para marcadores apenas.
 * `Ctrl+Alt+M`: Ir para notas apenas.
@@ -161,7 +170,9 @@ Os atalhos abaixo são para Windows. Quando o macOS difere, o equivalente é ano
 
 ### Menu Áudio
 
-* `Ctrl+Space` (macOS: `RawCtrl+Space`, ou seja, a tecla Control física, pois Cmd+Space abre o Spotlight): Reproduzir/pausar narração de áudio.
+* `Ctrl+Space` (macOS: `Control+Space`, ou seja, a tecla Control física, pois Cmd+Space abre o Spotlight): Reproduzir/pausar narração de áudio.
+* `Ctrl+J`: Ir para um tempo na gravação. Digite como `1:23:45`, `23:45` ou `45` segundos, ou coloque `+` ou `-` na frente para se mover de onde você está, por exemplo, `+5:00`. O diálogo mostra a que ponto você chegou e quanto tempo o livro dura.
+* `Shift+=`: Dizer quanto você avançou neste capítulo e quanto ainda falta, por exemplo, "Capítulo 3, 4:10 de 12:00, 7:50 restantes".
 * `'`: Avançar narração de áudio.
 * `;`: Retroceder narração de áudio.
 * `Shift+'`: Aumentar o valor de busca de áudio.
@@ -173,9 +184,10 @@ Os atalhos abaixo são para Windows. Quando o macOS difere, o equivalente é ano
 
 ### Menu Ferramentas
 
-* `Ctrl+W` (macOS: `RawCtrl+W`, ou seja, a tecla Control física em vez de Cmd): Mostrar contagem de palavras do documento atual.
+* `Ctrl+W` (macOS: `Control+W`, ou seja, a tecla Control física em vez de Cmd): Mostrar contagem de palavras do documento atual.
 * `Ctrl+I`: Mostrar informações do documento.
 * `Ctrl+Shift+O`: Reconhecer um intervalo de páginas de PDF digitalizadas com OCR.
+* `Ctrl+Shift+R`: Reconhecer a página de PDF ou histórias em quadrinhos em que o cursor está com OCR, substituindo qualquer texto que já possui.
 * `Ctrl+Shift+S`: Alternar temporizador de repouso.
 * `Ctrl+,`: Abrir Configurações (macOS: no menu do aplicativo).
 
@@ -194,7 +206,8 @@ Os atalhos abaixo são para Windows. Quando o macOS difere, o equivalente é ano
 * `Ctrl+Tab` e `Ctrl+Shift+Tab`: Ir para o próximo ou documento aberto anterior, voltando ao início ou fim.
 * `Enter` ou `Space` no texto do documento: Seguir um link ou abrir visualização de tabela ou fórmula no cursor.
 * `Enter` em uma página de PDF digitalizada: Reconhecer a página com OCR.
-* `Shift+F10` ou a tecla Menu/Aplicativo no texto do documento: Abrir o menu de contexto. Em uma imagem em EPUB, HTML, Markdown, CHM, FB2 ou história em quadrinhos, também oferece salvar a imagem em um arquivo.
+* `Enter` em uma imagem que não é um link: Mostrar o texto reconhecido na imagem, em uma visualização que `Escape` fecha. A imagem em si é deixada inalterada e o texto do documento não é alterado.
+* `Shift+F10` ou a tecla Menu/Aplicativo no texto do documento: Abrir o menu de contexto. Em uma imagem em PDF, EPUB, HTML, Markdown, CHM, FB2 ou história em quadrinhos, também oferece salvar a imagem em um arquivo e no Windows e macOS ler o texto nela, que é como ler uma imagem que também é um link.
 
 ## iOS e Android
 
@@ -233,7 +246,7 @@ O menu More Options é onde tudo mais fica. Alguns itens funcionam um pouco dife
 * **Go To:** salte para uma linha, uma página ou uma porcentagem através do documento. Escolha qual com o Mode picker.
 * **Recent Documents:** cada documento que você abriu, cada um marcado como atualmente aberto, fechado ou arquivo não encontrado. Cada um tem duas ações do leitor de tela: Remove o remove da lista e Locate permite encontrar um documento cujo arquivo foi movido. Clear Recent Documents esvazia a lista sem excluir nenhum documento.
 * **Word Count:** o número de palavras no documento.
-* **Document Info:** o título, o autor, o nome do arquivo e no iOS também as contagens de linhas e caracteres.
+* **Informações do Documento:** o título, o autor, o nome do arquivo, o quanto você avançou no documento e as contagens de palavras, linhas e caracteres. Para um audiolivro, também mostra quantos arquivos ele tem e, quando Paperback consegue determinar, quanto tempo eles levam no total e em média.
 * **Export:** salva o documento como texto simples, HTML ou Markdown.
 * **Sleep Timer:** para de ler após 5, 10, 15, 30, 45 ou 60 minutos, ou um tempo de sua escolha. Abra novamente enquanto está em execução para ver quanto tempo falta ou para cancelá-lo.
 * **Help:** abre este readme.
@@ -301,6 +314,132 @@ Nota: Considero um patrocinador público no GitHub motivo suficiente para inclus
 * Tyler Rodick
 
 ## Changelog
+
+### Versão 1.1
+
+1.1 traz um novo mecanismo de PDF, um modo de texto iOS reconstruído, OCR no Linux, documentos de links, suporte para décadas de arquivos antigos do Word, Write e PowerPoint e muito mais.
+
+#### Adicionado
+
+##### Geral
+* Uma tradução para húngaro e guia do usuário.
+* Abra um documento de um link, em todas as plataformas. `F5` faz download dele novamente.
+* `F5` recarrega o documento.
+* `Ctrl+1` a `Ctrl+9` pulam para seus nove primeiros documentos abertos.
+* `Ctrl+Tab` e `Ctrl+Shift+Tab` alternância de documentos no macOS e Linux.
+* O diálogo Abrir Documento e Todos os Documentos abrem cada documento que você seleciona, cada um em sua própria aba.
+* Salve uma imagem do menu de contexto.
+* Exporte marcadores e anotações como texto ou HTML.
+* Configurações para o nível de log e se Localizar seleciona sua correspondência.
+* A tecla de atalho da janela pode ser qualquer tecla, definida na nova aba Em todo o sistema de Personalizar Atalhos do Teclado.
+* Copiar diz quanto foi copiado e o texto fica na área de transferência após o Paperback fechar.
+* Cada item de menu tem sua própria tecla de acesso em todos os idiomas.
+* Um zip ilegível abre como uma lista dos documentos dentro.
+
+##### Novos Formatos
+* Word para Windows 1 e 2, Word para DOS, Word para Mac 4 e 5 e as edições Unicode do Word 6 e 95.
+* PowerPoint 95.
+* FictionBook compactado (`.fb2.zip`).
+* Livros DAISY 3 que contêm apenas um DTBook em um zip ou apenas áudio.
+
+##### OCR
+* OCR no Linux, através do Tesseract.
+* Reconhecer Página Atual (`Ctrl+Shift+R`) lê a página em que você está novamente, mesmo que tenha texto.
+* `Enter` em uma imagem lê seu texto.
+* O texto reconhecido segue o layout da página e é lembrado, para que um documento digitalizado abra com seu texto.
+* OCR em Lote pode refazer páginas que têm texto, lê várias páginas de uma vez e para quando você fecha o documento.
+
+##### Audiolivros
+* Velocidades até 4x em qualquer lugar, lembradas entre sessões.
+* Controles de volume.
+
+##### Documentos PDF
+* Um novo mecanismo de PDF: mais rápido, usa cada núcleo de CPU e não precisa de biblioteca pdfium.
+* Títulos encontrados em páginas não marcadas e títulos melhores.
+* Uma configuração para manter cabeçalhos e rodapés de página repetidos.
+
+##### Outros Documentos
+* Word: listas numeradas e com marcadores, notas de rodapé, notas finais, comentários, texto alt de imagem, navegação de listas e páginas próprias do Word.
+* OpenDocument: notas de rodapé e comentários após o texto.
+* Títulos e autores dos metadados do documento em Word, PowerPoint, OpenDocument, RTF, Markdown e reStructuredText.
+* Histórias em quadrinhos: título, escritor, tipos de página e marcadores de ComicInfo.xml.
+* FB2: títulos, tabela de conteúdos e linhas de verso separadas.
+* Imagens em livros MOBI, KF8 e DAISY compactados podem ser salvas e lidas com OCR.
+* Matemática delimitada por dólar em Markdown.
+* Diretivas Sphinx em reStructuredText.
+* Imagens sem descrição aparecem como [Imagem].
+
+##### iOS e Android
+* Uma linha Idioma em Configurações.
+* Informação do Documento mostra seu progresso e a contagem de arquivos e tempo de execução de um audiolivro.
+* O modo de texto é lembrado.
+* Continue lendo continuamente após um Localizar.
+* iOS: modo de texto reconstruído para VoiceOver. Ler Tudo percorre todo o livro, os rotores alcançam tudo, listas e tabelas são listas e tabelas reais, toques com três dedos viram páginas e o toque com três dedos fornece a página e percentagem.
+* iOS: uma voz, velocidade e tom por livro, de Fala para Este Livro.
+* iOS: documentos protegidos por senha.
+* iOS: compartilhe livros DAISY compactados e audiolivros MP3 com o Paperback.
+* iOS: o temporizador de descanso para audiolivros.
+* iOS: Eslovaco e Ucraniano.
+* Android: as mudanças de velocidade e tom se aplicam ao parágrafo sendo lido e funcionam com o mecanismo padrão do sistema.
+* Android: funciona em dispositivos x86_64.
+
+##### macOS
+* Um aplicativo universal, nativo em Intel e Apple silicon.
+* pb está incluído no aplicativo.
+
+##### pb
+* Converter por página, uma pasta inteira, uma lista de arquivos (`--files-from`) ou um link.
+
+#### Alterado
+* A barra de menu é reorganizada em oito menus.
+* A barra de status diz "Progresso" em vez de "Leitura".
+* Os comandos de menu anunciam o que fizeram, em vez de serem afogados conforme o menu fecha.
+* As atualizações fecham o Paperback normalmente e o trazem de volta para a frente.
+* Arquivos de texto enormes abrem com uma fração da memória, e o limite de 4 GB desapareceu.
+* A conversão MOBI, Word e HTML, Localizar Tudo e a busca em Todos os Documentos são mais rápidas.
+* O executável do Windows é 3 MB menor.
+
+#### Corrigido
+
+##### Geral
+* Atalhos de pontuação em layouts de teclado que precisam de Shift para eles; Personalizar Atalhos do Teclado marca qualquer um que seu layout não consegue digitar.
+* O foco retorna ao documento após `Win+D`.
+* Travamentos ao abrir marcadores para um novo documento, em Localizar Tudo e em alguns arquivos MOBI danificados.
+* A Localização com Regex seleciona a correspondência inteira.
+* A barra de status de um audiolivro não alterna mais entre o progresso de áudio e texto.
+* A contagem de palavras inclui texto lido com OCR.
+* Páginas digitalizadas não anunciam mais sua própria imagem.
+* A opção PATH do instalador.
+* As atualizações do Linux encontram seus downloads, e um AppImage é atualizado como um AppImage.
+* A linha de comentário em arquivos Word e OpenDocument é traduzida.
+
+##### Documentos
+* Arquivos Windows Write que se abriram como binários.
+* PDF: texto repetido em quebras de página em PDFs marcados, segundas colunas lidas primeiro, espaços perdidos e hífens no final da linha, texto em fontes Tipo 3 e líderes de ponto de conteúdo.
+* RTF: finais de linha CR simples, listas com marcadores de travessão, texto antes do primeiro parágrafo, texto acentuado e CJK, texto perdido após uma barra invertida escapada e RTF salvo como `.doc`.
+* Arquivos Word e PowerPoint com contêineres danificados que o Word ainda abre.
+* Texto do Word em mudanças rastreadas, campos e células de tabela.
+* Links do PowerPoint, slides sem texto e emoji.
+* `<` e `&` em células de tabela do Word, PowerPoint e OpenDocument.
+* Arquivos OpenDocument protegidos por senha do LibreOffice atual.
+* Arquivos CHM em sua página de código e arquivos HTML e DAISY em sua codificação declarada.
+* Livros DAISY compactados cujas referências usam o caso errado e livros DAISY 2.02 lendo apenas a primeira frase de uma seção.
+* Páginas man que redirecionam com `.so`.
+* Questões preliminares de Markdown lidas como texto.
+
+##### macOS
+* Navegação no início da linha, ativação por teclado e anúncios de cópia.
+* O comando do menu de contexto do VoiceOver abre o próprio do Paperback.
+* Os atalhos de menu não são mais anunciados sobre o que fazem.
+
+##### iOS e Android
+* iOS: o lançamento não é mais interrompido ao restaurar livros grandes.
+* iOS: reabre na aba que você estava lendo, fechar uma aba não lê mais o livro anterior e Documentos Recentes mantêm sua ordem.
+* iOS: audiolivros não são mais extraídos novamente em cada lançamento.
+* iOS: as regras de regex do dicionário de fala usam `\1`.
+* Android: leitura em voz alta de documentos protegidos por senha.
+* Android: Anterior no topo não relê mais o primeiro parágrafo, e o modo de texto não fixa mais sua rolagem.
+* Android: menos uso de bateria durante a leitura e pausa.
 
 ### Versão 1.0
 

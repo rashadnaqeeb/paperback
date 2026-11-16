@@ -1,4 +1,4 @@
-# Paperback - versio 1.0
+# Paperback – versio 1.1
 
 ## Johdanto
 
@@ -6,7 +6,7 @@ Paperback on kevyt ja saavutettava e- ja asiakirjojen luku- ja äänikirjojen ku
 
 ## Järjestelmävaatimukset
 
-Paperback toimii Windows 10:ssä ja 11:ssä, kaikissa nykyaikaisissa ARM-pohjaisissa macOSin versioissa, Linuxissa, iOS 17:ssä ja sitä uudemmissa sekä Android 7:ssä ja sitä uudemmissa versioissa. iOS- ja Android-sovellukset ovat saatavilla App Storesta ja Google Playsta.
+Paperback toimii Windows 10:ssä ja 11:ssä, kaikissa uusissa ARM-pohjaisissa macOSin versioissa, Linuxissa, iOS 17:ssä ja sitä uudemmissa sekä Android 7:ssä ja sitä uudemmissa versioissa. iOS- ja Android-sovellukset ovat saatavilla App Storesta ja Google Playsta.
 
 ## Ominaisuudet
 
@@ -20,11 +20,11 @@ Paperback toimii Windows 10:ssä ja 11:ssä, kaikissa nykyaikaisissa ARM-pohjais
 * Voidaan käyttää massamuistiversiona tai asentaa siten, että tiedostokytkennät määritetään automaattisesti.
 * Tukee erittäin kattavasti yleisiä tiedostomuotoja.
 * Toistaa äänikirjoja ja tukee niiden toistonopeuden muuttamista  sekä tarkan kohdan muistavia kirjanmerkkejä.
-* Mahdollistaa skannattujen PDF-asiakirjojen lukemisen Windowsin ja macOSin tekstintunnistusominaisuuden avulla.
+* Mahdollistaa skannattujen PDF-asiakirjojen lukemisen Windowsin ja macOSin tekstintunnistuksen tai Linuxissa Tesseractin avulla.
 * Kirjanmerkit ja muistiinpanot lukukohdan merkitsemistä ja siihen palaamista varten.
 * Kaikkia pikanäppäimiä on mahdollista muokata.
 * Avaa asiakirjoja suoraan HTTP- ja HTTPS-osoitteista. Ne ladataan uudelleen jokaisella avauskerralla tai `F5`-näppäimen painalluksella, mutta lukukohta ja kirjanmerkit säilyvät. Kun aiemmin avoinna olleet asiakirjat palautetaan, URL-osoitteista avatut asiakirjat ladataan uudelleen, jos niiden koko on enintään 2 Mt.
-* Mukana tulee `pb`-komentorivityökalu, joka muuntaa minkä tahansa tuetun asiakirjan HTML-, Markdown- tai tekstimuotoon. Se käsittelee kerralla useita asiakirjoja, tulkitsee `*.pdf`-tyyppiset jokerimerkit myös Windowsissa ja tallentaa muunnetut asiakirjat määritettyyn kansioon omiksi tiedostoikseen. Lisäksi se pystyy lukemaan `--files-from`-valitsimella käsiteltävien asiakirjojen luettelon tiedostosta tai vakiosyötteestä. Asiakirjoja voi muuntaa myös suoraan HTTP- ja HTTPS-osoitteista.
+* Mukana tulee `pb`-komentorivityökalu, joka muuntaa minkä tahansa tuetun asiakirjan HTML-, Markdown- tai tekstimuotoon. Se käsittelee kerralla useita asiakirjoja, tulkitsee `*.pdf`-tyyppiset jokerimerkit myös Windowsissa ja tallentaa muunnetut asiakirjat määritettyyn kansioon omiksi tiedostoikseen. Useiden asiakirjojen samanaikainen muuntaminen on myös mahdollista (muunnosten määrä valitaan `--jobs`-valitsimella). Lisäksi se pystyy lukemaan käsiteltävien asiakirjojen luettelon `--files-from`-valitsimella määritetystä tiedostosta tai vakiosyötteestä. Asiakirjoja voi muuntaa myös suoraan HTTP- ja HTTPS-osoitteista.
 
 ## Ruudunlukijoiden yhteensopivuus
 
@@ -46,12 +46,16 @@ Jos JAWS ei puhu mitään painaessasi jotain ilmoituksen aiheuttavaa näppäint�
 
 Paperback tukee seuraavia tiedostomuotoja:
 
-* Sarjakuvapaketit (`.cbz`)
+* National Library Service -palvelun BARD-pistekirjat, joiden jokainen nide käsitellään omana kirjanaan. Pistekirjoitus muunnetaan tavalliseksi tekstiksi kirjapaketissa ilmoitetun pistetaulukon avulla (BARD-palvelusta ladatut `.zip`-paketit tai purettujen pakettien `.bopf`-tiedostot).
+* Braille Ready File- ja Portable Embosser Format -muodossa olevat pistekirjat (`.brf`, `.pef`), joiden pistekirjoitus muunnetaan tavalliseksi tekstiksi käyttäjän valitseman pistetaulukon avulla
+* Sarjakuvapaketit (`.cbz`, `.cbr`)
 * CHM-ohjetiedostot (`.chm`)
 * DAISY-kirjat (`.opf`, `.zip`)
-* EPUB-kirjat (`.epub`)
+* eBraille-kirjat, joiden tavallinen teksti luetaan, jos sellainen on saatavilla. Muussa tapauksessa pistekirjoitus muunnetaan tavalliseksi tekstiksi kirjassa määritetyn pistetaulukon avulla (`.ebrl` tai pakkaamattoman kirjan `.opf`-tiedosto)
+* EPUB-kirjat (`.epub` tai pakkaamattomien kirjojen `.opf`-tiedostot)
 * FB2-e-kirjat (`.fb2`)
-* HTML-asiakirjat (`.htm`, `.html`, `.xhtml`)
+* GNU Info -ohjeet (`.info`, myös gzip-pakattuina, sekä useaan tiedostoon jaetut ohjeet, jotka voidaan avata mistä tahansa osasta)
+* HTML-asiakirjat (`.htm`, `.html`, `.shtml`, `.xhtml`)
 * `Man`- ja BSD `mdoc` -muodoissa olevat man-sivut (`.1`–`.9`, `.man`, `.roff` sekä niiden gzip-pakatut versiot)
 * Markdown-asiakirjat (`.md`, `.markdown`, `.mdx`, `.mdown`, `.mdwn`, `.mkd`, `.mkdn`, `.mkdown`, `.ronn`)
 * Microsoft Word -asiakirjat (`.docx`, `.docm`, `.doc`)
@@ -60,19 +64,24 @@ Paperback tukee seuraavia tiedostomuotoja:
 * MP3-äänikirjat (`.mp3`)
 * OpenDocument-esitykset (`.odp`, `.fodp`)
 * OpenDocument-tekstiasiakirjat (`.odt`, `.fodt`)
+* OS/2:n ohjetiedostot ja -kirjat kuvineen (`.inf`, `.hlp`)
 * PDF-asiakirjat (`.pdf`)
 * PowerPoint-esitykset (`.pptx`, `.pptm`, `.ppt`)
+* Kirjoja sisältävät RAR-paketit, jotka avataan ZIP-pakettien tavoin. Jos paketissa on useita kirjoja, avattava kirja valitaan luettelosta (`.rar`)
 * reStructuredText-asiakirjat (`.rst`, `.rest`)
 * RTF-asiakirjat (`.rtf`)
 * Windows Write -asiakirjat (`.wri`)
 * WinHelp-ohjetiedostot (`.hlp`)
+* XPS- ja OpenXPS-asiakirjat (`.xps`, `.oxps`)
 * Teksti- ja lokitiedostot (`.txt`, `.log`)
 
 ## Pikanäppäimet
 
 Paperback on suunniteltu ensisijaisesti näppäimistöllä käytettäväksi. Alla on luettelo kaikista pikanäppäimistä.
 
-Nämä pikanäppäimet toimivat Windowsissa. MacOS-komennot mainitaan sulkeissa. Erot johtuvat siitä, että näppäinyhdistelmät Ctrl+G, Ctrl+W sekä Alt + vasen/oikea nuoli on varattu macOS-alustalla järjestelmän tai muiden sovellusten käyttöön.
+Nämä pikanäppäimet toimivat Windowsissa. Jos macOSin pikanäppäin poikkeaa Windowsin vastaavasta, se ilmoitetaan sulkeissa. Erot johtuvat pääasiassa siitä, että macOSissa Ctrl+G, Ctrl+W ja Alt+Vasen/Oikea nuoli ovat jo muiden järjestelmä- tai sovellustoimintojen käytössä.
+
+Välimerkkejä käyttävien pikanäppäinten nimet perustuvat amerikkalaiseen näppäimistöasetteluun. Jos käytössä on jokin muu näppäimistöasettelu, paina samassa kohdassa olevaa näppäintä sen merkinnästä riippumatta. Esimerkiksi unkarilaisessa näppäimistöasettelussa é-näppäin vastaa ;-näppäintä ja á-näppäin '-näppäintä. Siksi Ctrl+' tarkoittaa Ctrl- ja á-näppäimien painamista yhdessä. Valikoissa näytetään silti amerikkalaisen näppäimistöasettelun mukaiset näppäimet. macOSissa valikoissa näytetään sen sijaan käytössä olevan näppäimistöasettelun mukaiset näppäimet.
 
 ### Tiedosto-valikko
 
@@ -84,6 +93,7 @@ Nämä pikanäppäimet toimivat Windowsissa. MacOS-komennot mainitaan sulkeissa.
 * `Ctrl+R`: Näytä ”Kaikki asiakirjat” -valintaikkuna (Viimeksi avatut -valikosta).
 * `Ctrl+Vaihto+C`: Avaa asiakirjan kansio.
 * `Ctrl+Vaihto+E`: Vie asiakirjan tiedot `.paperback`-tiedostoon.
+* `Ctrl+Alt+E`: Vie kirjanmerkit ja muistiinpanot luettavaan teksti- tai HTML-tiedostoon.
 * `Ctrl+Vaihto+I`: Tuo asiakirjan tiedot `.paperback`-tiedostosta.
 * `Ctrl+E`: Vie nykyinen asiakirja pelkkänä tekstinä.
 * `Ctrl+Q`: Lopeta (vain Windowsissa; macOSia käytettäessä tämä komento löytyy sovellusvalikosta).
@@ -101,7 +111,7 @@ Nämä pikanäppäimet toimivat Windowsissa. MacOS-komennot mainitaan sulkeissa.
 
 * `F5`: Päivitä levyllä olevan asiakirjan sisältö tai lataa se uudelleen URL-osoitteesta. Tämä toimii riippumatta siitä, onko "Päivitä muuttuneet asiakirjat automaattisesti" -asetus käytössä.
 * `Ctrl+Alt+W`: Ota automaattinen rivitys käyttöön tai poista se käytöstä.
-* `F11` (macOSissa `RawCtrl+Ctrl+F` eli Ctrl+Cmd+F): Ota koko näytön tila käyttöön tai poista se käytöstä.
+* `F11` (macOSissa `Control+Cmd+F` eli Ctrl+Cmd+F): Ota koko näytön tila käyttöön tai poista se käytöstä.
 * `Ctrl+Vaihto+V`: Avaa nykyinen sisältö selainnäkymässä.
 * `Ctrl+U`: Näytä asiakirjan lähdekoodi uudessa välilehdessä.
 
@@ -112,7 +122,7 @@ Nämä pikanäppäimet toimivat Windowsissa. MacOS-komennot mainitaan sulkeissa.
 * `Ctrl+G` (macOSissa `Cmd+L`): Siirry riville.
 §* `Ctrl+Vaihto+G` (macOSissa `Cmd+Vaihto+L`): Siirry prosenttiin.
 * `Ctrl+P`: Siirry sivulle (jos asiakirja tukee sitä).
-* `=`: Ilmoittaa asiakirjan lukukohdan prosentteina sekä sivunumeron (esim. ”15 %, sivu 30”). Sivunumeroa ei ilmoiteta, jos asiakirjassa ei niitä ole.
+* `=`: Ilmoita asiakirjan sivunumero ja lukukohta prosentteina (esim. ”15 %, sivu 30”). Sivunumeroita ei ilmoiteta, jos asiakirjassa ei niitä ole. Äänikirjoissa ilmoitetaan lisäksi nykyinen toistokohta ja kirjan kokonaiskesto, esimerkiksi ”15 %, 1:02:03 / 10:30:00”.
 * `Alt+Vasen nuoli` (macOSissa `Cmd+[`): Siirry taaksepäin navigointihistoriassa.
 * `Alt+Oikea nuoli` (macOSissa `Cmd+]`): Siirry eteenpäin navigointihistoriassa.
 * `[`: Edellinen luku.
@@ -150,7 +160,7 @@ Nämä pikanäppäimet toimivat Windowsissa. MacOS-komennot mainitaan sulkeissa.
 * `B`: Seuraava kirjanmerkki.
 * `Vaihto+N`: Edellinen muistiinpano.
 * `N`: Seuraava muistiinpano.
-* `Ctrl+Vaihto+W` (macOSissa `RawCtrl+Vaihto+W` eli fyysinen Ctrl-näppäin Cmd-näppäimen sijaan): Näytä muistiinpanon teksti nykyisessä sijainnissa.
+* `Ctrl+Vaihto+W` (macOSissa `Control+Vaihto+W` eli fyysinen Ctrl-näppäin Cmd-näppäimen sijaan): Näytä muistiinpanon teksti nykyisessä sijainnissa.
 * `Ctrl+B`: Siirry kaikkiin kirjanmerkkeihin ja muistiinpanoihin.
 * `Ctrl+Alt+B`: Siirry vain kirjanmerkkeihin.
 * `Ctrl+Alt+M`: Siirry vain muistiinpanoihin.
@@ -159,7 +169,9 @@ Nämä pikanäppäimet toimivat Windowsissa. MacOS-komennot mainitaan sulkeissa.
 
 ### Ääni-valikko
 
-* `Ctrl+Välilyönti` (macOSissa `RawCtrl+Välilyönti` eli fyysinen Ctrl-näppäin, koska Cmd+Välilyönti avaa Spotlight-haun): Aloita tai pysäytä äänitteen toisto.
+* `Ctrl+Välilyönti` (macOSissa `Control+Välilyönti` eli fyysinen Ctrl-näppäin, koska Cmd+Välilyönti avaa Spotlight-haun): Aloita tai pysäytä äänitteen toisto.
+* `Ctrl+J`: Siirry tiettyyn äänitteen kohtaan. Anna aika muodossa `1:23:45`, `23:45` tai `45` sekuntia. Voit myös lisätä ajan eteen `+`- tai `-`-merkin, jolloin nykyisestä toistokohdasta siirrytään eteen- tai taaksepäin, esimerkiksi `+5:00`. Valintaikkunassa näytetään nykyinen toistokohta ja kirjan kokonaiskesto.
+* `Vaihto+=`: Ilmoita nykyisen luvun kulunut ja jäljellä oleva toistoaika, esimerkiksi ”Luku 3, 4:10 / 12:00, jäljellä 7:50”. Jos kirjassa ei ole äänitettä, luvun lukemisen edistyminen ilmoitetaan prosentteina ja jäljellä oleva osuus sanojen määränä, esimerkiksi ”Luku 3, 42 %, jäljellä 1 850 sanaa”.
 * `'`: Kelaa äänitettä eteenpäin.
 * `;`: Kelaa äänitettä taaksepäin.
 * `Vaihto+'`: Pidennä kelauksen aikasiirtymää.
@@ -171,9 +183,10 @@ Nämä pikanäppäimet toimivat Windowsissa. MacOS-komennot mainitaan sulkeissa.
 
 ### Työkalut-valikko
 
-* `Ctrl+W` (macOSissa `RawCtrl+W` eli fyysinen Ctrl-näppäin Cmd-näppäimen sijaan): Näytä nykyisen asiakirjan sanamäärä.
+* `Ctrl+W` (macOSissa `Control+W` eli fyysinen Ctrl-näppäin Cmd-näppäimen sijaan): Näytä nykyisen asiakirjan sanamäärä.
 * `Ctrl+I`: Näytä asiakirjan tiedot.
 * `Ctrl+Vaihto+O`: Suorita tekstintunnistus skannatun PDF-asiakirjan valituille sivuille.
+* `Ctrl+Vaihto+R`: Tunnista kohdistimen kohdalla olevan PDF-asiakirjan tai sarjakuvakirjan sivun teksti ja korvaa sivun mahdollinen aiempi teksti tunnistetulla tekstillä.
 * `Ctrl+Vaihto+S`: Ota uniajastin käyttöön tai poista se käytöstä.
 * `Ctrl+,`: Avaa asetukset (löytyy macOSia käytettäessä sovellusvalikosta).
 
@@ -192,7 +205,8 @@ Nämä pikanäppäimet toimivat Windowsissa. MacOS-komennot mainitaan sulkeissa.
 * `Ctrl+Sarkain` ja `Ctrl+Vaihto+Sarkain`: Siirry seuraavaan tai edelliseen avoinna olevaan asiakirjaan. Viimeisen jälkeen siirrytään ensimmäiseen ja ensimmäistä edeltävästä viimeiseen.
 * `Enter` tai `Välilyönti` asiakirjan tekstissä: Avaa kohdistimen kohdalla oleva linkki tai näytä taulukko tai kaava omassa näkymässään.
 * `Enter` skannatun PDF-asiakirjan sivulla: Suorita sivun tekstintunnistus.
-* `Vaihto+F10` tai sovellusnäppäin asiakirjan tekstissä: Avaa pikavalikko. EPUB-, HTML-, Markdown-, CHM-, FB2- ja sarjakuva-asiakirjoissa on lisäksi mahdollista tallentaa kohdistimen kohdalla oleva kuva tiedostoksi.
+* `Enter` muun kuin linkkinä toimivan kuvan kohdalla: Näyttää kuvasta tunnistetun tekstin Esc-näppäimellä suljettavassa näkymässä. Kuvaan tai asiakirjan tekstiin ei tehdä muutoksia.
+* `Vaihto+F10` tai sovellusnäppäin asiakirjan tekstissä: Avaa pikavalikko. PDF-, EPUB-, HTML-, Markdown-, CHM-, FB2- ja sarjakuvakirjoissa on lisäksi mahdollista tallentaa kohdistimen kohdalla oleva kuva tiedostoksi sekä Windowsissa ja macOSissa lukea sen teksti, mikä mahdollistaa myös linkkinä toimivan kuvan sisällön lukemisen.
 
 ## iOS ja Android
 
@@ -231,7 +245,7 @@ Muut toiminnot löytyvät Lisää vaihtoehtoja -valikosta. Osa niistä toimii so
 * **Siirry:** siirry asiakirjassa haluamallesi riville, sivulle tai tiettyyn prosenttikohtaan. Valitse haluamasi siirtymätapa Tila-valitsimella.
 * **Viimeksi avatut:** näyttää kaikki avaamasi asiakirjat ja ilmoittaa kunkin kohdalla, onko se parhaillaan avoinna, suljettu tai jos sen tiedostoa ei löydy. Asiakirjoille on kaksi ruudunlukijan toimintoa: ”Poista” poistaa asiakirjan luettelosta ja ”Etsi”-toiminnolla voit etsiä asiakirjan tiedoston, jos se on siirretty toiseen hakemistoon. ”Tyhjennä viimeksi avattujen luettelo” tyhjentää luettelon poistamatta varsinaisia asiakirjoja.
 * **Sanamäärä:** näyttää asiakirjan sanojen määrän.
-* **Asiakirjan tiedot:** näyttää asiakirjan otsikon, tekijän, tiedostonimen ja iOSissa myös rivien ja merkkien määrän.
+* **Asiakirjan tiedot:** näyttää asiakirjan otsikon, tekijän, tiedostonimen, luetun osuuden sekä sanojen, rivien ja merkkien määrän. Äänikirjoissa näytetään myös tiedostojen määrä sekä mahdollisuuksien mukaan niiden kokonais- ja keskimääräinen kesto.
 * **Vie:** tallentaa asiakirjan teksti-, HTML- tai Markdown-muodossa.
 * **Uniajastin:** pysäyttää lukemisen 5, 10, 15, 30, 45 tai 60 minuutin kuluttua tai itse valitsemanasi ajankohtana. Avaa se uudelleen ajastuksen ollessa käynnissä nähdäksesi jäljellä olevan ajan tai peruuttaaksesi sen.
 * **Ohje:** avaa tämän lueminut-tiedoston.
@@ -299,6 +313,132 @@ Huom: julkista GitHub-sponsorointia pidetään automaattisen lisäämisen perust
 * Tyler Rodick
 
 ## Versiohistoria
+
+### Versio 1.1
+
+Versio 1.1 tuo mukanaan uuden PDF-moottorin, uudistetun iOSin tekstitilan, Linuxissa toimivan tekstintunnistuksen, asiakirjojen avaamisen URL-osoitteista sekä tuen vanhoille Word-, Write- ja PowerPoint-tiedostoille.
+
+#### Lisätty
+
+##### Yleiset
+* Unkarinkielinen käännös ja käyttöohje.
+* Avaa asiakirjoja URL-osoitteista kaikilla alustoilla. `F5` lataa ne uudelleen.
+* `F5` päivittää asiakirjan.
+* `Ctrl+1–9` siirtää johonkin yhdeksästä ensimmäisestä avoinna olevasta asiakirjasta.
+* `Ctrl+Sarkain` ja `Ctrl+Vaihto+Sarkain` vaihtavat asiakirjaa macOSissa ja Linuxissa.
+* Valitut asiakirjat avautuvat omiin välilehtiinsä Avaa- ja Kaikki asiakirjat -valintaikkunoista.
+* Kuvan tallennus pikavalikosta.
+* Kirjanmerkkien ja muistiinpanojen vienti teksti- tai HTML-muodossa.
+* Lokitason määrittämisen ja Etsi-toiminnon hakutuloksen valitsemisen asetukset.
+* Ikkunan pikanäppäimeksi voi määrittää minkä tahansa näppäimen Pikanäppäimet-valintaikkunan uudella Järjestelmänlaajuiset-välilehdellä.
+* Kopioinnin yhteydessä ilmoitetaan kopioidun tekstin määrä, ja teksti säilyy leikepöydällä myös Paperbackin sulkemisen jälkeen.
+* Jokaisella valikkokomennolla on oma pikanäppäimensä kaikissa tuetuissa kielissä.
+* Jos ZIP-pakettia ei voida lukea sellaisenaan, sen sisältämät asiakirjat näytetään luettelona.
+
+##### Uudet tiedostomuodot
+* Word for Windows 1 ja 2, Word for DOS, Word for Mac 4 ja 5 sekä Word 6:n ja 95:n Unicode-versiot.
+* PowerPoint 95.
+* ZIP-pakattu FictionBook (`.fb2.zip`).
+* DAISY 3 -kirjat, joissa on vain ZIP-pakattu DTBook-asiakirja tai pelkkää ääntä.
+
+##### Tekstintunnistus
+* Tekstintunnistus Linuxissa Tesseractin avulla.
+* Tunnista nykyisen sivun teksti (`Ctrl+Vaihto+R`) suorittaa tekstintunnistuksen uudelleen, vaikka sivulla olisi jo tekstiä.
+* `Enter`-näppäimen painaminen kuvan kohdalla tunnistaa sen tekstin.
+* Tekstintunnistus säilyttää sivun asettelun ja tallentaa tunnistetun tekstin myöhempää käyttöä varten.
+* Usean sivun tekstintunnistuksella on mahdollista tunnistaa uudelleen myös tekstiä sisältäviä sivuja. Se käsittelee useita sivuja samanaikaisesti, ja tunnistus keskeytetään asiakirjaa suljettaessa.
+
+##### Äänikirjat
+* Toistonopeuden voi säätää kaikilla alustoilla jopa nelinkertaiseksi, ja valittu nopeus säilyy myös sovelluksen uudelleenkäynnistyksen jälkeen.
+* Äänenvoimakkuuden säätimet.
+
+##### PDF-asiakirjat
+* Uusi PDF-moottori, joka on aiempaa nopeampi, hyödyntää kaikkia suorittimen ytimiä eikä tarvitse pdfium-kirjastoa.
+* Otsikoiden tunnistaminen myös rakenteellisesti merkitsemättömiltä sivuilta sekä aiempaa paremmat asiakirjojen nimet.
+* Asetus, joka säilyttää sivujen toistuvat ylä- ja alatunnisteet.
+
+##### Muut asiakirjat
+* Word: numeroitujen ja luettelomerkittyjen luetteloiden, ala- ja loppuviitteiden, kommenttien, kuvien vaihtoehtoisten tekstien, luetteloissa navigoimisen sekä Wordin omien sivujakojen tuki.
+* OpenDocument: loppuviitteet ja kommentit näytetään tekstin lopussa.
+* Asiakirjojen nimet ja tekijätiedot luetaan Word-, PowerPoint-, OpenDocument-, RTF-, Markdown- ja reStructuredText-tiedostojen metatiedoista.
+* Sarjakuvat: nimi, käsikirjoittaja, sivutyypit ja kirjanmerkit luetaan ComicInfo.xml-tiedostosta.
+* FB2: otsikot, sisällysluettelo ja runojen säkeiden erottaminen omille riveilleen.
+* MOBI-, KF8- ja ZIP-pakattujen DAISY-kirjojen kuvat on mahdollista tallentaa ja niissä oleva teksti tunnistaa tekstintunnistuksen avulla.
+* Dollarimerkeillä rajattujen matemaattisten kaavojen tunnistaminen Markdown-asiakirjoissa.
+* Sphinx-direktiivien tuki reStructuredText-asiakirjoissa.
+* Kuvien kohdalla lukee [Kuva], jos niillä ei ole kuvauksia.
+
+##### iOS ja Android
+* Asetuksiin on lisätty kielen valintakohta.
+* Asiakirjan tiedot -toiminto näyttää lukemisen edistymisen sekä äänikirjan tiedostojen määrän ja kokonaiskeston.
+* Tekstitilan asetus tallennetaan.
+* Tekstistä puheeksi -toiminnolla lukeminen jatkuu keskeytyksettä haun jälkeen.
+* iOS: Tekstitila on uudistettu VoiceOveria varten. Lue kaikki -toiminto lukee koko kirjan, roottoritoiminnoilla voi siirtyä kaikkialle kirjan sisältöön, luettelot ja taulukot tunnistetaan oikein, kolmen sormen pyyhkäisyllä vaihdetaan sivua ja kolmen sormen napautuksella ilmoitetaan sivunumero ja lukemisen edistyminen prosentteina.
+* iOS: Kullekin kirjalle voi määrittää oman puheäänen, puhenopeuden ja äänenkorkeuden kirjakohtaisissa puheasetuksissa.
+* iOS: Salasanalla suojattujen asiakirjojen tuki.
+* iOS: ZIP-pakattuja DAISY-kirjoja ja MP3-äänikirjoja voi jakaa Paperbackiin muista sovelluksista.
+* iOS: Uniajastin pysäyttää myös äänikirjojen toiston.
+* iOS: Slovakin ja ukrainan kielen tuki.
+* Android: Puhenopeuden ja äänenkorkeuden muutokset vaikuttavat myös parhaillaan luettavaan kappaleeseen ja toimivat järjestelmän oletusarvoisella puhemoottorilla.
+* Android: Toimii myös x86_64-arkkitehtuuriin perustuvissa laitteissa.
+
+##### macOS
+* Yleissovellus, joka toimii suoraan sekä Intel- että Apple Silicon -suorittimilla.
+* Sovelluksen mukana toimitetaan pb-komentorivityökalu.
+
+##### pb-komentorivityökalu
+* Muunna yksittäisiä sivuja, kokonaisia kansioita, tiedostoluettelossa olevia tiedostoja (`--files-from`) tai URL-osoitteista avattuja asiakirjoja.
+
+#### Muutettu
+* Valikkorivin rakenne on uudistettu, ja siinä on nyt kahdeksan valikkoa.
+* Tilarivillä lukee nyt ”Edistyminen” aiemman ”Lukeminen”-tekstin sijaan.
+* Valikkokomentojen suorittamisesta ilmoitetaan nyt selvästi valikon sulkeutuessa.
+* Paperback suljetaan normaalisti päivityksen yhteydessä ja tuodaan etualalle uudelleenkäynnistyksen jälkeen.
+* Erittäin suurten tekstitiedostojen avaaminen kuluttaa huomattavasti vähemmän muistia, eikä neljän gigatavun kokorajoitusta enää ole.
+* MOBI-, Word- ja HTML-tiedostojen muuntaminen, Etsi kaikki -toiminto sekä Kaikki asiakirjat -ikkunassa hakeminen ovat aiempaa nopeampia.
+* Windows-version ohjelmatiedoston koko on pienentynyt kolmella megatavulla.
+
+#### Korjattu
+
+##### Yleiset
+* Välimerkkejä käyttävät pikanäppäimet toimivat myös näppäimistöasetteluilla, joissa välimerkkien kirjoittamiseen tarvitaan Vaihto-näppäintä. Pikanäppäinasetuksissa ilmoitetaan pikanäppäimistä, joita ei voi käyttää nykyisellä näppäimistöasettelulla.
+* Kohdistus palaa asiakirjaan `Win+D`-näppäinyhdistelmän käytön jälkeen.
+* Kaatumisia, jotka aiheutuivat uuden asiakirjan kirjanmerkkien avaamisesta, Etsi kaikki -toiminnon käytöstä ja joidenkin vioittuneiden MOBI-tiedostojen avaamisesta.
+* Etsi-toiminto valitsee säännöllisiä lausekkeita käytettäessä koko hakutuloksen.
+* Tilarivillä ei enää vaihdella äänentoiston ja tekstin edistymistietojen välillä äänikirjan ollessa avoinna.
+* Sanamäärään lasketaan mukaan myös tekstintunnistuksella tunnistettu teksti.
+* Skannatuilla sivuilla ei enää ilmoiteta erikseen sivun kuvaa.
+* Asennusohjelman PATH-asetus.
+* Päivitystoiminto löytää Linuxissa lataamansa tiedostot, ja AppImage päivitetään AppImage-muodossa.
+* Word- ja OpenDocument-asiakirjojen kommenttirivi näytetään nyt käännettynä.
+
+##### Asiakirjat
+* Windows Write -tiedostot avautuivat binäärimuodossa.
+* PDF: Tekstin toistuminen sivunvaihtojen kohdalla rakenteellisesti merkityissä PDF-asiakirjoissa, toisen palstan lukeminen ennen ensimmäistä, välilyöntien ja rivin lopussa olevien yhdysmerkkien katoaminen, Type 3 -fontteja käyttävän tekstin käsittely sekä sisällysluetteloiden pisteviivat.
+* RTF: Pelkät CR-rivinvaihdot, ajatusviivoilla merkityt luettelot, ensimmäistä kappaletta edeltävä teksti, aksenttimerkkejä ja kiinalaisia, japanilaisia tai korealaisia merkkejä sisältävän tekstin käsittely, kenoviivan koodauksen jälkeisen tekstin katoaminen sekä .doc-tarkenteella tallennettujen RTF-tiedostojen käsittely.
+* Sellaisten Word- ja PowerPoint-tiedostojen avaaminen, joiden tiedostorakenne on vioittunut mutta jotka Microsoft Word pystyy silti avaamaan.
+* Tekstin käsittely Wordin muutosmerkinnöissä, kentissä ja taulukon soluissa.
+* PowerPoint-esitysten linkkien, tekstiä sisältämättömien diojen ja emojien käsittely.
+* Taulukon soluissa olevien `<`- ja `&`-merkkien käsittely Word-, PowerPoint- ja OpenDocument-tiedostoissa.
+* LibreOfficen uusilla versioilla luotujen salasanasuojattujen OpenDocument-tiedostojen avaaminen.
+* CHM-tiedostojen koodisivujen ja HTML- sekä DAISY-tiedostojen merkistökoodausten tunnistaminen.
+* ZIP-pakattujen DAISY-kirjojen viittausten virheellisen kirjainkoon käsittely sekä ongelma, jonka vuoksi DAISY 2.02 -kirjojen luvuista luettiin vain ensimmäinen lause.
+* `.so`-direktiivillä toiseen ohjesivuun viittaavien man-ohjesivujen käsittely.
+* Markdown-asiakirjojen alussa olevien metatietojen lukeminen tavallisena tekstinä.
+
+##### macOS
+* Rivien alkuun siirtyminen, toimintojen käynnistäminen näppäimistöllä ja kopioinnista annettavat ilmoitukset.
+* VoiceOverin pikavalikkokomento avaa nyt Paperbackin oman pikavalikon.
+* Valikkokomentojen pikanäppäinten ilmoittaminen ei enää keskeytä komentojen suorittamisesta annettavia ilmoituksia.
+
+##### iOS ja Android
+* iOS: Sovelluksen käynnistyminen ei enää keskeydy suuria kirjoja palautettaessa.
+* iOS: Sovellus avautuu uudelleen sille välilehdelle, jolla olit lukemassa. Välilehden sulkeminen ei enää käynnistä edellisen kirjan tekstistä puheeksi -lukutoimintoa, ja viimeksi avatut asiakirjat säilyvät oikeassa järjestyksessä.
+* iOS: Äänikirjojen sisältöä ei enää pureta uudelleen jokaisella käynnistyskerralla.
+* iOS: Käyttäjän sanaston säännöllisissä lausekkeissa voi nyt käyttää `\1`-takaisinviittausta.
+* Android: Salasanalla suojattujen asiakirjojen lukeminen tekstistä puheeksi -toiminnolla.
+* Android: Edellinen-komento ei enää aloita ensimmäisen kappaleen tekstistä puheeksi -toiminnolla lukemista uudelleen asiakirjan alussa, eikä tekstitilan vieritys enää siirrä odottamatta toiseen kohtaan.
+* Android: Akkua kuluu nyt vähemmän tekstistä puheeksi -toiminnolla luettaessa ja sen ollessa keskeytettynä.
 
 ### Versio 1.0
 

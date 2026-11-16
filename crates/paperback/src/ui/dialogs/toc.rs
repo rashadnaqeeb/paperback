@@ -16,13 +16,12 @@ pub fn show_toc_dialog(parent: &Frame, toc_items: &[TocItem], current_offset: i3
 	return show_toc_dialog_wx(parent, toc_items, current_offset);
 }
 
-// ── DataViewTreeCtrl implementation (Linux + macOS) ───────────────────────────
-
 #[cfg(not(target_os = "windows"))]
 fn show_toc_dialog_dv(parent: &Frame, toc_items: &[TocItem], current_offset: i32) -> Option<i32> {
 	// TRANSLATORS: Title of the Table of Contents dialog
 	let dialog_title = t("Table of Contents");
 	let dialog = Dialog::builder(parent, &dialog_title).build();
+	let _destroy = super::DestroyOnDrop(dialog);
 	let selected_offset = Rc::new(Cell::new(-1i32));
 	let tree = DataViewTreeCtrl::builder(&dialog).with_size(dialog.from_dip(Size::new(400, 500))).build();
 	let mut item_offsets: HashMap<usize, i32> = HashMap::new();
@@ -34,10 +33,7 @@ fn show_toc_dialog_dv(parent: &Frame, toc_items: &[TocItem], current_offset: i32
 	bind_toc_selection_dv(tree, Rc::clone(&item_offsets), Rc::clone(&selected_offset));
 	bind_toc_activation_dv(dialog, tree, Rc::clone(&item_offsets), Rc::clone(&selected_offset));
 	let (ok_button, cancel_button) = build_toc_buttons(dialog);
-	// OK confirms the tree's current selection at click time, as Enter does, rather than
-	// trusting a cached offset: the entry nearest the reader is preselected while the tree
-	// is being built, before the selection-changed listener is attached, so that listener
-	// never records it and OK would otherwise claim nothing is selected.
+	// The preselected entry is set before the selection listener is attached, so OK reads the live selection rather than a cached offset.
 	let resolve_selected: Rc<dyn Fn() -> Option<i32>> = {
 		let tree_for_ok = tree;
 		let offsets_for_ok = Rc::clone(&item_offsets);
@@ -70,7 +66,7 @@ fn populate_toc_tree_dv(
 	for item in items {
 		// TRANSLATORS: Placeholder text shown in the table of contents tree when an entry has no title
 		let display_text = if item.name.is_empty() { t("Untitled") } else { item.name.clone() };
-		let offset = i32::try_from(item.offset).unwrap_or(i32::MAX);
+		let offset = i32::try_from(item.offset.get()).unwrap_or(i32::MAX);
 		let node = if item.children.is_empty() {
 			tree.append_item(parent, &display_text, -1)
 		} else {
@@ -123,28 +119,23 @@ fn bind_toc_activation_dv(
 
 #[cfg(not(target_os = "windows"))]
 fn bind_toc_layout_dv(dialog: Dialog, tree: DataViewTreeCtrl, ok_button: Button, cancel_button: Button) {
+	let padding = super::dialog_padding(&dialog);
 	let content_sizer = BoxSizer::builder(Orientation::Vertical).build();
-	content_sizer.add(&tree, 1, SizerFlag::Expand | SizerFlag::All, super::DIALOG_PADDING);
+	content_sizer.add(&tree, 1, SizerFlag::Expand | SizerFlag::All, padding);
 	let button_sizer = BoxSizer::builder(Orientation::Horizontal).build();
 	button_sizer.add_stretch_spacer(1);
-	// macOS HIG puts the default/affirmative action rightmost (Cancel, then OK); this
-	// implementation also covers Linux, which keeps the OK-then-Cancel order.
+	// macOS HIG puts the default action rightmost; Linux keeps OK first.
 	#[cfg(target_os = "macos")]
 	{
-		button_sizer.add(&cancel_button, 0, SizerFlag::Right, super::DIALOG_PADDING);
-		button_sizer.add(&ok_button, 0, SizerFlag::Right, super::DIALOG_PADDING);
+		button_sizer.add(&cancel_button, 0, SizerFlag::Right, padding);
+		button_sizer.add(&ok_button, 0, SizerFlag::Right, padding);
 	}
 	#[cfg(not(target_os = "macos"))]
 	{
-		button_sizer.add(&ok_button, 0, SizerFlag::Right, super::DIALOG_PADDING);
-		button_sizer.add(&cancel_button, 0, SizerFlag::Right, super::DIALOG_PADDING);
+		button_sizer.add(&ok_button, 0, SizerFlag::Right, padding);
+		button_sizer.add(&cancel_button, 0, SizerFlag::Right, padding);
 	}
-	content_sizer.add_sizer(
-		&button_sizer,
-		0,
-		SizerFlag::Expand | SizerFlag::Bottom | SizerFlag::Right,
-		super::DIALOG_PADDING,
-	);
+	content_sizer.add_sizer(&button_sizer, 0, SizerFlag::Expand | SizerFlag::Bottom | SizerFlag::Right, padding);
 	dialog.set_sizer_and_fit(content_sizer, true);
 	dialog.centre();
 }
@@ -173,23 +164,19 @@ fn find_and_select_dv(
 	false
 }
 
-// ── Windows implementation (TreeCtrl) ─────────────────────────────────────────
-
 #[cfg(target_os = "windows")]
 fn show_toc_dialog_wx(parent: &Frame, toc_items: &[TocItem], current_offset: i32) -> Option<i32> {
 	// TRANSLATORS: Title of the Table of Contents dialog
 	let dialog_title = t("Table of Contents");
 	let dialog = Dialog::builder(parent, &dialog_title).build();
+	let _destroy = super::DestroyOnDrop(dialog);
 	let selected_offset = Rc::new(Cell::new(-1));
 	let (tree, _root) = build_toc_tree(dialog, toc_items, current_offset);
 	bind_toc_selection(tree, Rc::clone(&selected_offset));
 	bind_toc_activation(dialog, tree, Rc::clone(&selected_offset));
 	bind_toc_search(tree);
 	let (ok_button, cancel_button) = build_toc_buttons(dialog);
-	// OK confirms the tree's current selection at click time, as Enter does, rather than
-	// trusting a cached offset: the entry nearest the reader is preselected while the tree
-	// is being built, before the selection-changed listener is attached, so that listener
-	// never records it and OK would otherwise claim nothing is selected.
+	// The preselected entry is set before the selection listener is attached, so OK reads the live selection rather than a cached offset.
 	let resolve_selected: Rc<dyn Fn() -> Option<i32>> = {
 		let tree_for_ok = tree;
 		Rc::new(move || {
@@ -253,7 +240,7 @@ fn bind_toc_activation(dialog: Dialog, tree: TreeCtrl, selected_offset: Rc<Cell<
 
 #[cfg(target_os = "windows")]
 fn bind_toc_search(tree: TreeCtrl) {
-	// Prevent space from triggering item_activated (which our handler maps to OK).
+	// Space would fire `item_activated`, which the dialog treats as OK.
 	tree.bind_internal(EventType::KEY_DOWN, move |event| {
 		if let Some(key) = event.get_key_code()
 			&& key == KEY_SPACE
@@ -267,18 +254,14 @@ fn bind_toc_search(tree: TreeCtrl) {
 
 #[cfg(target_os = "windows")]
 fn bind_toc_layout(dialog: Dialog, tree: TreeCtrl, ok_button: Button, cancel_button: Button) {
+	let padding = super::dialog_padding(&dialog);
 	let content_sizer = BoxSizer::builder(Orientation::Vertical).build();
-	content_sizer.add(&tree, 1, SizerFlag::Expand | SizerFlag::All, super::DIALOG_PADDING);
+	content_sizer.add(&tree, 1, SizerFlag::Expand | SizerFlag::All, padding);
 	let button_sizer = BoxSizer::builder(Orientation::Horizontal).build();
 	button_sizer.add_stretch_spacer(1);
-	button_sizer.add(&ok_button, 0, SizerFlag::Right, super::DIALOG_PADDING);
-	button_sizer.add(&cancel_button, 0, SizerFlag::Right, super::DIALOG_PADDING);
-	content_sizer.add_sizer(
-		&button_sizer,
-		0,
-		SizerFlag::Expand | SizerFlag::Bottom | SizerFlag::Right,
-		super::DIALOG_PADDING,
-	);
+	button_sizer.add(&ok_button, 0, SizerFlag::Right, padding);
+	button_sizer.add(&cancel_button, 0, SizerFlag::Right, padding);
+	content_sizer.add_sizer(&button_sizer, 0, SizerFlag::Expand | SizerFlag::Bottom | SizerFlag::Right, padding);
 	dialog.set_sizer_and_fit(content_sizer, true);
 	dialog.centre();
 }
@@ -300,7 +283,7 @@ fn populate_toc_tree(tree: TreeCtrl, parent: &TreeItemId, items: &[TocItem]) {
 #[cfg(target_os = "windows")]
 fn append_toc_items(tree: TreeCtrl, parent: &TreeItemId, items: &[TocItem]) {
 	for item in items {
-		let offset = i32::try_from(item.offset).unwrap_or(i32::MAX);
+		let offset = i32::try_from(item.offset.get()).unwrap_or(i32::MAX);
 		if let Some(id) = tree.append_item_with_data(parent, &toc_label(item), offset, None, None)
 			&& !item.children.is_empty()
 		{
@@ -338,9 +321,8 @@ fn find_and_select_item(tree: TreeCtrl, parent: &TreeItemId, offset: i32) -> boo
 	false
 }
 
-// ── Shared helpers ─────────────────────────────────────────────────────────────
-
 fn build_toc_buttons(dialog: Dialog) -> (Button, Button) {
+	// Not `ID_OK`, so the custom handler can keep the dialog open until something is selected.
 	// TRANSLATORS: Label for the confirmation button
 	let ok_button = Button::builder(&dialog).with_label(&t("OK")).build();
 	// TRANSLATORS: Label for the cancellation button
@@ -361,16 +343,13 @@ fn bind_toc_ok(
 			selected_offset.set(offset);
 			dialog_for_ok.end_modal(ID_OK);
 		} else {
-			MessageDialog::builder(
+			wx_utils::show_info(
 				&dialog_for_ok,
 				// TRANSLATORS: Error message shown when the user attempts to confirm the Table of Contents dialog without having selected any section
-				&t("Please select a section from the table of contents."),
+				t("Please select a section from the table of contents."),
 				// TRANSLATORS: Title of the error dialog shown when the user attempts to confirm the Table of Contents dialog without having selected any section
 				&t("No Selection"),
-			)
-			.with_style(MessageDialogStyle::OK | MessageDialogStyle::IconInformation | MessageDialogStyle::Centre)
-			.build()
-			.show_modal();
+			);
 		}
 	});
 }

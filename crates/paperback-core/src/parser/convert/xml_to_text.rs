@@ -1,12 +1,13 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use roxmltree::{Document, ParsingOptions};
 
-use super::{format_spans::FormatSpans, line_builder::LineBuilder, list_style::ListStyle};
+use super::{block_spans::BlockSpans, format_spans::FormatSpans, line_builder::LineBuilder, list_style::ListStyle};
 use crate::{
+	document::DocPos,
 	parser::ConverterOutput,
 	types::{
-		FormatInfo, FormulaInfo, HeadingInfo, ImageInfo, LinkInfo, ListInfo, ListItemInfo, PageBreakInfo,
+		BlockInfo, FormatInfo, FormulaInfo, HeadingInfo, ImageInfo, LinkInfo, ListInfo, ListItemInfo, PageBreakInfo,
 		SeparatorInfo, TableInfo,
 	},
 };
@@ -14,7 +15,7 @@ use crate::{
 #[derive(Default)]
 pub struct XmlToText {
 	text: LineBuilder,
-	id_positions: HashMap<String, usize>,
+	id_positions: HashMap<String, DocPos>,
 	headings: Vec<HeadingInfo>,
 	links: Vec<LinkInfo>,
 	images: Vec<ImageInfo>,
@@ -25,20 +26,20 @@ pub struct XmlToText {
 	page_breaks: Vec<PageBreakInfo>,
 	lists: Vec<ListInfo>,
 	list_items: Vec<ListItemInfo>,
-	section_offsets: Vec<usize>,
-	position_watch: Option<usize>,
+	section_offsets: Vec<DocPos>,
+	position_watch: Option<DocPos>,
 	watched_byte_offset: Option<usize>,
 	in_body: bool,
 	list_level: i32,
 	list_style_stack: Vec<ListStyle>,
-	/// Indices into `lists` for currently open `<ul>`/`<ol>` elements, in nesting order.
-	/// `None` marks an open list that was not recorded (no direct `<li>`), keeping the stack
-	/// balanced with the start/close handlers so list lengths are set on the right entries.
+	/// `None` marks an unrecorded list (no direct `<li>`), keeping the stack balanced so list lengths land on the right entries.
 	open_lists: Vec<Option<usize>>,
 	format_spans: FormatSpans,
-	/// When `true`, tables are emitted as their full tab-separated rendering; otherwise as a
-	/// `"[Table]: <first row>"` placeholder. A config flag, not parse state: it survives `clear()`.
+	blocks: BlockSpans,
+	/// A config flag, not parse state, so it survives `clear()`.
 	render_tables_inline: bool,
+	/// The sources of the pictures with an empty `alt` that the format measured as content, see [`image_text::is_decorative`]. Given per document, not parse state, so it survives `clear()`.
+	content_images: HashSet<String>,
 }
 
 impl XmlToText {
@@ -47,12 +48,16 @@ impl XmlToText {
 		Self::default()
 	}
 
-	/// Like [`new`](Self::new) but sets whether tables are rendered inline (full TSV) or as a
-	/// placeholder. Threaded from the owning parser's `ParserContext`; preserved across
-	/// `convert`/`clear`.
 	#[must_use]
 	pub fn with_render_tables_inline(render_tables_inline: bool) -> Self {
 		Self { render_tables_inline, ..Self::default() }
+	}
+
+	/// Shows the pictures with an empty `alt` whose sources are in `sources`, which the format measured as big enough to be content.
+	#[must_use]
+	pub fn with_content_images(mut self, sources: HashSet<String>) -> Self {
+		self.content_images = sources;
+		self
 	}
 
 	pub fn convert(&mut self, xml_content: &str) -> bool {
@@ -65,7 +70,7 @@ impl XmlToText {
 		}
 	}
 
-	/// [`Self::convert`] without the warning, for a caller that has a fallback for content that is not well-formed and reports that itself.
+	/// For a caller that has a fallback for malformed content and reports that itself.
 	///
 	/// # Errors
 	///
@@ -78,19 +83,22 @@ impl XmlToText {
 			self.process_node(child);
 		}
 		self.text.finalize_current_line();
-		tracing::debug!(bytes = xml_content.len(), lines = self.text.lines.len(), "converted xml document to text");
+		self.blocks.drop_break_at(self.text.get_current_text_position());
+		tracing::debug!(bytes = xml_content.len(), chars = %self.text.get_current_text_position(), "converted xml document to text");
 		Ok(())
 	}
 
 	#[must_use]
-	pub fn get_text(&self) -> String {
+	pub fn get_text(&self) -> &str {
 		self.text.get_text()
 	}
 
-	/// Returns the source byte offset of the start tag of the element nearest
-	/// at-or-before `target_position` (a character position in the converted text),
-	/// suitable as an insertion point for a navigation anchor.
-	pub fn find_anchor_byte_offset(&mut self, xml_content: &str, target_position: usize) -> Option<usize> {
+	/// Moves the text out rather than copying a whole book, leaving the markers to read afterwards.
+	pub fn take_text(&mut self) -> String {
+		self.text.take_text()
+	}
+
+	pub fn find_anchor_byte_offset(&mut self, xml_content: &str, target_position: DocPos) -> Option<usize> {
 		self.position_watch = Some(target_position);
 		self.watched_byte_offset = None;
 		let converted = self.convert(xml_content);
@@ -100,7 +108,7 @@ impl XmlToText {
 	}
 
 	#[must_use]
-	pub const fn get_id_positions(&self) -> &HashMap<String, usize> {
+	pub const fn get_id_positions(&self) -> &HashMap<String, DocPos> {
 		&self.id_positions
 	}
 
@@ -150,7 +158,7 @@ impl XmlToText {
 	}
 
 	#[must_use]
-	pub fn get_section_offsets(&self) -> &[usize] {
+	pub fn get_section_offsets(&self) -> &[DocPos] {
 		&self.section_offsets
 	}
 
@@ -167,6 +175,31 @@ impl XmlToText {
 	#[must_use]
 	pub fn get_underlines(&self) -> &[FormatInfo] {
 		self.format_spans.underlines()
+	}
+
+	#[must_use]
+	pub fn get_preformatted(&self) -> &[FormatInfo] {
+		self.format_spans.preformatted()
+	}
+
+	#[must_use]
+	pub fn get_code(&self) -> &[FormatInfo] {
+		self.format_spans.code()
+	}
+
+	#[must_use]
+	pub fn get_superscripts(&self) -> &[FormatInfo] {
+		self.format_spans.superscripts()
+	}
+
+	#[must_use]
+	pub fn get_subscripts(&self) -> &[FormatInfo] {
+		self.format_spans.subscripts()
+	}
+
+	#[must_use]
+	pub fn get_blocks(&self) -> &[BlockInfo] {
+		self.blocks.spans()
 	}
 
 	pub fn clear(&mut self) {
@@ -188,18 +221,14 @@ impl XmlToText {
 		self.list_style_stack.clear();
 		self.open_lists.clear();
 		self.format_spans.clear();
+		self.blocks.clear();
 	}
 }
 
 mod process;
 
-/// Inserts an empty `<span id="{anchor_id}"></span>` into `xml_content`.
-///
-/// The span is placed before the element nearest at-or-before `target_position`
-/// (a character position in the converted text). Returns `None` when the
-/// content is not valid XML.
 #[must_use]
-pub fn inject_anchor_at_position(xml_content: &str, target_position: usize, anchor_id: &str) -> Option<String> {
+pub fn inject_anchor_at_position(xml_content: &str, target_position: DocPos, anchor_id: &str) -> Option<String> {
 	let byte_offset = XmlToText::new().find_anchor_byte_offset(xml_content, target_position)?;
 	let mut result = xml_content.to_string();
 	result.insert_str(byte_offset, &format!("<span id=\"{anchor_id}\"></span>"));
@@ -242,6 +271,21 @@ impl ConverterOutput for XmlToText {
 	}
 	fn get_underlines(&self) -> &[FormatInfo] {
 		self.format_spans.underlines()
+	}
+	fn get_preformatted(&self) -> &[FormatInfo] {
+		self.format_spans.preformatted()
+	}
+	fn get_code(&self) -> &[FormatInfo] {
+		self.format_spans.code()
+	}
+	fn get_superscripts(&self) -> &[FormatInfo] {
+		self.format_spans.superscripts()
+	}
+	fn get_subscripts(&self) -> &[FormatInfo] {
+		self.format_spans.subscripts()
+	}
+	fn get_blocks(&self) -> &[BlockInfo] {
+		self.blocks.spans()
 	}
 }
 

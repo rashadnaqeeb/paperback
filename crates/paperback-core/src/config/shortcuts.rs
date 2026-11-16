@@ -1,32 +1,16 @@
-//! The keyboard shortcut system: [`ActionId`] names every user-triggerable action,
-//! [`KeyChord`] represents a physical key combination, and [`ShortcutsConfig`] maps the
-//! two together with per-action overrides layered on [`ActionId::default_chord`]. Also
-//! holds [`HotkeyConfig`], the single global show/hide hotkey, which is unrelated to the
-//! per-action bindings but is just as much a "keyboard shortcut" setting.
-
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de::value::StrDeserializer};
 
 mod action_id;
 
 pub use action_id::ActionId;
 pub use key_chord::KeyChord;
 
-#[allow(clippy::struct_excessive_bools)]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct HotkeyConfig {
-	pub ctrl: bool,
-	pub alt: bool,
-	pub shift: bool,
-	pub win: bool,
-	pub key: char,
-}
-
-impl Default for HotkeyConfig {
-	fn default() -> Self {
-		Self { ctrl: true, alt: true, shift: false, win: false, key: 'P' }
-	}
+/// The system-wide chord that shows and hides the window.
+#[must_use]
+pub fn default_window_hotkey() -> KeyChord {
+	KeyChord::new(true, true, false, "P")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -75,8 +59,20 @@ impl ShortcutCategory {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ShortcutsConfig {
-	#[serde(default)]
+	#[serde(default, deserialize_with = "known_actions")]
 	pub bindings: HashMap<ActionId, Option<String>>,
+}
+
+/// Drops the binding of an action that no longer exists. Failing on it would fail the whole config, which is then replaced with the defaults, losing every setting and bookmark.
+fn known_actions<'de, D: Deserializer<'de>>(deserializer: D) -> Result<HashMap<ActionId, Option<String>>, D::Error> {
+	let stored = HashMap::<String, Option<String>>::deserialize(deserializer)?;
+	Ok(stored
+		.into_iter()
+		.filter_map(|(name, chord)| {
+			let action = ActionId::deserialize(StrDeserializer::<serde::de::value::Error>::new(&name)).ok()?;
+			Some((action, chord))
+		})
+		.collect())
 }
 
 impl ShortcutsConfig {
@@ -91,13 +87,13 @@ impl ShortcutsConfig {
 		}
 	}
 
+	pub fn chords(&self) -> Vec<(ActionId, KeyChord)> {
+		ActionId::all().iter().filter_map(|&action| Some((action, self.get_chord(action)?))).collect()
+	}
+
 	pub fn get_display_str(&self, action: ActionId) -> String {
 		// TRANSLATORS: Shown in the Customize Keyboard Shortcuts list in place of a key combination when an action has no shortcut assigned
 		self.get_chord(action).map_or_else(|| crate::t("None"), |c| c.to_shortcut_string())
-	}
-
-	pub fn get_menu_str(&self, action: ActionId) -> String {
-		self.get_chord(action).map_or_else(String::new, |c| c.to_shortcut_string())
 	}
 
 	pub fn set_chord(&mut self, action: ActionId, chord: Option<KeyChord>) {
@@ -134,15 +130,24 @@ impl ShortcutsConfig {
 mod tests {
 	use super::*;
 
-	/// On a Japanese keyboard `=` and `'` are typed with Shift, so the reader finds their shortcuts by the character typed instead of the key pressed (#982). That lookup is by character code with no modifiers, and has to land on the defaults.
+	#[test]
+	fn a_binding_for_an_action_that_no_longer_exists_is_dropped() {
+		let config: ShortcutsConfig =
+			toml::from_str("[bindings]\nan_action_since_removed = \"Ctrl+Q\"\noptions = \"Ctrl+Shift+O\"\n").unwrap();
+		assert_eq!(config.bindings.len(), 1);
+		assert_eq!(config.bindings.get(&ActionId::Options), Some(&Some("Ctrl+Shift+O".to_string())));
+	}
+
+	/// #982: on a Japanese keyboard `=` and `'` take Shift, so the reader looks them up by the character typed, with no modifiers.
 	#[test]
 	fn punctuation_defaults_are_found_by_the_character_they_type() {
 		let sc = ShortcutsConfig::default();
 		assert_eq!(sc.find_action(i32::from(b'='), false, false, false), Some(ActionId::AnnouncePercent));
 		assert_eq!(sc.find_action(i32::from(b'\''), false, false, false), Some(ActionId::SeekAudioForward));
+		assert_eq!(sc.find_action(i32::from(b'='), false, false, true), Some(ActionId::AnnounceChapterProgress));
 	}
 
-	/// Found by the key code the text control reports, 344 (`WXK_F5`), through the lookup the key handler uses.
+	/// 344 is `WXK_F5`, the key code the text control reports.
 	#[test]
 	fn f5_reloads_the_document() {
 		let chord = ActionId::Reload.default_chord().expect("reload ships a default chord");
@@ -158,33 +163,35 @@ mod tests {
 	#[test]
 	fn no_two_actions_share_a_default_chord() {
 		let all = ActionId::all();
-		for (index, &first) in all.iter().enumerate() {
-			let Some(first_chord) = first.default_chord() else {
-				continue;
-			};
-			for &second in &all[index + 1..] {
-				let Some(second_chord) = second.default_chord() else {
+		for mac in [false, true] {
+			for (index, &first) in all.iter().enumerate() {
+				let Some(first_chord) = first.default_chord_on(mac) else {
 					continue;
 				};
-				assert_ne!(
-					(
-						&first_chord.key,
-						first_chord.ctrl,
-						first_chord.raw_ctrl,
-						first_chord.alt,
-						first_chord.shift,
-						first_chord.win
-					),
-					(
-						&second_chord.key,
-						second_chord.ctrl,
-						second_chord.raw_ctrl,
-						second_chord.alt,
-						second_chord.shift,
-						second_chord.win
-					),
-					"{first:?} and {second:?} ship the same default chord"
-				);
+				for &second in &all[index + 1..] {
+					let Some(second_chord) = second.default_chord_on(mac) else {
+						continue;
+					};
+					assert_ne!(
+						(
+							&first_chord.key,
+							first_chord.ctrl,
+							first_chord.raw_ctrl,
+							first_chord.alt,
+							first_chord.shift,
+							first_chord.win
+						),
+						(
+							&second_chord.key,
+							second_chord.ctrl,
+							second_chord.raw_ctrl,
+							second_chord.alt,
+							second_chord.shift,
+							second_chord.win
+						),
+						"{first:?} and {second:?} ship the same default chord (mac: {mac})"
+					);
+				}
 			}
 		}
 	}
@@ -212,9 +219,7 @@ mod tests {
 		assert_eq!(chord.key, "Space");
 	}
 
-	/// Pinned to the key codes the text control actually reports, so a typo in the key string
-	/// fails here rather than shipping a shortcut that silently never fires. 348 and 349 are
-	/// `WXK_F9` and `WXK_F10` as wxdragon defines them.
+	/// Pinned to the key codes the text control reports (348 and 349 are wxdragon's `WXK_F9` and `WXK_F10`), so a typo fails here rather than shipping a dead shortcut.
 	#[cfg(not(target_os = "macos"))]
 	#[test]
 	fn selection_shortcuts_are_alt_f9_f10_and_alt_shift_f9() {
@@ -226,13 +231,11 @@ mod tests {
 			let chord = action.default_chord().expect("every selection command ships a default");
 			assert_eq!(chord, KeyChord::new(false, true, own_shift, key_name), "{action:?} default chord");
 			assert!(chord.matches(key_code, false, true, own_shift), "{action:?} must match its own chord");
-			// The other Alt form on the same key belongs to a sibling command, not to this one.
 			assert!(
 				!chord.matches(key_code, false, true, !own_shift),
 				"{action:?} must not answer for the other Alt form"
 			);
-			// Alt is doing the work: the bare key must not claim it, or F10 alone would collide
-			// with the menu bar and Shift+F10 with the reader's context menu.
+			// F10 alone is the menu bar and Shift+F10 the context menu.
 			assert!(!chord.matches(key_code, false, false, false), "{action:?} must not match the bare key");
 			assert!(!chord.matches(key_code, false, false, true), "{action:?} must not match Shift+{key_name}");
 		}
@@ -277,7 +280,7 @@ mod tests {
 	}
 
 	#[test]
-	fn tools_category_holds_the_remaining_six() {
+	fn tools_category_holds_the_remaining_seven() {
 		assert_eq!(
 			ShortcutCategory::Tools.actions(),
 			[
@@ -286,6 +289,7 @@ mod tests {
 				ActionId::Options,
 				ActionId::SleepTimer,
 				ActionId::BatchOcr,
+				ActionId::RecognizeCurrentPage,
 				ActionId::CustomizeShortcuts,
 			]
 		);
@@ -353,6 +357,8 @@ mod tests {
 			ShortcutCategory::Audio.actions(),
 			[
 				ActionId::PlayPauseAudio,
+				ActionId::GoToAudioTime,
+				ActionId::AnnounceChapterProgress,
 				ActionId::SeekAudioForward,
 				ActionId::SeekAudioBackward,
 				ActionId::IncreaseAudioSeekAmount,

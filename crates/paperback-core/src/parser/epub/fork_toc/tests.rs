@@ -7,7 +7,7 @@ use crate::parser::epub::{
 	toc::build_epub_toc,
 };
 
-fn title(role: TitleRole, offset: usize) -> ChapterTitle {
+fn title(role: TitleRole, offset: DocPos) -> ChapterTitle {
 	ChapterTitle { role, offset, reference: format!("ch.xhtml#t{offset}") }
 }
 
@@ -51,13 +51,16 @@ fn attribute_id_does_not_take_another_attribute_ending_in_id() {
 
 #[test]
 fn the_largest_gap_counts_the_stretches_before_the_first_entry_and_after_the_last() {
-	let toc = vec![TocItem::new("A".into(), String::new(), 10), TocItem::new("B".into(), String::new(), 30)];
+	let toc = vec![
+		TocItem::new("A".into(), String::new(), DocPos::from_raw(10)),
+		TocItem::new("B".into(), String::new(), DocPos::from_raw(30)),
+	];
 	assert_eq!(largest_gap(&toc, 100), 70);
 	assert_eq!(largest_gap(&[], 100), 100);
 }
 
 fn entry(name: &str, offset: usize, class: &str) -> Entry {
-	Entry { item: TocItem::new(name.into(), String::new(), offset), class: class.into() }
+	Entry { item: TocItem::new(name.into(), String::new(), DocPos::from_raw(offset)), class: class.into() }
 }
 
 #[test]
@@ -92,11 +95,11 @@ fn a_contents_page_without_parts_stays_flat() {
 }
 
 /// A buffer whose lines are `lines`, and the display offset each line starts at.
-fn text_buffer(lines: &[&str]) -> (DocumentBuffer, Vec<usize>) {
+fn text_buffer(lines: &[&str]) -> (DocumentBuffer, Vec<DocPos>) {
 	let mut starts = Vec::new();
 	let mut text = String::new();
 	for line in lines {
-		starts.push(text.chars().count());
+		starts.push(DocLen::of(&text).as_pos());
 		text.push_str(line);
 		text.push('\n');
 	}
@@ -140,18 +143,18 @@ fn missing_chapter_titles_are_added_with_their_subtitles_and_covered_ones_are_no
 #[test]
 fn a_subtitle_alone_is_not_a_title() {
 	let (buffer, at) = text_buffer(&["Start", "Prose.", "— Thucydides", "Prose."]);
-	let mut toc = vec![TocItem::new("Start".into(), String::new(), 0)];
+	let mut toc = vec![TocItem::new("Start".into(), String::new(), DocPos::from_raw(0))];
 	assert_eq!(add_missing_titles(&mut toc, &buffer, &[title(TitleRole::Subtitle, at[2])]), 0);
 }
 
 #[test]
 fn a_title_nests_inside_the_entry_whose_children_already_reach_past_it() {
-	let mut part = TocItem::new("Part One".into(), String::new(), 0);
-	part.children.push(TocItem::new("Chapter 1".into(), String::new(), 10));
-	part.children.push(TocItem::new("Chapter 3".into(), String::new(), 30));
-	let mut toc = vec![part, TocItem::new("Part Two".into(), String::new(), 40)];
-	insert_by_offset(&mut toc, TocItem::new("Chapter 2".into(), String::new(), 20));
-	insert_by_offset(&mut toc, TocItem::new("Part Three".into(), String::new(), 50));
+	let mut part = TocItem::new("Part One".into(), String::new(), DocPos::from_raw(0));
+	part.children.push(TocItem::new("Chapter 1".into(), String::new(), DocPos::from_raw(10)));
+	part.children.push(TocItem::new("Chapter 3".into(), String::new(), DocPos::from_raw(30)));
+	let mut toc = vec![part, TocItem::new("Part Two".into(), String::new(), DocPos::from_raw(40))];
+	insert_by_offset(&mut toc, TocItem::new("Chapter 2".into(), String::new(), DocPos::from_raw(20)));
+	insert_by_offset(&mut toc, TocItem::new("Part Three".into(), String::new(), DocPos::from_raw(50)));
 	assert_eq!(
 		names(&toc),
 		vec!["Part One@0", "  Chapter 1@10", "  Chapter 2@20", "  Chapter 3@30", "Part Two@40", "Part Three@50"]
@@ -186,7 +189,7 @@ fn own_and_repaired(name: &str) -> Option<(Vec<TocItem>, Vec<TocItem>, DocumentB
 	let doc = XmlDocument::parse_with_options(&opf, ParsingOptions { allow_dtd: true, ..Default::default() }).ok()?;
 	let package = doc.descendants().find(|n| n.tag_name().name() == "package")?;
 	let (manifest, spine, nav, ncx, _) = parse_package(package, &opf_dir);
-	let conversion = convert_spine_items(&path.to_string_lossy(), &manifest, &spine, false);
+	let conversion = convert_spine_items(&path.to_string_lossy(), &archive.metadata(), &manifest, &spine, false);
 	let own =
 		build_epub_toc(&mut archive, nav.as_deref(), ncx.as_deref(), &conversion.sections, &conversion.id_positions);
 	let repaired = repair_toc(

@@ -17,12 +17,11 @@ fn session_with_audio(timeline: AudioTimeline) -> DocumentSession {
 		history_index: 0,
 		parser_flags: ParserFlags::empty(),
 		parse_settings: ParseSettings::default(),
+		password: String::new(),
 	}
 }
 
-/// Two files of very different lengths, the case a character-count percentage gets wrong: the
-/// text is one blank line each, so position says 50% at the boundary while the recording is
-/// only a quarter done.
+/// The case a character percentage gets wrong: 50% of the text at the boundary, a quarter of the recording.
 fn lopsided_timeline(second_duration_known: bool) -> AudioTimeline {
 	let mut builder = crate::audio::AudioTimelineBuilder::new();
 	let short = builder.add_source(AudioLocation::File("one.mp3".to_string()), Some(60_000));
@@ -30,8 +29,8 @@ fn lopsided_timeline(second_duration_known: bool) -> AudioTimeline {
 		AudioLocation::File("two.mp3".to_string()),
 		if second_duration_known { Some(180_000) } else { None },
 	);
-	builder.add_clip(short, 0, 60_000, 0, 1);
-	builder.add_clip(long, 0, 180_000, 1, 2);
+	builder.add_clip(short, 0, 60_000, 0.into(), 1.into());
+	builder.add_clip(long, 0, 180_000, 1.into(), 2.into());
 	builder.build()
 }
 
@@ -39,13 +38,11 @@ fn lopsided_timeline(second_duration_known: bool) -> AudioTimeline {
 fn audio_progress_follows_the_recording_not_the_text() {
 	let session = session_with_audio(lopsided_timeline(true));
 	assert_eq!(session.audio_progress_percent(0), Some(0));
-	// The boundary between the two files: half the text, a quarter of the running time.
 	assert_eq!(session.audio_progress_percent(60_000), Some(25));
 	assert_eq!(session.audio_progress_percent(120_000), Some(50));
 	assert_eq!(session.audio_progress_percent(240_000), Some(100));
 }
 
-/// Truncating, so a book with time left to play never reports as finished.
 #[test]
 fn audio_progress_reaches_a_hundred_only_at_the_end() {
 	let session = session_with_audio(lopsided_timeline(true));
@@ -67,9 +64,6 @@ fn audio_percent_clamps_out_of_range_input() {
 	assert_eq!(session.audio_elapsed_for_percent(500), Some(240_000));
 }
 
-/// A file whose length was never established gets a placeholder far longer than any recording,
-/// so the total is nonsense and every proportion drawn from it would be too. Better to say
-/// nothing and let the caller keep the character-count percentage it had before.
 #[test]
 fn audio_percent_declines_when_a_duration_is_unknown() {
 	let session = session_with_audio(lopsided_timeline(false));
@@ -91,8 +85,8 @@ fn two_source_timeline() -> AudioTimeline {
 	let mut builder = crate::audio::AudioTimelineBuilder::new();
 	let source0 = builder.add_source(AudioLocation::File("chapter1.mp3".to_string()), Some(9000));
 	let source1 = builder.add_source(AudioLocation::File("chapter2.mp3".to_string()), Some(4000));
-	builder.add_clip(source0, 0, 9000, 0, 10);
-	builder.add_clip(source1, 0, 4000, 10, 17);
+	builder.add_clip(source0, 0, 9000, 0.into(), 10.into());
+	builder.add_clip(source1, 0, 4000, 10.into(), 17.into());
 	builder.build()
 }
 
@@ -141,7 +135,7 @@ fn audio_cursor_at_elapsed_ffi_resolves_the_containing_clip() {
 #[test]
 fn audio_point_for_position_ffi_anchors_to_the_clip_start() {
 	let session = session_with_audio(two_source_timeline());
-	let point = session.audio_point_for_position_ffi(15);
+	let point = session.audio_point_for_position_ffi(15.into());
 	assert!(point.found);
 	assert_eq!(point.position, 10);
 	assert_eq!(point.time_ms, 9000);
@@ -150,7 +144,7 @@ fn audio_point_for_position_ffi_anchors_to_the_clip_start() {
 #[test]
 fn audio_point_for_position_ffi_is_not_found_in_a_gap() {
 	let session = session_with_audio(two_source_timeline());
-	assert!(!session.audio_point_for_position_ffi(30).found);
+	assert!(!session.audio_point_for_position_ffi(30.into()).found);
 }
 
 #[test]
@@ -182,7 +176,7 @@ fn audio_extract_source_ffi_copies_a_file_source() {
 	fs::write(&source_path, b"chapter-one-bytes").unwrap();
 	let mut builder = crate::audio::AudioTimelineBuilder::new();
 	let source = builder.add_source(AudioLocation::File(source_path.to_string_lossy().to_string()), None);
-	builder.add_clip(source, 0, 1000, 0, 10);
+	builder.add_clip(source, 0, 1000, 0.into(), 10.into());
 	let session = session_with_audio(builder.build());
 	let output_path = dir.join("out.mp3");
 	assert!(session.audio_extract_source_ffi(0, output_path.to_string_lossy().to_string()));
@@ -210,7 +204,7 @@ fn audio_extract_source_ffi_extracts_a_zip_entry_source() {
 		},
 		None,
 	);
-	builder.add_clip(source, 0, 1000, 0, 10);
+	builder.add_clip(source, 0, 1000, 0.into(), 10.into());
 	let session = session_with_audio(builder.build());
 	let output_path = dir.join("out.mp3");
 	assert!(session.audio_extract_source_ffi(0, output_path.to_string_lossy().to_string()));
@@ -240,43 +234,98 @@ fn audio_extract_source_ffi_extracts_a_password_protected_zip_entry_source() {
 		},
 		None,
 	);
-	builder.add_clip(source, 0, 1000, 0, 10);
+	builder.add_clip(source, 0, 1000, 0.into(), 10.into());
 	let session = session_with_audio(builder.build());
 	let output_path = dir.join("out.mp3");
 	assert!(session.audio_extract_source_ffi(0, output_path.to_string_lossy().to_string()));
 	assert_eq!(fs::read(&output_path).unwrap(), b"zipped-chapter-bytes");
 }
 
-/// A plain audio bundle's text is one placeholder character per file (see
-/// `navigate_section_in_an_audio_only_book_announces_the_file_name`), so two adjacent tracks
-/// sit a single character apart no matter how long either recording runs.
+/// Adjacent tracks of a plain audio bundle sit one placeholder character apart however long they run.
 fn adjacent_tracks_timeline() -> AudioTimeline {
 	let mut builder = crate::audio::AudioTimelineBuilder::new();
 	let one = builder.add_source(AudioLocation::File("one.mp3".to_string()), Some(60_000));
 	let two = builder.add_source(AudioLocation::File("two.mp3".to_string()), Some(60_000));
-	builder.add_clip(one, 0, 60_000, 0, 1);
-	builder.add_clip(two, 0, 60_000, 1, 2);
+	builder.add_clip(one, 0, 60_000, 0.into(), 1.into());
+	builder.add_clip(two, 0, 60_000, 1.into(), 2.into());
 	builder.build()
 }
 
-// #890: character distance alone can't tell a real jump from a step to the next line in a
-// plain audio bundle, so a jump between tracks minutes apart has to be recorded even though it
-// only moves the caret by a single placeholder character.
+// #890: a jump between tracks minutes apart moves the caret one character, so only audio distance shows it.
 #[test]
 fn record_jump_uses_audio_distance_when_text_distance_is_too_sparse_to_tell() {
 	let mut session = session_with_audio(adjacent_tracks_timeline());
-	session.record_jump(0, 1);
+	session.record_jump(0.into(), 1.into());
 	let (history, index) = session.get_history();
 	assert_eq!(history, &[0]);
 	assert_eq!(index, 0);
 }
 
-/// The counterpart: a short seek within the same track (or one shorter than the audio
-/// threshold) still records nothing, just like a short jump in plain text.
 #[test]
 fn record_jump_still_ignores_a_short_audio_seek() {
 	let mut session = session_with_audio(adjacent_tracks_timeline());
-	session.record_jump(0, 0);
+	session.record_jump(0.into(), 0.into());
 	let (history, _) = session.get_history();
 	assert!(history.is_empty());
+}
+
+/// Two chapters, of one and three minutes, each a heading in the text and an entry in the table of contents.
+fn session_with_chapters(toc: bool) -> DocumentSession {
+	let mut builder = crate::audio::AudioTimelineBuilder::new();
+	let one = builder.add_source(AudioLocation::File("one.mp3".to_string()), Some(60_000));
+	let two = builder.add_source(AudioLocation::File("two.mp3".to_string()), Some(180_000));
+	builder.add_clip(one, 0, 60_000, 0.into(), 6.into());
+	builder.add_clip(two, 0, 180_000, 6.into(), 12.into());
+	let mut session = session_with_audio(builder.build());
+	if toc {
+		let mut document = session.handle.document().clone();
+		document.toc_items = vec![
+			crate::document::TocItem::new("Chapter 1".to_string(), String::new(), 0.into()),
+			crate::document::TocItem::new("Chapter 2".to_string(), String::new(), 6.into()),
+		];
+		session.handle = DocumentHandle::new(document);
+	}
+	session
+}
+
+#[test]
+fn audio_time_is_of_the_whole_recording() {
+	let session = session_with_chapters(true);
+	assert_eq!(session.audio_time_announcement(0).as_deref(), Some("0:00 of 4:00"));
+	assert_eq!(session.audio_time_announcement(90_500).as_deref(), Some("1:30 of 4:00"));
+	assert_eq!(session.audio_time_announcement(999_000).as_deref(), Some("4:00 of 4:00"));
+}
+
+#[test]
+fn audio_time_waits_for_every_length() {
+	let session = session_with_audio(lopsided_timeline(false));
+	assert_eq!(session.audio_time_announcement(0), None);
+	assert_eq!(session.audio_chapter_announcement(0), None);
+	assert_eq!(session.audio_time_announcement_ffi(0), "");
+}
+
+#[test]
+fn chapter_time_is_of_the_chapter_playing() {
+	let session = session_with_chapters(true);
+	assert_eq!(session.audio_chapter_announcement(30_000).as_deref(), Some("Chapter 1, 0:30 of 1:00, 0:30 left"));
+	assert_eq!(session.audio_chapter_announcement(60_000).as_deref(), Some("Chapter 2, 0:00 of 3:00, 3:00 left"));
+	assert_eq!(session.audio_chapter_announcement(150_000).as_deref(), Some("Chapter 2, 1:30 of 3:00, 1:30 left"));
+}
+
+#[test]
+fn a_book_without_chapters_is_one() {
+	let session = session_with_chapters(false);
+	assert_eq!(session.audio_chapter_announcement(150_000).as_deref(), Some("2:30 of 4:00, 1:30 left"));
+}
+
+#[test]
+fn go_to_time_entries_resolve_through_the_session() {
+	let session = session_with_chapters(true);
+	assert!(session.audio_time_known_ffi());
+	assert_eq!(session.audio_time_entry_ffi("1:30".to_string(), 0), 90_000);
+	assert_eq!(session.audio_time_entry_ffi("+30".to_string(), 60_000), 90_000);
+	assert_eq!(session.audio_time_entry_ffi("soon".to_string(), 0), -1);
+	assert_eq!(session.audio_time_entry_ffi("5:00".to_string(), 0), -2);
+	assert_eq!(session.format_audio_time_ffi(3_723_000), "1:02:03");
+	assert_eq!(session_with_audio(lopsided_timeline(false)).audio_time_entry_ffi("1:00".to_string(), 0), -3);
 }

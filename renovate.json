@@ -10,6 +10,11 @@
   },
   "packageRules": [
     {
+      "description": "A runner image sets the oldest glibc the Linux builds run on, so moving to a newer one is a decision about who can run Paperback (#1252), not a routine bump.",
+      "matchDatasources": ["github-runners"],
+      "enabled": false
+    },
+    {
       "matchManagers": ["cargo"],
       "groupName": "cargo dependencies",
       "rangeStrategy": "bump"
@@ -37,10 +42,9 @@
       "allowedVersions": "<0.23.0"
     },
     {
-      "description": "Every pinned PDFium archive moves to the same release in one PR, so desktop and Android never ship different PDFium builds.",
-      "matchDatasources": ["github-release-attachments"],
-      "matchPackageNames": ["bblanchon/pdfium-binaries"],
-      "groupName": "pdfium"
+      "description": "hayro's PDF interpreter is built on skrifa 0.46, and the XPS parser shares that copy. A newer skrifa here alone adds another copy of skrifa and read-fonts to the binary, so lift this together with hayro.",
+      "matchPackageNames": ["skrifa"],
+      "allowedVersions": "<0.47.0"
     }
   ],
   "customManagers": [
@@ -52,18 +56,6 @@
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)\\s+COBALT_VERSION: (?<currentValue>[^\\s]+)"
       ],
       "extractVersionTemplate": "^v(?<version>.+)$"
-    },
-    {
-      "description": "PDFium's prebuilt archives in pdfium-fetch, each pinned by release tag and SHA-256. github-release-attachments rehashes the same-named asset from the new release. The iOS archive is left out of the pattern on purpose: see its comment in the crate.",
-      "customType": "regex",
-      "managerFilePatterns": ["crates/pdfium-fetch/src/lib.rs"],
-      "matchStrings": [
-        "tag: \"(?<currentValue>chromium/\\d+)\",\\s*name: \"pdfium-(?:win|mac|linux|android)-[a-z0-9]+\\.tgz\",\\s*sha256: \"(?<currentDigest>[0-9a-f]{64})\""
-      ],
-      "datasourceTemplate": "github-release-attachments",
-      "packageNameTemplate": "bblanchon/pdfium-binaries",
-      "depNameTemplate": "pdfium-binaries",
-      "versioningTemplate": "regex:^chromium/(?<major>\\d+)$"
     }
   ]
 }

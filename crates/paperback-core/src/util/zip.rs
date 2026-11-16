@@ -52,13 +52,10 @@ pub fn read_zip_entry_by_name_with_password<R: Read + Seek>(
 	Ok(decode_html(&contents, None))
 }
 
-/// Reads a zip entry's raw bytes, unlike `read_zip_entry_by_name` which assumes text and
-/// converts it to UTF-8. For binary payloads such as audio clips.
 pub fn read_zip_entry_bytes<R: Read + Seek>(archive: &mut ZipArchive<R>, name: &str) -> Result<Vec<u8>> {
 	read_zip_entry_bytes_with_password(archive, name, None)
 }
 
-/// [`read_zip_entry_bytes`], but for an entry that may be AES-encrypted.
 pub fn read_zip_entry_bytes_with_password<R: Read + Seek>(
 	archive: &mut ZipArchive<R>,
 	name: &str,
@@ -104,7 +101,7 @@ pub fn extract_zip_entry_to_file_with_password<R: Read + Seek>(
 	Ok(())
 }
 
-/// Returns a function mapping a reference to the archive entry it names, matching case-insensitively when no entry has the exact name. Books are often written against a case-insensitive filesystem, so a reference to `01.Mp3` that plays fine once extracted on Windows or macOS has to find the zip's `01.mp3` too. A reference matching nothing comes back unchanged, so the lookup still reports it missing.
+/// Books are often written against a case-insensitive filesystem, so `01.Mp3` must find the zip's `01.mp3`; a miss comes back unchanged so it is still reported missing.
 pub fn zip_entry_name_resolver<R: Read + Seek>(archive: &ZipArchive<R>) -> impl Fn(&str) -> String + use<R> {
 	let names: HashSet<String> = archive.file_names().flatten().map(String::from).collect();
 	let mut lowercase = HashMap::new();
@@ -126,7 +123,7 @@ pub struct ZipEntryInfo {
 	pub supported: bool,
 }
 
-/// Skips directories and names that would escape an extraction directory. Reads only the central directory, because each entry's own header costs a seek, which takes seconds on a big archive.
+/// Reads only the central directory, because each entry's own header costs a seek, which takes seconds on a big archive.
 pub fn list_zip_entries<R: Read + Seek>(archive: &ZipArchive<R>) -> Vec<ZipEntryInfo> {
 	archive
 		.file_names()
@@ -160,6 +157,11 @@ fn is_daisy_book_file(name: &str) -> bool {
 
 fn is_word_file(name: &str) -> bool {
 	extension_is(name, &["docx", "docm", "doc"])
+}
+
+/// A zip of these is one audiobook split into parts, which the DAISY parser opens as a book with a section per file.
+fn is_audio_file(name: &str) -> bool {
+	extension_is(name, &["mp3", "m4b"])
 }
 
 /// Files that routinely sit beside a book (a readme) or get merged into one (several .docx), so they don't make a zip a collection.
@@ -196,16 +198,24 @@ pub fn zip_books(entries: &[ZipEntryInfo]) -> Vec<String> {
 		.collect()
 }
 
-/// A collection, or a zip no parser would claim, is something to pick from. A lone DAISY book or a set of Word documents has a parser of its own, and a picker would only get in its way. `None` means open the zip as one document.
+/// A lone DAISY book or a set of Word documents has a parser of its own, which a picker would only get in the way of.
 pub fn zip_books_to_browse<R: Read + Seek>(archive: &ZipArchive<R>) -> Option<Vec<String>> {
 	let entries = list_zip_entries(archive);
+	// A BARD braille book's volumes are one book, which its package says how to read.
+	if entries.iter().any(|e| extension_is(&e.name, &["bopf"])) {
+		return None;
+	}
 	let books = zip_books(&entries);
-	let is_collection = books.iter().filter(|name| !is_companion_file(name)).count() >= 2;
+	let main_books: Vec<&String> = books.iter().filter(|name| !is_companion_file(name)).collect();
+	if !main_books.is_empty() && main_books.iter().all(|name| is_audio_file(name)) {
+		return None;
+	}
+	let is_collection = main_books.len() >= 2;
 	let claimed = entries.iter().any(|e| is_daisy_book_file(&e.name) || is_word_file(&e.name));
 	((is_collection || !claimed) && !books.is_empty()).then_some(books)
 }
 
-/// The path depends only on the archive and entry, and the file keeps the entry's own name, so the extracted copy opens like any other file: the same reading position, bookmarks and recent-documents entry come back each time. An earlier copy is overwritten.
+/// The path depends only on the archive and entry and keeps the entry's name, so the copy gets the same reading position and bookmarks each time.
 pub fn extract_zip_entry_to_cache(zip_path: &Path, entry_name: &str, cache_root: &Path) -> Result<PathBuf> {
 	let mut archive = ZipArchive::new(BufReader::new(
 		File::open(zip_path).with_context(|| format!("Failed to open '{}'", zip_path.display()))?,
@@ -219,7 +229,7 @@ pub fn extract_zip_entry_to_cache(zip_path: &Path, entry_name: &str, cache_root:
 	hasher.update(entry_name.as_bytes());
 	let entry_root = cache_root.join(URL_SAFE_NO_PAD.encode(hasher.finalize()));
 	if is_daisy_book_file(entry_name) {
-		// A DAISY book is many files that refer to each other, so extract its whole folder. At the archive root that would be the whole archive, so only the files beside the book come along.
+		// A DAISY book is many files referring to each other, so its whole folder comes along, but at the root only the files beside it.
 		let dir = dir_of(entry_name);
 		let prefix = if dir.is_empty() { String::new() } else { format!("{dir}/") };
 		extract_zip_to_dir(&mut archive, &entry_root, |p| {
@@ -233,11 +243,7 @@ pub fn extract_zip_entry_to_cache(zip_path: &Path, entry_name: &str, cache_root:
 	Ok(output_path)
 }
 
-/// Extracts every entry of `archive` for which `skip` returns `false` into
-/// `output_dir`, preserving the archive's internal directory structure so that
-/// relative references between entries (e.g. an XHTML file's
-/// `<img src="../images/foo.jpg">`) keep resolving once extracted. Entries
-/// whose name would escape `output_dir` are always skipped.
+/// Keeps the archive's layout so relative references between entries keep resolving.
 pub fn extract_zip_to_dir<R: Read + Seek>(
 	archive: &mut ZipArchive<R>,
 	output_dir: &Path,
@@ -552,6 +558,8 @@ mod tests {
 		let dir = TempDir::new("zip");
 		assert_eq!(browse(&dir, &["d1/ncc.html", "d1/book.opf", "readme.txt", "readme.html"]), None);
 		assert_eq!(browse(&dir, &["a.docx", "b.docx"]), None);
+		assert_eq!(browse(&dir, &["/", "001_part01.mp3", "002_part02.mp3", "readme.txt"]), None);
+		assert_eq!(browse(&dir, &["only.m4b"]), None);
 	}
 
 	#[test]
@@ -560,6 +568,7 @@ mod tests {
 		assert_eq!(browse(&dir, &["a.epub", "b.epub"]).map(|b| b.len()), Some(2));
 		assert_eq!(browse(&dir, &["d1/a.opf", "d2/b.opf"]).map(|b| b.len()), Some(2));
 		assert_eq!(browse(&dir, &["only.epub"]), Some(vec!["only.epub".to_string()]));
+		assert_eq!(browse(&dir, &["talk.mp3", "slides.pdf"]).map(|b| b.len()), Some(2));
 		assert_eq!(browse(&dir, &["pic.xyz"]), None);
 	}
 }

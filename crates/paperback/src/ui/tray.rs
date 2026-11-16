@@ -6,9 +6,7 @@ use wxdragon::prelude::*;
 
 use super::{document_manager::DocumentManager, icon, menu_ids};
 
-/// Gives `tray_icon` the application icon. Left as-is if the artwork can't be built: the
-/// notification area falls back to a blank slot rather than to a stock "information" glyph
-/// that looks like a message from another app.
+/// Left unset if the artwork can't be built, since a blank slot beats a stock "information" glyph that looks like another app's message.
 pub fn set_tray_icon(tray_icon: &TaskBarIcon) {
 	if let Some(bundle) = icon::notification_area_bundle() {
 		tray_icon.set_icon_bundle(&bundle, "Paperback");
@@ -49,7 +47,8 @@ fn handle_minimize_to_tray(
 	doc_manager: &Rc<Mutex<DocumentManager>>,
 	tray_state: &Rc<Mutex<Option<TrayState>>>,
 ) {
-	if !frame.is_iconized() {
+	// A frame hidden in the tray still reports itself iconized; without the shown check every idle event rebuilt the icon and spun a core.
+	if !frame.is_iconized() || !frame.is_shown() {
 		return;
 	}
 	if !config.lock().unwrap().get_app_bool("minimize_to_tray", false) {
@@ -99,7 +98,6 @@ fn create_tray_state(
 			_ => {}
 		});
 	}
-	// On Windows/Linux, also restore on click and double-click
 	#[cfg(any(target_os = "windows", target_os = "linux"))]
 	{
 		let doc_manager_click = Rc::clone(&doc_manager);

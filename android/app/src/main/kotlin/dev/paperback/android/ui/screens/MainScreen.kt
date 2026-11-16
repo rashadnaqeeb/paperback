@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -46,6 +45,7 @@ import dev.paperback.android.ui.state.scrollsWorthSaving
 import dev.paperback.android.ui.state.shouldSyncPositionFromList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.paperback.ExportFormat
@@ -76,25 +76,17 @@ fun MainScreen(
 	val activeSearchOptions by viewModel.search.options.collectAsStateWithLifecycle()
 	val isTextMode by settings.textMode.state.collectAsStateWithLifecycle()
 
-	// An audio-only tab has no real text spine to show in Text Mode (its top-bar toggle is
-	// hidden for the same reason), so switching to one from a Text Mode session falls back to
-	// Read-Aloud mode instead of stranding the user on a blank text view with no way back.
+	// An audio-only tab hides the Text Mode toggle, so staying in Text Mode would strand the reader on a blank view with no way back.
 	LaunchedEffect(state.activeTab?.documentUri) {
 		if (state.activeTab?.isAudioOnly == true) {
 			settings.textMode.set(false)
 		}
 	}
 
-	// F3/Shift+F3 (MainActivity) trigger this. In Read-Aloud mode, Find is a nav unit, so this
-	// just steps it the same way the nav-unit slider's Previous/Next buttons do; only Text mode
-	// (which has no nav-unit slider) still needs this handler's own search-and-scroll logic.
 	LaunchedEffect(Unit) {
 		viewModel.search.stepRequests.collect { forward ->
 			if (!isTextMode) {
-				// No active search means Find isn't the nav unit, so there's nothing for F3 to
-				// step through here; without this guard it would fall through to whatever unit
-				// currently is selected (Section, a Time seek, ordinary Paragraph...), silently
-				// doing the wrong thing instead of the no-op F3 has always been without a search.
+				// Without a search, F3 would otherwise step whatever unit is selected instead of doing nothing.
 				if (activeSearchQuery != null && activeSearchOptions != null) {
 					val speaking = viewModel.ttsManager.isSpeaking.value
 					if (forward) {
@@ -265,9 +257,7 @@ fun MainScreen(
 		}
 	)
 
-	// The three actions that pick a file. Which picker each one uses depends on a setting and on
-	// where the document came from, so the top bar's menu items and the keyboard shortcuts share
-	// these rather than each deciding for themselves.
+	// Shared by the menu and the keyboard shortcuts so both pick the same picker for the setting and the document's origin.
 	val openBook: () -> Unit = {
 		if (useInAppFileBrowser) {
 			if (needsAllFilesAccessPermission()) {
@@ -312,9 +302,7 @@ fun MainScreen(
 
 	Box(modifier = Modifier.fillMaxSize()) {
 		Scaffold(
-			// safeDrawing rather than the default systemBars so text keeps clear of a landscape
-			// display cutout. The bars each pad themselves, so letting the Scaffold be the one
-			// place that applies these is what stops them being counted twice.
+			// safeDrawing keeps text clear of a landscape cutout; applied only here so the bars' own padding isn't counted twice.
 			contentWindowInsets = WindowInsets.safeDrawing,
 			topBar = {
 				MainScreenTopBar(
@@ -338,6 +326,7 @@ fun MainScreen(
 					onExportDocumentOpen = { viewModel.openExportDocumentDialog() },
 					onExportSettings = exportSettings,
 					onImportSettings = importSettings,
+					onOpenFromUrl = { viewModel.links.prompt() },
 					onHelpOpen = {
 						viewModel.openHelpDocument()
 					}
@@ -365,12 +354,11 @@ fun MainScreen(
 						onNavigate = { lineIndexToFocus = it }
 					)
 				} else if (!isTextMode && activeTab != null) {
+					val audioSpeed by viewModel.reading.audioSpeed.collectAsStateWithLifecycle()
 					val baseNavUnits = remember(activeTab.session) { viewModel.reading.navUnitsFor(activeTab) }
-					// Find is only offered as a nav unit once a search is active; it steps through
-					// that search's matches instead of opening a separate find bar.
 					val navUnits = if (activeSearchQuery != null) baseNavUnits + NavUnit.Find else baseNavUnits
-					LaunchedEffect(navUnits) {
-						viewModel.reading.ensureNavUnitSupported(navUnits)
+					LaunchedEffect(activeTab.documentUri, navUnits) {
+						viewModel.reading.ensureNavUnitSupported(activeTab, navUnits)
 					}
 					TtsBottomBar(
 						isSpeaking = isSpeaking,
@@ -384,6 +372,8 @@ fun MainScreen(
 						onNavUnitChange = { viewModel.reading.setNavUnit(it) },
 						speechRatePercent = speechRatePercent.takeUnless { ttsEngine == null },
 						onSpeechRateChange = { viewModel.ttsManager.setSpeechRate(it) },
+						audioSpeed = audioSpeed.takeIf { activeTab.hasAudio },
+						onAudioSpeedChange = { viewModel.reading.setAudioSpeed(it) },
 						swipeUpMovesForward = swipeUpMovesForward,
 						hidePrevNextButtons = hidePrevNextButtons
 					)
@@ -418,9 +408,6 @@ fun MainScreen(
 							val listState = listStates.getOrPut(docState.documentUri) {
 								LazyListState(firstVisibleItemIndex = docState.initialScrollIndex)
 							}
-							// What every "take me there" control in this view does once it has worked
-							// out which line it wants: record the new position, switch to Text Mode so
-							// the destination is actually on screen, and put the focus on it.
 							val jumpToLine: (Int) -> Unit = { indexToScroll ->
 								viewModel.reading.savePosition(docState.session, docState.documentUri, indexToScroll)
 								viewModel.reading.refreshSegmentPreview()
@@ -430,8 +417,7 @@ fun MainScreen(
 									lineIndexToFocus = indexToScroll
 								}
 							}
-							// Set by the elements screen, which cannot switch to Text Mode or
-							// scroll the list itself.
+							// Set by the elements screen, which cannot switch to Text Mode or scroll the list itself.
 							LaunchedEffect(pendingJumpOffset) {
 								val offset = pendingJumpOffset
 								if (offset != null) {
@@ -461,10 +447,12 @@ fun MainScreen(
 							}
 							LaunchedEffect(ttsPosition) {
 								if (isTextMode) {
-									val line = docState.session.lineFromPosition(ttsPosition)
-									val index = lineIndexFor(line)
-									listState.scrollToItem(index)
-									lineIndexToFocus = index
+									val index = lineIndexFor(docState.session.lineFromPosition(ttsPosition))
+									// A scroll that settles saves its top line as the position, and following that back would snap the reader's scroll flush to the line.
+									if (index != listState.firstVisibleItemIndex) {
+										listState.scrollToItem(index)
+										lineIndexToFocus = index
+									}
 								}
 							}
 							LaunchedEffect(docState.documentUri) {
@@ -473,20 +461,23 @@ fun MainScreen(
 									.collect { index -> viewModel.reading.savePosition(docState.session, docState.documentUri, index) }
 							}
 							if (!isTextMode) {
-								// An audio-only book's buffer is one blank line per narration file, so a
-								// share of its characters says nothing about how far in the reader is,
-								// and its recording is no better: a plain zip of narration files gives
-								// every clip the same placeholder duration, so a share of the running
-								// time is just as made up. It goes without a reading rather than with
-								// a wrong one.
+								// Neither an audio-only book's text (a blank line per file) nor its placeholder clip durations give a true share, so it shows none rather than a wrong one.
 								val session = docState.session
 								val progressPercent = remember(session, docState.isAudioOnly, ttsPosition) {
 									if (docState.isAudioOnly) null else session.getStatusInfo(ttsPosition).percentage
+								}
+								// A recording moves on between the clip changes the screen hears of, so its time is read again every second, as on iOS.
+								val audioTime by produceState<String?>(null, session) {
+									while (true) {
+										value = viewModel.reading.audioElapsedMs()?.let { session.audioTimeAnnouncementFfi(it) }?.ifEmpty { null }
+										delay(1000)
+									}
 								}
 								ReadAloudPane(
 									segmentText = currentSegmentText,
 									readability = readability,
 									progressPercent = progressPercent,
+									audioTime = audioTime,
 									sleepTimerRemaining = sleepTimerRemaining,
 									onCancelSleepTimer = { viewModel.reading.sleepTimer.cancel() }
 								)
@@ -538,9 +529,7 @@ fun MainScreen(
 			PermissionRationaleDialog(
 				onGrantClick = {
 					viewModel.navigation.permissionRationaleDialog.close()
-					val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-					intent.data = "package:${context.packageName}".toUri()
-					context.startActivity(intent)
+					openAllFilesAccessSettings(context)
 				},
 				onDismiss = {
 					viewModel.navigation.permissionRationaleDialog.close()
@@ -581,11 +570,7 @@ fun MainScreen(
 	}
 }
 
-/**
- * Runs [work] off the UI thread and tells the reader how it went. Every transfer to or from a
- * file is slow enough to belong off the main thread and quiet enough to need saying, since the
- * result is a file somewhere the reader cannot see from here.
- */
+/** The result is a file the reader can't see from here, so it has to be said. */
 private fun CoroutineScope.reportResult(context: Context, succeeded: String, failed: String, work: () -> Boolean) {
 	launch(Dispatchers.IO) {
 		val message = if (work()) succeeded else failed

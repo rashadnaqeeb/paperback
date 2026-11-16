@@ -3,14 +3,14 @@
 use std::sync::Arc;
 
 use super::ConfigManagerFfi;
-use crate::{config::SyncStore, session::DocumentSession};
+use crate::{config::SyncStore, document::DocPos, session::DocumentSession};
 
 /// A book whose position another device moved, and where to.
 #[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncMoveFfi {
 	pub path: String,
-	pub position: i64,
+	pub position: DocPos,
 }
 
 // Owned parameters because that is the signature UniFFI generates for.

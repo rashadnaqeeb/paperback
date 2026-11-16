@@ -1,4 +1,5 @@
 use std::{
+	borrow::Cow,
 	collections::{BTreeSet, HashMap},
 	fs::File,
 	io::Read,
@@ -14,10 +15,12 @@ use crate::{
 	parser::{
 		Parser, add_converter_markers, add_toc_heading_markers,
 		convert::html_to_text::{HtmlSourceMode, HtmlToText},
+		text::text_document,
 		util::{path::extract_title_from_path, toc::build_toc_from_headings},
 	},
 	t,
 	types::HeadingInfo,
+	util::encoding::decode_guessing_code_page,
 };
 
 mod chunk;
@@ -29,6 +32,7 @@ mod huffman;
 mod index;
 mod kf8;
 mod links;
+pub mod pictures;
 mod toc;
 mod varint;
 
@@ -55,27 +59,41 @@ impl Parser for MobiParser {
 		let title_bytes = data[0..32].to_vec();
 		let mut header = parse_header(&data, &title_bytes)?;
 		let (exth_map, exth_author, exth_title) = parse_exth(&header);
-		let document_author = exth_author.unwrap_or_default();
+		let mut document_author = exth_author.unwrap_or_default();
 		if let Some(title) = exth_title {
 			header.document_title = title;
 		}
+		// Each book-sized stage is freed as soon as the next is made, since the function's end is too late: by then every copy has sat through the conversion.
 		let content = decode_content(&data, &header)?;
-		let text = if header.text_encoding == 65001 {
-			tracing::debug!("decoding mobi content as utf-8");
-			String::from_utf8_lossy(&content).into_owned()
-		} else {
-			tracing::debug!(text_encoding = header.text_encoding, "decoding mobi content as windows-1252");
-			WINDOWS_1252.decode(&content).0.into_owned()
+		// Early Mobipocket books are PalmDOC files holding HTML, and go on to be read as any other; the rest of PalmDOC is plain text.
+		if header.is_palmdoc && !looks_like_html(&content) {
+			let mut document = text_document(&context.file_path, decode_guessing_code_page(content));
+			if !header.document_title.is_empty() {
+				document.title = header.document_title;
+			}
+			tracing::debug!(path = %context.file_path, compression = header.compression, "parsed plain palmdoc file");
+			return Ok(document);
+		}
+		let raw = {
+			// PalmDOC names no encoding, and Russian books in Windows-1251 came out garbled when every one was taken as Western.
+			if header.is_palmdoc {
+				decode_guessing_code_page(content)
+			} else if header.text_encoding == 65001 {
+				tracing::debug!("decoding mobi content as utf-8");
+				String::from_utf8(content)
+					.unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned())
+			} else {
+				tracing::debug!(text_encoding = header.text_encoding, "decoding mobi content as windows-1252");
+				WINDOWS_1252.decode(&content).0.into_owned()
+			}
 		};
-		// A KF8 book was an EPUB before it was compiled, and its skeleton index still records
-		// where each of those files began. Those are the book's sections.
+		// A KF8 book was an EPUB before it was compiled, and its skeleton index still records where each file began.
 		let section_starts = if header.is_kf8 {
 			kf8::section_starts(&data, &header.record_offsets, header.mobi_header()).unwrap_or_default()
 		} else {
 			Vec::new()
 		};
-		// Rewrite MOBI-style filepos links into standard href/id anchors before any
-		// content is stripped, since filepos values are byte offsets into the raw HTML.
+		// filepos values are byte offsets into the raw HTML, so links are rewritten before anything is stripped.
 		let frag_offsets = build_fragment_offsets(&data, &header.record_offsets, header.mobi_header());
 		let mut ncx_toc =
 			parse_ncx(&data, &header.record_offsets, header.mobi_header(), &exth_map, header.is_kf8, &frag_offsets);
@@ -96,49 +114,43 @@ impl Parser for MobiParser {
 		}
 		let mut extra_targets = BTreeSet::new();
 		extract_targets(&ncx_toc, &mut extra_targets);
-		// Section starts ride along as link targets, which gets each one an anchor in the
-		// HTML and so an entry in `id_positions` once the text is converted. That is the only
-		// way to learn where a raw-text position ended up, since rewriting and cleaning move
-		// everything around before the converter ever sees it.
+		// Anchoring section starts as link targets is the only way to learn where a raw-text position ends up after rewriting and cleaning move everything.
 		extra_targets.extend(section_starts.iter().copied());
-		let mut text = rewrite_internal_links(&text, &frag_offsets, &extra_targets);
-		// Everything the converter has no use for comes out in one pass rather than five: each one
-		// was a full scan and a full copy of a string that runs to a hundred megabytes on the
-		// largest books. A title or style element wins over an `aid`/`cid` attribute inside it,
-		// since the element starts first and the leftmost match is the one taken.
-		//
-		// KF8 / AZW3 files concatenate the skeleton and fragments, often leaving `</body></html>`
-		// inside unclosed tags at insertion points, which `scraper` cannot parse the fragments
-		// around, so those go too.
+		let mut text = rewrite_internal_links(&raw, &frag_offsets, &extra_targets);
+		if header.is_palmdoc {
+			// These books describe themselves in a Dublin Core block before the text, which would otherwise be read out as the book's first line.
+			let (stripped, creator) = take_palmdoc_metadata(text);
+			text = stripped;
+			if document_author.is_empty() {
+				document_author = creator.unwrap_or_default();
+			}
+		}
+		drop(raw);
+		// One pass rather than five, since each was a full copy of a string reaching a hundred megabytes; a title or style element beats an `aid`/`cid` inside it as the leftmost match.
+		// KF8 / AZW3 files often leave `</body></html>` inside unclosed tags at fragment insertion points, which `scraper` cannot parse around.
 		static RE_STRIP: LazyLock<regex::Regex> = LazyLock::new(|| {
 			regex::Regex::new(
 				r#"(?is)<title[^>]*>.*?</title>|<style[^>]*>.*?</style>|</body>|</html>|@page\s*\{[^<]+|\s[ac]id\s*=\s*["'][^"']*["']"#,
 			)
 			.unwrap()
 		});
-		text = RE_STRIP.replace_all(&text, "").into_owned();
+		if let Cow::Owned(stripped) = RE_STRIP.replace_all(&text, "") {
+			text = stripped;
+		}
 		// Old-style Mobipocket files use <font size="N"> instead of <h1>-<h6>.
-		// Rewrite them so the heading-based TOC builder can pick them up.
-		text = rewrite_font_size_headings(&text);
+		text = rewrite_font_size_headings(text);
+		text = pictures::point_pictures_at_records(text, &data, &header.record_offsets, header.mobi_header());
+		drop(data);
 		let mut document_title = header.document_title;
 		if document_title.trim().is_empty() {
 			document_title = extract_title_from_path(&context.file_path);
 		}
 		let mut document = Document::new().with_author(document_author);
 		document.title = document_title;
-		// Converted chunk by chunk rather than as one whole-book DOM parse: `HtmlToText::convert`
-		// builds a full `scraper`/`html5ever` tree for whatever it's handed, and a book-sized
-		// single tree is what ran huge MOBI/AZW3 files out of memory (#781). Each chunk lands on
-		// a block-element boundary (see `chunk::split_html_chunks`), so splitting costs nothing
-		// beyond that boundary already being a line break in the rendered output; appending each
-		// chunk's text in sequence (rather than via `DocumentBuffer::from_parts`, which inserts a
-		// separator between parts) keeps a single-chunk book's output byte-identical to before
-		// chunking existed.
+		// Chunked because one book-sized DOM ran huge MOBI/AZW3 files out of memory (#781); chunks end on block boundaries, and appending (not `DocumentBuffer::from_parts`, which adds separators) keeps output unchanged.
 		let mut buffer = DocumentBuffer::new();
 		let mut id_positions = HashMap::new();
 		let mut headings: Vec<HeadingInfo> = Vec::new();
-		// The chunks are independent by construction, so they convert on every core at once. Only
-		// the stitching below has to stay in order, and it is a fraction of the work.
 		let converted: Vec<HtmlToText> = split_html_chunks(&text)
 			.par_iter()
 			.map(|piece| {
@@ -147,14 +159,15 @@ impl Parser for MobiParser {
 				html_converter
 			})
 			.collect();
+		drop(text);
 		for html_converter in converted {
-			let offset = buffer.current_position();
-			buffer.append(&html_converter.get_text());
+			let offset = buffer.end();
+			buffer.append(html_converter.get_text());
 			for (id, &relative) in html_converter.get_id_positions() {
-				id_positions.entry(id.clone()).or_insert(offset + relative);
+				id_positions.entry(id.clone()).or_insert_with(|| offset + relative.from_start());
 			}
 			for heading in html_converter.get_headings() {
-				headings.push(HeadingInfo { offset: offset + heading.offset, ..heading.clone() });
+				headings.push(HeadingInfo { offset: offset + heading.offset.from_start(), ..heading.clone() });
 			}
 			add_converter_markers(&mut buffer, &html_converter, offset);
 		}
@@ -167,10 +180,7 @@ impl Parser for MobiParser {
 		document.id_positions = id_positions;
 		let ncx_item_count = ncx_toc.len();
 		let mut toc_items = build_toc_from_headings(&headings);
-		// Whichever of the two names more of the book. A novel whose text marks up its title and
-		// nothing else gives a one entry table of contents while its index quietly lists all forty
-		// chapters, and taking the longer list is what puts those chapters back. A single entry
-		// index is a stub rather than a table of contents and never wins.
+		// A novel marking up only its title gives one heading while its index lists all forty chapters; a single-entry index is a stub and never wins.
 		let use_ncx = ncx_item_count > 1 && ncx_item_count > toc_items.len();
 		let toc_source = if use_ncx {
 			"ncx"
@@ -185,9 +195,6 @@ impl Parser for MobiParser {
 				toc_items = ncx_toc;
 			}
 		}
-		// The book may name every chapter in its index and mark up none of them in its text, which
-		// leaves the reader a table of contents and nothing to move between by heading. Asked one
-		// entry at a time so that a chapter which did write its own heading is not announced twice.
 		add_toc_heading_markers(&mut buffer, &toc_items);
 		document.set_buffer(buffer);
 		document.toc_items = toc_items;
@@ -204,5 +211,99 @@ impl Parser for MobiParser {
 			"parsed mobi file"
 		);
 		Ok(document)
+	}
+}
+
+/// The `<metadata>` block and its `dc:Creator`, which stands in for the EXTH author these books lack.
+fn take_palmdoc_metadata(mut html: String) -> (String, Option<String>) {
+	static METADATA: LazyLock<regex::Regex> =
+		LazyLock::new(|| regex::Regex::new(r"(?is)<metadata\b.*?</metadata\s*>").expect("metadata pattern is valid"));
+	static CREATOR: LazyLock<regex::Regex> = LazyLock::new(|| {
+		regex::Regex::new(r"(?is)<dc:creator\b[^>]*>(.*?)</dc:creator\s*>").expect("creator pattern is valid")
+	});
+	let Some(block) = METADATA.find(&html) else { return (html, None) };
+	let creator = CREATOR
+		.captures(block.as_str())
+		.map(|captures| captures[1].trim().to_string())
+		.filter(|creator| !creator.is_empty());
+	html.replace_range(block.range(), "");
+	(html, creator)
+}
+
+/// Only the start is checked: a Mobipocket book opens with its `<html>`, and plain text that happens to hold a tag further in stays text.
+fn looks_like_html(content: &[u8]) -> bool {
+	let start = String::from_utf8_lossy(&content[..content.len().min(2048)]).to_ascii_lowercase();
+	start.trim_start().starts_with('<') && (start.contains("<html") || start.contains("<body"))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::util::test_support::TempDir;
+
+	/// A Palm database holding `texts` as uncompressed PalmDOC records.
+	fn palmdoc(name: &str, texts: &[&str]) -> Vec<u8> {
+		let records = texts.len() + 1;
+		let mut header = vec![0u8; 78];
+		header[..name.len()].copy_from_slice(name.as_bytes());
+		header[60..68].copy_from_slice(b"TEXtREAd");
+		header[76..78].copy_from_slice(&u16::try_from(records).unwrap().to_be_bytes());
+		let mut record0 = Vec::new();
+		record0.extend_from_slice(&1u16.to_be_bytes());
+		record0.extend_from_slice(&[0, 0]);
+		record0.extend_from_slice(&u32::try_from(texts.iter().map(|t| t.len()).sum::<usize>()).unwrap().to_be_bytes());
+		record0.extend_from_slice(&u16::try_from(texts.len()).unwrap().to_be_bytes());
+		record0.extend_from_slice(&4096u16.to_be_bytes());
+		record0.extend_from_slice(&[0; 4]);
+		let bodies: Vec<&[u8]> =
+			std::iter::once(record0.as_slice()).chain(texts.iter().map(|t| t.as_bytes())).collect();
+		let mut offset = 78 + records * 8;
+		let mut list = Vec::new();
+		for body in &bodies {
+			list.extend_from_slice(&u32::try_from(offset).unwrap().to_be_bytes());
+			list.extend_from_slice(&[0; 4]);
+			offset += body.len();
+		}
+		let mut out = header;
+		out.extend_from_slice(&list);
+		for body in bodies {
+			out.extend_from_slice(body);
+		}
+		out
+	}
+
+	#[test]
+	fn a_palmdoc_book_holding_html_is_read_as_html() {
+		let dir = TempDir::new("palmdoc-html");
+		let path = dir.write_str(
+			"book.mobi",
+			palmdoc(
+				"Html_Book",
+				&["<HTML><HEAD><metadata><dc-metadata><dc:Title>Html Book</dc:Title><dc:Creator>Jane Writer</dc:Creator></dc-metadata></metadata></HEAD><BODY><h1>Chapter</h1><p>One &amp; two</p></BODY></HTML>"],
+			),
+		);
+		let document = MobiParser.parse(&ParserContext::new(path)).expect("a PalmDOC book holding HTML");
+		assert!(document.buffer.content.contains("One & two"), "{}", document.buffer.content);
+		assert!(!document.buffer.content.contains("<p>"), "{}", document.buffer.content);
+		assert_eq!(document.toc_items.first().map(|item| item.name.as_str()), Some("Chapter"));
+		assert!(
+			document.buffer.content.trim_start().starts_with("Chapter"),
+			"metadata read as text: {}",
+			document.buffer.content
+		);
+		assert_eq!(document.author, "Jane Writer");
+	}
+
+	#[test]
+	fn a_palmdoc_book_reads_as_its_plain_text() {
+		let dir = TempDir::new("palmdoc");
+		let path = dir
+			.write_str("book.mobi", palmdoc("My_Palm_Book", &["First line\r\nstill ", "the first <b>paragraph</b>\n"]));
+		let document = MobiParser.parse(&ParserContext::new(path)).expect("a PalmDOC book");
+		assert_eq!(
+			document.buffer.content, "First line\nstill the first <b>paragraph</b>\n",
+			"kept as text, not read as HTML"
+		);
+		assert_eq!(document.title, "My Palm Book");
 	}
 }

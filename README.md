@@ -1,25 +1,8 @@
 # Paperback
 
-[Paperback](https://paperback.dev) is an accessible reader for ebooks, documents, and audiobooks, designed for screen reader users first. It runs on Windows, macOS, Linux, iOS, and Android, and all five apps share one reading engine written in Rust.
+[Paperback](https://paperback.dev) is an accessible reader for ebooks, documents, and audiobooks, designed for screen reader users first. It runs on Windows, macOS, Linux, iOS, and Android, with all five apps sharing one reading engine written in Rust.
 
 This file is for people who work on Paperback. To use it, see the [user guide](doc/readme.md) or download it from [paperback.dev](https://paperback.dev). To contribute, see [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## Features
-
-- Opens EPUB, PDF, Word, PowerPoint, OpenDocument, RTF, HTML, Markdown, reStructuredText, FictionBook, MOBI and Kindle, CHM, WinHelp, DAISY, comic book archives, man pages, Windows Write, plain text, and M4B and MP3 audiobooks. For the full list of file extensions, see the [user guide](doc/readme.md#currently-supported-file-types).
-- Opens documents in tabs. Files opened from the shell or through a file association go to the window that's already running.
-- Moves by heading, page, link, list, table, image, figure, formula, and more with single-letter keys, like a screen reader's browse mode. A table of contents and an elements list are also available.
-- Finds text, with options for case, whole words, and regular expressions, and remembers past searches.
-- Keeps bookmarks, notes, and navigation history, and goes to a line, page, or percentage.
-- Plays audiobooks and DAISY audio at adjustable speeds, with a sleep timer.
-- Reads scanned PDF pages with the OCR engine built into Windows and macOS.
-- Reads MathML as AsciiMath through MathCAT.
-- Reads untagged PDFs in order, joins their wrapped lines into paragraphs, finds headings by size and weight, and removes running headers and footers. You can turn off each of these.
-- Lets you change the font, colors, spacing, alignment, word wrap, and every keyboard shortcut.
-- Exports and imports each document's position, bookmarks, and notes as a `.paperback` file.
-- Updates itself, from either the stable or the dev channel.
-- Includes `pb`, a command-line tool that converts any supported document to plain text, HTML, or Markdown.
-- Is translated into 15 languages.
 
 ## Repository layout
 
@@ -46,11 +29,7 @@ To build the desktop app, you need the following:
 - CMake and Ninja, which compile wxWidgets.
 - gettext, for `msgfmt`, which compiles the translations. Without it, the app builds but is English only.
 - On Windows, the [WebView2 SDK](https://www.nuget.org/packages/Microsoft.Web.WebView2) on the linker's `LIB` path.
-- On Linux, the GTK 3 and WebKitGTK development packages. On Debian or Ubuntu, install them with this command:
-
-  ```
-  sudo apt install cmake ninja-build gettext libgtk-3-dev libwebkit2gtk-4.1-dev libpng-dev libjpeg-dev libtiff-dev libgl1-mesa-dev libglu1-mesa-dev libxkbcommon-dev libwayland-dev libexpat1-dev libxtst-dev libsm-dev libice-dev libasound2-dev
-  ```
+- On Linux, the GTK 3 and WebKitGTK development packages.
 
 ### Build and run
 
@@ -98,19 +77,31 @@ cargo run --release -p pb -- book.epub -f markdown -o book.md
 
 ## Build the iOS app
 
-To build the iOS app, you need a Mac with Xcode, and the iOS Rust targets:
+To build the iOS app, you need a Mac with Xcode. To build it and start it in the Simulator, run:
 
 ```
-rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+cargo ios run
 ```
 
-Then build the reading engine:
+This builds the reading engine for devices and the Simulator, generates the Swift bindings and translations that the Xcode project uses, then builds the app and starts it. It uses the booted simulator, or the newest iPhone simulator if none is booted. To pick one, add `--simulator` with its name or UDID, like `--simulator "iPhone 17"`. To keep printing the app's output until it quits, add `--console`.
+
+`cargo ios` (with no `run`) builds the Rust parts. Afterwards, you can also open `ios/Paperback.xcodeproj` and build in Xcode.
+
+The Simulator doesn't work well with VoiceOver, so this is mostly for agents testing their work. To try Paperback yourself, run it on a device instead.
+
+### Run on your iPhone or iPad
+
+A free Apple account is enough; you don't need to join the Apple Developer Program. Once per Mac, sign in to Xcode under Xcode > Settings > Accounts. Once per device, connect it with a cable, unlock it and tap Trust, then turn on Developer Mode under Settings > Privacy & Security on the device. Then run:
 
 ```
-cargo ios
+cargo ios run --device
 ```
 
-`cargo ios` builds the reading engine for devices and the Simulator, and generates the Swift bindings and translations that the Xcode project uses. To build the app, open `ios/Paperback.xcodeproj` in Xcode.
+The first run sets up signing. It reads the team that is signed into Xcode, creates a bundle ID, and saves both in `~/.config/paperback-dev/ios-signing.xcconfig`. Every Paperback checkout uses that file to avoid running out of limits on free accounts when parallel checkouts and agent sessions are in use. Xcode then creates your certificate and provisioning profile and registers the device. If you're in several teams,  pick one with `--team`, the command will list them if the flag is required and missing. If several devices are paired, pick one with `--device` and its name. If the build says "No Accounts", sign in again under Xcode > Settings > Accounts. The saved login can expire while the account is still listed in Xcode, which is when this message appears.
+
+When an app signed with a free account is started for the first time, iOS asks you to trust its developer. To do so, open Settings > General > VPN & Device Management on the device and trust your certificate. These apps stop opening after 7 days; run the command again to reinstall.
+
+Don't set a team or bundle ID in the Xcode project, including through its Signing & Capabilities tab. A value there would override every other contributor's settings, so the build fails when it finds one.
 
 ## Build the Android app
 
@@ -131,7 +122,7 @@ cargo android --debug
 
 ## Translations
 
-Paperback uses gettext catalogs through [patois](https://github.com/trypsynth/patois). Strings marked with `t()` in Rust, Swift, and Kotlin are collected into `po/paperback.pot`. To update the template, run the following command:
+Paperback uses gettext catalogs through [patois](https://github.com/accessware/patois). Strings marked with `t()` in Rust, Swift, and Kotlin are collected into `po/paperback.pot`. To update the template, run the following command:
 
 ```
 cargo gen-pot

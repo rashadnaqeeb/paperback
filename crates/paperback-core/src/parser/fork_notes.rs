@@ -7,10 +7,7 @@
 //! references (a figure, a year, a decimal) find no place in the line-up and are left alone, and so is a book whose
 //! numbers mostly fail to line up, since a wrong link is worse than none.
 
-use crate::{
-	document::{Document, Marker, MarkerType},
-	util::text::ch_width,
-};
+use crate::document::{DocLen, DocPos, Document, Marker, MarkerType};
 
 const NOTES_HEADINGS: &[&str] = &["notes", "endnotes", "end notes", "notes and sources", "source notes"];
 /// Punctuation that can stand between a word and its note number: a clause's or a quotation's closing marks.
@@ -23,8 +20,8 @@ const MAX_CELLS: usize = 8_000_000;
 
 struct Line<'a> {
 	text: &'a str,
-	/// Display position of the line's first character.
-	start: usize,
+	/// Position of the line's first character.
+	start: DocPos,
 	heading: Option<i32>,
 }
 
@@ -32,7 +29,7 @@ struct Line<'a> {
 /// only a reference would (after a word) or could also be part of something else (after a number, as in "1921.39").
 struct Reference {
 	number: u32,
-	start: usize,
+	start: DocPos,
 	digits: String,
 	clear: bool,
 }
@@ -41,7 +38,7 @@ struct Reference {
 struct Note {
 	group: usize,
 	number: u32,
-	start: usize,
+	start: DocPos,
 	digits: String,
 }
 
@@ -52,7 +49,7 @@ fn is_vague(marker: &Marker) -> bool {
 /// Links every bare note number to its note, returning how many it linked.
 pub(super) fn link_bare_notes(doc: &mut Document) -> usize {
 	let Some((references, notes, matches)) = plan(doc) else { return 0 };
-	let replaced: Vec<usize> = matches.iter().map(|&(reference, _)| references[reference].start).collect();
+	let replaced: Vec<DocPos> = matches.iter().map(|&(reference, _)| references[reference].start).collect();
 	doc.buffer.markers.retain(|marker| {
 		!(marker.mtype == MarkerType::Link && is_vague(marker) && replaced.binary_search(&marker.position).is_ok())
 	});
@@ -80,27 +77,27 @@ fn plan(doc: &Document) -> Option<Plan> {
 	Some((references, notes, matches))
 }
 
-fn link(position: usize, digits: &str, target: &str) -> Marker {
+fn link(position: DocPos, digits: &str, target: &str) -> Marker {
 	let mut marker = Marker::new(MarkerType::Link, position);
 	marker.text = digits.to_string();
 	marker.reference = format!("#{target}");
-	marker.length = digits.chars().map(ch_width).sum();
+	marker.length = DocLen::of(digits);
 	marker
 }
 
 fn lines(doc: &Document) -> Vec<Line<'_>> {
 	let content = &doc.buffer.content;
 	let mut lines = Vec::new();
-	let mut display = 0;
+	let mut display = DocPos::ZERO;
 	let mut line_start = 0;
-	let mut line_display = 0;
+	let mut line_display = DocPos::ZERO;
 	for (byte, ch) in content.char_indices() {
 		if ch == '\n' {
 			lines.push(Line { text: &content[line_start..byte], start: line_display, heading: None });
 			line_start = byte + 1;
-			line_display = display + 1;
+			line_display = display + DocLen::ONE;
 		}
-		display += ch_width(ch);
+		display += DocLen::ONE;
 	}
 	lines.push(Line { text: &content[line_start..], start: line_display, heading: None });
 	for marker in &doc.buffer.markers {
@@ -162,7 +159,7 @@ fn note_groups(lines: &[Line], notes_line: usize) -> Vec<Vec<Note>> {
 		let note = Note {
 			group: 0,
 			number,
-			start: line.start + line.text[..leading].chars().map(ch_width).sum::<usize>(),
+			start: line.start + DocLen::of(&line.text[..leading]),
 			digits: digits.to_string(),
 		};
 		match groups.last_mut() {
@@ -188,12 +185,12 @@ fn note_groups(lines: &[Line], notes_line: usize) -> Vec<Vec<Note>> {
 /// numbers the book already links to a place. A link to a whole file, which some Word books put on note numbers,
 /// lands nowhere near the note, so its number is taken like a bare one.
 fn candidates(doc: &Document, lines: &[Line]) -> Vec<Reference> {
-	let links: Vec<(usize, usize)> = doc
+	let links: Vec<(DocPos, DocPos)> = doc
 		.buffer
 		.markers
 		.iter()
 		.filter(|marker| marker.mtype == MarkerType::Link && !is_vague(marker))
-		.map(|marker| (marker.position, marker.position + marker.length.max(1)))
+		.map(|marker| (marker.position, marker.position + marker.length.max(DocLen::ONE)))
 		.collect();
 	lines
 		.iter()
@@ -215,14 +212,14 @@ fn references(line: &Line) -> Vec<Reference> {
 	let mut index = 0;
 	while index < chars.len() {
 		if !chars[index].is_ascii_digit() {
-			display += ch_width(chars[index]);
+			display += DocLen::ONE;
 			index += 1;
 			continue;
 		}
 		let start = index;
 		let start_display = display;
 		while index < chars.len() && chars[index].is_ascii_digit() {
-			display += 1;
+			display += DocLen::ONE;
 			index += 1;
 		}
 		let digits: String = chars[start..index].iter().collect();
@@ -311,12 +308,13 @@ mod tests {
 		2. Temperley, p. 243.\n3. Webster, p. 15.\nCHAPTER 2: PARIS\n1. Ribot, p. 255.\n2. Callwell, p. 197.\n";
 
 	fn link_to(doc: &Document, digits_at: usize) -> Option<usize> {
+		let digits_at = DocPos::from_raw(digits_at);
 		let marker = doc
 			.buffer
 			.markers
 			.iter()
 			.find(|marker| marker.mtype == MarkerType::Link && marker.position == digits_at)?;
-		doc.id_positions.get(marker.reference.trim_start_matches('#')).copied()
+		doc.id_positions.get(marker.reference.trim_start_matches('#')).copied().map(DocPos::get)
 	}
 
 	#[test]
@@ -340,7 +338,7 @@ mod tests {
 	fn years_decimals_and_numbers_after_a_space_are_not_references() {
 		let line = Line {
 			text: "In 1919 it rose 3.5 percent, by 12 points, to v3.0, and 1.2 million.",
-			start: 0,
+			start: DocPos::ZERO,
 			heading: None,
 		};
 		assert!(
@@ -372,12 +370,12 @@ mod tests {
 	fn a_number_linked_only_to_a_whole_file_gets_a_link_to_its_note() {
 		let mut doc = doc(BOOK);
 		let at = BOOK.find("Europe.1").unwrap() + "Europe.".len();
-		let mut marker = Marker::new(MarkerType::Link, at);
+		let mut marker = Marker::new(MarkerType::Link, DocPos::from_raw(at));
 		marker.text = "1".to_string();
 		marker.reference = "chapter3.docx".to_string();
 		doc.buffer.add_marker(marker);
 		assert_eq!(link_bare_notes(&mut doc), 5);
-		assert_eq!(doc.buffer.markers.iter().filter(|marker| marker.position == at).count(), 1);
+		assert_eq!(doc.buffer.markers.iter().filter(|marker| marker.position.get() == at).count(), 1);
 		assert_eq!(link_to(&doc, at), Some(BOOK.find("1. Cambon").unwrap()));
 	}
 
@@ -385,11 +383,11 @@ mod tests {
 	fn numbers_already_linked_are_left_as_they_are() {
 		let mut doc = doc(BOOK);
 		let at = BOOK.find("Europe.1").unwrap() + "Europe.".len();
-		let mut marker = Marker::new(MarkerType::Link, at);
-		marker.length = 1;
+		let mut marker = Marker::new(MarkerType::Link, DocPos::from_raw(at));
+		marker.length = DocLen::ONE;
 		marker.reference = "#existing".to_string();
 		doc.buffer.add_marker(marker);
 		link_bare_notes(&mut doc);
-		assert_eq!(doc.buffer.markers.iter().filter(|marker| marker.position == at).count(), 1);
+		assert_eq!(doc.buffer.markers.iter().filter(|marker| marker.position.get() == at).count(), 1);
 	}
 }

@@ -1,4 +1,4 @@
-# Paperback - wersja 1.0
+# Paperback - wersja 1.1
 
 ## Wprowadzenie
 
@@ -20,11 +20,11 @@ Paperback działa w systemach Windows 10/11, we wszystkich nowoczesnych wersjach
 * Może działać w pełni przenośnie albo zostać zainstalowany z automatycznym skojarzeniem typów plików.
 * Obsługuje ogromną liczbę popularnych formatów plików.
 * Odtwarza audiobooki z regulacją szybkości i zakładkami zapamiętującymi dokładną pozycję w nagraniu.
-* Odczytuje zeskanowane strony PDF za pomocą OCR wbudowanego w Windows i macOS.
+* Odczytuje zeskanowane strony PDF za pomocą OCR wbudowanego w Windows i macOS albo programu Tesseract w systemie Linux.
 * Pozwala dodawać zakładki i notatki, aby zaznaczać miejsca i do nich wracać.
 * Umożliwia zmianę każdego skrótu klawiszowego.
 * Otwiera dokumenty bezpośrednio z odnośników HTTP i HTTPS. Pobiera je ponownie przy ponownym otwarciu lub po naciśnięciu `F5`, zachowując pozycję czytania i zakładki. Przy przywracaniu wcześniej otwartych dokumentów ponownie pobiera z odnośników te dokumenty, które przy ostatnim pobraniu miały nie więcej niż 2 MB.
-* Zawiera `pb`, narzędzie wiersza poleceń, które przekształca dowolny obsługiwany dokument na HTML, Markdown lub zwykły tekst. Przyjmuje wiele dokumentów naraz i samodzielnie rozwija wzorce nazw plików, takie jak `*.pdf`, dzięki czemu to samo polecenie działa także w systemie Windows. Może zapisać w folderze osobny plik dla każdego dokumentu. Opcja `--files-from` pozwala też wczytać listę dokumentów z pliku lub ze standardowego wejścia. Można również przekształcać dokumenty bezpośrednio z odnośników HTTP i HTTPS.
+* Zawiera `pb`, narzędzie wiersza poleceń, które przekształca dowolny obsługiwany dokument na HTML, Markdown lub zwykły tekst. Przyjmuje wiele dokumentów naraz i samodzielnie rozwija wzorce nazw plików, takie jak `*.pdf`, dzięki czemu to samo polecenie działa także w systemie Windows. Może zapisać w folderze osobny plik dla każdego dokumentu, przekształcając kilka dokumentów równolegle (opcja `--jobs` określa ich liczbę). Opcja `--files-from` pozwala też wczytać listę dokumentów z pliku lub ze standardowego wejścia. Można również przekształcać dokumenty bezpośrednio z odnośników HTTP i HTTPS.
 
 ## Zgodność z czytnikami ekranu
 
@@ -48,11 +48,14 @@ Jeśli JAWS milczy po naciśnięciu klawisza, który powinien wywołać komunika
 
 Paperback obsługuje następujące formaty i rozszerzenia:
 
-* Archiwa komiksów (`.cbz`)
+* Pliki BRF (Braille Ready Files) i książki PEF (Portable Embosser Format), przekształcane z brajla na zwykły tekst przy użyciu wybranej tablicy brajlowskiej (`.brf`, `.pef`)
+* Archiwa komiksów (`.cbz`, `.cbr`)
 * Pliki pomocy CHM (`.chm`)
 * Książki DAISY (`.opf`, `.zip`)
-* Książki EPUB (`.epub`)
+* Książki eBraille, odczytywane jako zwykły tekst, jeśli go zawierają, a w przeciwnym razie przekształcane z brajla na tekst z użyciem wskazanego w nich kodu brajlowskiego (`.ebrl` lub plik `.opf` książki niespakowanej do archiwum ZIP)
+* Książki EPUB (`.epub` lub plik `.opf` książki niespakowanej do archiwum ZIP)
 * E-booki FB2 (`.fb2`)
+* Podręczniki GNU Info (`.info`, niespakowane lub spakowane gzipem; podręczniki podzielone na części można otworzyć z dowolnej z nich)
 * Dokumenty HTML (`.htm`, `.html`, `.xhtml`)
 * Dokumenty Markdown (`.md`, `.markdown`, `.mdx`, `.mdown`, `.mdwn`, `.mkd`, `.mkdn`, `.mkdown`, `.ronn`)
 * Dokumenty Microsoft Word (`.docx`, `.docm`, `.doc`)
@@ -62,12 +65,15 @@ Paperback obsługuje następujące formaty i rozszerzenia:
 * Audiobooki MP3 (`.mp3`)
 * Prezentacje OpenDocument (`.odp`, `.fodp`)
 * Pliki tekstowe OpenDocument (`.odt`, `.fodt`)
+* Pliki pomocy i książki systemu OS/2 wraz z ilustracjami (`.inf`, `.hlp`)
 * Dokumenty PDF (`.pdf`)
 * Prezentacje PowerPoint (`.pptx`, `.pptm`, `.ppt`)
+* Archiwa RAR z książkami, otwierane tak samo jak archiwa ZIP; jeśli archiwum zawiera kilka książek, można wybrać jedną z listy (`.rar`)
 * Dokumenty reStructuredText (`.rst`, `.rest`)
 * Dokumenty RTF (`.rtf`)
 * Dokumenty Windows Write (`.wri`)
 * Pliki WinHelp (`.hlp`)
+* Dokumenty XPS i OpenXPS (`.xps`, `.oxps`)
 * Pliki zwykłego tekstu i dzienników (`.txt`, `.log`)
 
 ## Skróty klawiszowe
@@ -75,6 +81,8 @@ Paperback obsługuje następujące formaty i rozszerzenia:
 Paperback został zaprojektowany przede wszystkim do pracy z klawiaturą. Poniżej znajdują się aktualne skróty.
 
 Podane skróty dotyczą systemu Windows. Tam, gdzie macOS używa innych, odpowiednik podano w nawiasie. Wynika to głównie z tego, że skróty Ctrl+G, Ctrl+W oraz Alt+Strzałka w lewo i w prawo są w tym systemie zajęte przez inne konwencje systemowe lub aplikacyjne.
+
+Skróty ze znakami interpunkcyjnymi nazwano według klawiszy klawiatury amerykańskiej. W innym układzie naciśnij klawisz w tym samym miejscu, niezależnie od jego oznaczenia: na klawiaturze węgierskiej klawisz oznaczony `é` działa jak `;`, a klawisz `á` jak `'`, więc `Ctrl+'` oznacza Ctrl i klawisz `á`. Menu nadal pokazują oznaczenia amerykańskie. W systemie macOS menu pokazują natomiast klawisze z używanego układu.
 
 ### Menu Plik
 
@@ -86,6 +94,7 @@ Podane skróty dotyczą systemu Windows. Tam, gdzie macOS używa innych, odpowie
 * `Ctrl+R`: Pokaż dialog Wszystkie dokumenty (z menu Ostatnie dokumenty).
 * `Ctrl+Shift+C`: Otwórz folder zawierający.
 * `Ctrl+Shift+E`: Eksportuj dane dokumentu (`.paperback`).
+* `Ctrl+Alt+E`: Eksportuj zakładki i notatki do czytelnego pliku tekstowego lub HTML.
 * `Ctrl+Shift+I`: Importuj dane dokumentu (`.paperback`).
 * `Ctrl+E`: Eksportuj bieżący dokument do zwykłego tekstu.
 * `Ctrl+Q`: Zakończ (tylko Windows; w systemie macOS znajduje się w menu aplikacji).
@@ -103,7 +112,7 @@ Podane skróty dotyczą systemu Windows. Tam, gdzie macOS używa innych, odpowie
 
 * `F5`: Przeładuj bieżący dokument z dysku lub pobierz go ponownie, jeśli otwarto go z odnośnika. Działa niezależnie od tego, czy opcja „Automatycznie przeładowuj zmienione dokumenty” jest włączona w Ustawieniach.
 * `Ctrl+Alt+W`: Przełącz zawijanie wierszy.
-* `F11` (macOS: `RawCtrl+Ctrl+F`, czyli Control+Command+F): Przełącz tryb pełnoekranowy.
+* `F11` (macOS: `Control+Cmd+F`, czyli Control+Command+F): Przełącz tryb pełnoekranowy.
 * `Ctrl+Shift+V`: Otwórz bieżącą treść w Widoku WWW.
 * `Ctrl+U`: Wyświetl źródło dokumentu w nowej karcie.
 
@@ -114,7 +123,7 @@ Podane skróty dotyczą systemu Windows. Tam, gdzie macOS używa innych, odpowie
 * `Ctrl+G` (macOS: `Cmd+L`): Przejdź do wiersza.
 * `Ctrl+Shift+G` (macOS: `Cmd+Shift+L`): Przejdź do procentu.
 * `Ctrl+P`: Przejdź do strony (gdy jest obsługiwana przez bieżący dokument).
-* `=`: Odczytaj bieżącą pozycję procentową i numer strony, na przykład „15%, strona 30”. W dokumentach bez numerów stron numer strony jest pomijany.
+* `=`: Odczytaj bieżącą pozycję procentową i numer strony, na przykład „15%, strona 30”. W dokumentach bez numerów stron numer strony jest pomijany. W audiobooku po tych informacjach podawane są bieżąca pozycja czasowa i długość całego nagrania, na przykład „15%, 1:02:03 z 10:30:00”.
 * `Alt+Strzałka w lewo` (macOS: `Cmd+[`): Przejdź wstecz w historii nawigacji.
 * `Alt+Strzałka w prawo` (macOS: `Cmd+]`): Przejdź do przodu w historii nawigacji.
 * `[`: Poprzednia sekcja.
@@ -152,7 +161,7 @@ Podane skróty dotyczą systemu Windows. Tam, gdzie macOS używa innych, odpowie
 * `B`: Następna zakładka.
 * `Shift+N`: Poprzednia notatka.
 * `N`: Następna notatka.
-* `Ctrl+Shift+W` (macOS: `RawCtrl+Shift+W`, czyli fizyczny klawisz Control, a nie Cmd): Wyświetl tekst notatki w bieżącej pozycji.
+* `Ctrl+Shift+W` (macOS: `Control+Shift+W`, czyli fizyczny klawisz Control, a nie Cmd): Wyświetl tekst notatki w bieżącej pozycji.
 * `Ctrl+B`: Przejdź do wszystkich zakładek i notatek.
 * `Ctrl+Alt+B`: Przejdź tylko do zakładek.
 * `Ctrl+Alt+M`: Przejdź tylko do notatek.
@@ -161,7 +170,9 @@ Podane skróty dotyczą systemu Windows. Tam, gdzie macOS używa innych, odpowie
 
 ### Menu Dźwięk
 
-* `Ctrl+Spacja` (macOS: `RawCtrl+Spacja`, czyli fizyczny klawisz Control, ponieważ Cmd+Spacja otwiera Spotlight): Odtwórz lub wstrzymaj narrację dźwiękową.
+* `Ctrl+Spacja` (macOS: `Control+Spacja`, czyli fizyczny klawisz Control, ponieważ Cmd+Spacja otwiera Spotlight): Odtwórz lub wstrzymaj narrację dźwiękową.
+* `Ctrl+J`: Przejdź do wskazanego czasu w nagraniu. Wpisz czas w postaci `1:23:45`, `23:45` lub liczbę sekund, na przykład `45`. Aby przesunąć się względem bieżącej pozycji, poprzedź czas znakiem `+` lub `-`, na przykład `+5:00`. Okno dialogowe pokazuje bieżącą pozycję i długość całego nagrania.
+* `Shift+=`: Odczytaj bieżącą pozycję w rozdziale i ile zostało do końca, na przykład „Rozdział 3, 4:10 z 12:00, pozostało 7:50”. W książce bez nagrania odczytywane są procentowa pozycja w rozdziale i liczba pozostałych w nim słów, na przykład „Rozdział 3, 42%, pozostało 1850 słów”.
 * `'`: Przewiń narrację dźwiękową w przód.
 * `;`: Przewiń narrację dźwiękową w tył.
 * `Shift+'`: Zwiększ skok przewijania dźwięku.
@@ -173,9 +184,10 @@ Podane skróty dotyczą systemu Windows. Tam, gdzie macOS używa innych, odpowie
 
 ### Menu Narzędzia
 
-* `Ctrl+W` (macOS: `RawCtrl+W`, czyli fizyczny klawisz Control, a nie Cmd): Pokaż liczbę słów w bieżącym dokumencie.
+* `Ctrl+W` (macOS: `Control+W`, czyli fizyczny klawisz Control, a nie Cmd): Pokaż liczbę słów w bieżącym dokumencie.
 * `Ctrl+I`: Pokaż informacje o dokumencie.
 * `Ctrl+Shift+O`: Rozpoznaj tekst na wybranym zakresie zeskanowanych stron PDF za pomocą OCR.
+* `Ctrl+Shift+R`: Rozpoznaj za pomocą OCR stronę PDF lub stronę komiksu, na której znajduje się kursor. Dotychczasowy tekst tej strony zostanie zastąpiony.
 * `Ctrl+Shift+S`: Przełącz Wyłącznik czasowy.
 * `Ctrl+,`: Otwórz Ustawienia (w systemie macOS: w menu aplikacji).
 
@@ -194,7 +206,8 @@ Podane skróty dotyczą systemu Windows. Tam, gdzie macOS używa innych, odpowie
 * `Ctrl+Tab` i `Ctrl+Shift+Tab`: przejdź do następnego lub poprzedniego otwartego dokumentu. Po ostatnim dokumencie przejdziesz do pierwszego, a przed pierwszym do ostatniego.
 * `Enter` albo `Spacja` w tekście dokumentu: otwórz odnośnik, Widok tabeli lub Widok wzoru pod kursorem.
 * `Enter` na zeskanowanej stronie PDF: rozpoznaj tekst na stronie za pomocą OCR.
-* `Shift+F10` albo klawisz menu aplikacji w tekście dokumentu: otwórz menu kontekstowe. Na obrazie w dokumencie EPUB, HTML, Markdown, CHM, FB2 lub w komiksie menu pozwala także zapisać obraz do pliku.
+* `Enter` na obrazie, który nie jest odnośnikiem: pokaż tekst rozpoznany na obrazie w osobnym widoku. Widok zamkniesz klawiszem `Escape`. Ani obraz, ani tekst dokumentu się nie zmieniają.
+* `Shift+F10` albo klawisz menu aplikacji w tekście dokumentu: otwórz menu kontekstowe. Na obrazie w dokumencie PDF, EPUB, HTML, Markdown, CHM, FB2 lub w komiksie menu pozwala także zapisać obraz do pliku, a w systemach Windows i macOS odczytać tekst z obrazu. W ten sposób odczytasz tekst z obrazu, który jest jednocześnie odnośnikiem.
 
 ## iOS i Android
 
@@ -233,7 +246,7 @@ Menu Więcej opcji zawiera pozostałe funkcje. Niektóre działają nieco inacze
 * **Przejdź do:** przenosi do wybranego wiersza, strony lub pozycji wyrażonej procentowo. Rodzaj pozycji wybiera się w polu Tryb.
 * **Ostatnie dokumenty:** lista wszystkich otwieranych dokumentów. Przy każdym podany jest stan: obecnie otwarty, zamknięty lub brak pliku. Każdy dokument ma dwie akcje czytnika ekranu: Usuń usuwa go z listy, a Zlokalizuj pozwala wskazać plik po jego przeniesieniu. Polecenie Wyczyść listę ostatnich dokumentów opróżnia listę, ale nie usuwa samych dokumentów.
 * **Liczba słów:** liczba słów w dokumencie.
-* **Informacje o dokumencie:** tytuł, autor i nazwa pliku, a w iOS także liczba wierszy i znaków.
+* **Informacje o dokumencie:** tytuł, autor, nazwa pliku, postęp czytania oraz liczba słów, wierszy i znaków. W przypadku audiobooka podawana jest też liczba plików, a jeśli Paperback potrafi to ustalić, również całkowity i średni czas ich trwania.
 * **Eksport (Eksport dokumentu w iOS, Eksportuj jako w Androidzie):** zapisuje dokument jako zwykły tekst, HTML lub Markdown.
 * **Wyłącznik czasowy:** zatrzymuje czytanie po 5, 10, 15, 30, 45 lub 60 minutach albo po podanym przez Ciebie czasie. Otwórz go ponownie, gdy jest włączony, aby sprawdzić pozostały czas lub go anulować.
 * **Pomoc:** otwiera ten dokument.
@@ -301,6 +314,132 @@ Uwaga: publiczne sponsorowanie w GitHub traktuję jako podstawę do automatyczne
 * Tyler Rodick
 
 ## Lista zmian
+
+### Wersja 1.1
+
+Wersja 1.1 przynosi nowy silnik PDF, przebudowany tryb tekstowy w iOS, OCR w systemie Linux, otwieranie dokumentów z odnośników, obsługę plików Word, Write i PowerPoint sprzed kilkudziesięciu lat oraz wiele innych nowości.
+
+#### Dodano
+
+##### Ogólne
+* Węgierskie tłumaczenie programu i pomocy.
+* Otwieranie dokumentu z odnośnika na wszystkich platformach. `F5` pobiera go ponownie.
+* Skrót `F5` przeładowuje dokument.
+* Skróty od `Ctrl+1` do `Ctrl+9` przenoszą do pierwszych dziewięciu otwartych dokumentów.
+* Skróty `Ctrl+Tab` i `Ctrl+Shift+Tab` przełączają między dokumentami w systemach macOS i Linux.
+* Dialogi Otwórz i Wszystkie dokumenty otwierają wszystkie wybrane dokumenty, każdy na osobnej karcie.
+* Zapisywanie obrazu z menu kontekstowego.
+* Eksport zakładek i notatek do zwykłego tekstu lub HTML.
+* Ustawienia poziomu szczegółowości dziennika oraz tego, czy Znajdź zaznacza znaleziony tekst.
+* Globalnemu skrótowi pokazującemu i ukrywającemu okno można przypisać dowolny klawisz. Ustawia się go na nowej karcie Globalne w dialogu Dostosuj skróty klawiszowe.
+* Po skopiowaniu Paperback informuje, ile skopiowano, a tekst pozostaje w schowku także po zamknięciu programu.
+* Każda pozycja menu ma w każdym języku własny klawisz dostępu.
+* Archiwum ZIP, którego nie da się odczytać jako dokumentu, otwiera się jako lista zawartych w nim dokumentów.
+
+##### Nowe formaty
+* Dokumenty Word for Windows 1 i 2, Word for DOS, Word for Mac 4 i 5 oraz Word 6 i Word 95 w wydaniach Unicode.
+* Prezentacje PowerPoint 95.
+* Spakowane książki FictionBook (`.fb2.zip`).
+* Książki DAISY 3 zawierające tylko plik DTBook w archiwum ZIP albo tylko dźwięk.
+
+##### OCR
+* OCR w systemie Linux za pomocą programu Tesseract.
+* Polecenie Rozpoznaj bieżącą stronę (`Ctrl+Shift+R`) ponownie rozpoznaje stronę, na której jesteś, nawet jeśli ma ona już warstwę tekstową.
+* Naciśnięcie `Enter` na obrazie odczytuje znajdujący się na nim tekst.
+* Rozpoznany tekst zachowuje układ strony i jest zapamiętywany, więc zeskanowany dokument otwiera się od razu z tekstem.
+* Zbiorcze OCR może ponownie rozpoznawać strony z warstwą tekstową, rozpoznaje kilka stron jednocześnie i zatrzymuje się po zamknięciu dokumentu.
+
+##### Audiobooki
+* Szybkość odtwarzania aż do czterokrotnej na wszystkich platformach. Wybrana szybkość jest zapamiętywana między uruchomieniami programu.
+* Regulację głośności.
+
+##### Dokumenty PDF
+* Nowy silnik PDF: szybszy, wykorzystujący wszystkie rdzenie procesora i niewymagający biblioteki pdfium.
+* Wykrywanie nagłówków na nieotagowanych stronach oraz trafniejsze tytuły.
+* Ustawienie pozwalające zachować powtarzające się nagłówki i stopki stron.
+
+##### Inne dokumenty
+* Word: listy numerowane i wypunktowane, przypisy dolne i końcowe, komentarze, teksty alternatywne obrazów, nawigacja po listach oraz podział na strony taki, jaki zapisał sam Word.
+* OpenDocument: przypisy i komentarze umieszczane po tekście głównym.
+* Tytuł i autor pobierane z metadanych dokumentu w plikach Word, PowerPoint, OpenDocument, RTF, Markdown i reStructuredText.
+* Komiksy: tytuł, scenarzysta, typy stron i zakładki z pliku ComicInfo.xml.
+* FB2: nagłówki, spis treści i osobne wersy w utworach poetyckich.
+* Obrazy w książkach MOBI, KF8 i spakowanych książkach DAISY można zapisywać, a ich tekst odczytywać za pomocą OCR.
+* Wzory matematyczne zapisane między znakami dolara w dokumentach Markdown.
+* Dyrektywy Sphinx w dokumentach reStructuredText.
+* Obrazy bez opisu są oznaczane jako [Obraz].
+
+##### iOS i Android
+* Pozycję Język w Ustawieniach.
+* Informacje o dokumencie pokazują postęp czytania, a w audiobookach także liczbę plików i łączny czas trwania.
+* Tryb tekstowy jest zapamiętywany.
+* Możliwość nieprzerwanego czytania dalej po znalezieniu tekstu funkcją Znajdź.
+* iOS: tryb tekstowy przebudowany z myślą o VoiceOver. Czytaj wszystko obejmuje całą książkę, pokrętłem można dotrzeć do całej treści, listy i tabele są prawdziwymi listami i tabelami, przesunięcia trzema palcami zmieniają strony, a stuknięcie trzema palcami podaje numer strony i procent postępu.
+* iOS: osobny głos, tempo i wysokość głosu dla każdej książki, ustawiane na ekranie Synteza mowy dla tej książki.
+* iOS: obsługę dokumentów chronionych hasłem.
+* iOS: udostępnianie do Paperbacka spakowanych książek DAISY i audiobooków MP3.
+* iOS: wyłącznik czasowy zatrzymuje także audiobooki.
+* iOS: tłumaczenie słowackie i ukraińskie.
+* Android: zmiany tempa i wysokości głosu obowiązują już w czytanym akapicie i działają także z domyślnym silnikiem systemowym.
+* Android: działanie na urządzeniach x86_64.
+
+##### macOS
+* Aplikację uniwersalną, działającą natywnie na procesorach Intel i Apple Silicon.
+* Narzędzie pb jest dołączone do aplikacji.
+
+##### pb
+* Konwersję wybranych stron, całego folderu, listy plików (`--files-from`) albo dokumentu z odnośnika.
+
+#### Zmieniono
+* Pasek menu ma nowy układ, podzielony na osiem menu.
+* Pasek stanu podaje „Postęp” zamiast „Czytanie”.
+* Polecenia z menu informują, co zrobiły, a ich komunikat nie ginie już przy zamykaniu menu.
+* Aktualizacja zamyka Paperbacka w zwykły sposób i przywraca go potem na pierwszy plan.
+* Ogromne pliki tekstowe otwierają się, zużywając ułamek dotychczasowej pamięci, a limit 4 GB został zniesiony.
+* Konwersja plików MOBI, Word i HTML, funkcja Znajdź wszystkie oraz wyszukiwanie w dialogu Wszystkie dokumenty działają szybciej.
+* Plik wykonywalny dla systemu Windows jest mniejszy o 3 MB.
+
+#### Naprawiono
+
+##### Ogólne
+* Skróty ze znakami interpunkcyjnymi w układach klawiatury, w których wymagają one klawisza Shift. Dialog Dostosuj skróty klawiszowe oznacza teraz skróty, których nie da się wpisać w bieżącym układzie.
+* Fokus wraca do dokumentu po użyciu skrótu `Win+D`.
+* Awarie przy otwieraniu zakładek nowego dokumentu, w funkcji Znajdź wszystkie oraz przy niektórych uszkodzonych plikach MOBI.
+* Znajdź z wyrażeniem regularnym zaznacza całe dopasowanie.
+* Pasek stanu audiobooka nie przeskakuje już między postępem nagrania a postępem tekstu.
+* Liczba słów obejmuje tekst rozpoznany przez OCR.
+* Paperback nie informuje już o obrazie samej zeskanowanej strony.
+* Opcja PATH w instalatorze.
+* Aktualizacja w systemie Linux znajduje pobrane pliki, a wersja AppImage aktualizuje się jako AppImage.
+* Wiersz komentarza w plikach Word i OpenDocument jest tłumaczony.
+
+##### Dokumenty
+* Pliki Windows Write, które otwierały się jako dane binarne.
+* PDF: tekst powtarzany na granicach stron w otagowanych plikach PDF, drugie kolumny odczytywane przed pierwszymi, gubione spacje i dywizy na końcach wierszy, tekst w czcionkach Type 3 oraz kropki wypełniające wiersze spisu treści.
+* RTF: końce wierszy zapisane samym znakiem CR, listy wypunktowane myślnikami, tekst przed pierwszym akapitem, tekst ze znakami diakrytycznymi i tekst CJK, tekst gubiony po ukośniku odwrotnym poprzedzonym znakiem ucieczki oraz pliki RTF zapisane z rozszerzeniem `.doc`.
+* Pliki Word i PowerPoint z uszkodzoną strukturą, które Word mimo to otwiera.
+* Tekst w śledzonych zmianach, polach i komórkach tabel w dokumentach Word.
+* Odnośniki w prezentacjach PowerPoint, slajdy bez tekstu oraz emoji.
+* Znaki `<` i `&` w komórkach tabel plików Word, PowerPoint i OpenDocument.
+* Chronione hasłem pliki OpenDocument z aktualnej wersji LibreOffice.
+* Pliki CHM są odczytywane zgodnie z ich stroną kodową, a pliki HTML i DAISY zgodnie z zadeklarowanym kodowaniem.
+* Spakowane książki DAISY z odwołaniami zapisanymi niewłaściwą wielkością liter oraz książki DAISY 2.02, z których odczytywana była tylko pierwsza fraza sekcji.
+* Strony podręcznika systemowego przekierowujące poleceniem `.so`.
+* Blok metadanych (front matter) w dokumentach Markdown nie jest już odczytywany jako tekst.
+
+##### macOS
+* Przechodzenie na początek wiersza, aktywowanie elementów klawiaturą i komunikaty o kopiowaniu.
+* Polecenie menu kontekstowego w VoiceOver otwiera własne menu kontekstowe Paperbacka.
+* VoiceOver nie odczytuje już nazwy pozycji menu przy każdym użyciu jej skrótu, więc nie zagłusza wyniku polecenia.
+
+##### iOS i Android
+* iOS: system nie przerywa już uruchamiania aplikacji podczas przywracania dużych książek.
+* iOS: aplikacja otwiera się na ostatnio czytanej karcie, zamknięcie karty nie powoduje już czytania poprzedniej książki, a Ostatnie dokumenty zachowują swoją kolejność.
+* iOS: audiobooki nie są już ponownie rozpakowywane przy każdym uruchomieniu.
+* iOS: reguły słownika mowy z wyrażeniami regularnymi przyjmują `\1`.
+* Android: czytanie na głos dokumentów chronionych hasłem.
+* Android: przycisk przejścia wstecz na pasku czytania nie odczytuje już ponownie pierwszego akapitu na początku dokumentu, a przewijanie w trybie tekstowym nie odskakuje.
+* Android: mniejsze zużycie baterii podczas czytania i gdy czytanie jest wstrzymane.
 
 ### Wersja 1.0
 

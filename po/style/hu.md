@@ -141,15 +141,26 @@ English → Hungarian. Use these consistently.
   elérhető.`
 - archive → archívum; open from archive → megnyitás archívumból
 - audio narration → audionarráció; audiobook → hangoskönyv
+- audio speed (playback speed of recorded audio) → lejátszási sebesség, never `audiosebesség`
 - audio seek amount → léptetési időegység (the setting lists units of time); seek
   forward/backward → előretekerés/visszatekerés
 - batch OCR → kötegelt szövegfelismerés
 - bookmark → könyvjelző; note → jegyzet; bookmark note → könyvjelzőjegyzet; bookmark with note →
-  könyvjelző jegyzettel; temporary bookmark → ideiglenes könyvjelző
+  könyvjelző jegyzettel; temporary bookmark → ideiglenes könyvjelző; notes and bookmarks →
+  jegyzetek és könyvjelzők, bookmarks and notes → könyvjelzők és jegyzetek (keep the English order)
 - braille display → braille-kijelző
 - clipboard → vágólap
+- comic book page types (spoken for the page) → front cover `Első borító`,
+  inside cover `Belső borító`, back cover `Hátsó borító`, recap `Az eddig történtek`,
+  editorial `Szerkesztői oldal`, letters `Olvasói levelek`, preview `Előzetes` (never `Előnézet`,
+  the interface preview), advertisement `Hirdetés`
+- comment (left by a reviewer) → megjegyzés; comments → megjegyzések;
+  comment from {} → `{} megjegyzése`; speaker notes → előadói jegyzetek; slide → dia
 - container → tároló; list → lista; list item → listaelem; table → táblázat; figure → ábra;
   image → kép; formula → képlet; link → hivatkozás, never `link`; web link → webhivatkozás
+- count of a list's items (spoken on entering a list) → `{} elem`, not `listaelem`: the screen
+  reader already says it is a list
+- directory, folder → mappa, never `könyvtár`
 - document data (.paperback file) → dokumentumadatok; document info → dokumentuminformáció
 - elements list → elemlista
 - e-book → e-könyv
@@ -161,26 +172,43 @@ English → Hungarian. Use these consistently.
 - file manager → fájlkezelő; file browser (in the app) → fájlböngésző
 - heading → címsor; heading level 2 → 2. szintű címsor
 - keyboard shortcut → billentyűparancs
+- latest (version, release) → legújabb, never `legutolsó`
 - log → napló; log level → naplózási szint
 - OCR → szövegfelismerés (the acronym `OCR` is fine where space is short)
 - open from URL → megnyitás webcímről; URL (on its own) → webcím
+- package manager → csomagkezelő; install it from your package manager → telepítse a
+  csomagkezelővel
 - page → oldal; line → sor; paragraph → bekezdés; word → szó; character → karakter
+- passage (the text a note is attached to) → szövegrész
 - percent → százalék
+- progress (how far through the document) → haladás; "{}% through" → `{}%-nál tart`
 - reading position → olvasási pozíció, never `olvasási hely`
 - read aloud → felolvasás; speech rate → beszédsebesség; pitch → hangmagasság; voice (a
   text-to-speech voice) → beszédhang, never `hang`; text to speech → szövegfelolvasás
 - recent documents → legutóbbi dokumentumok
+- recognize (with OCR) → szövegfelismerés;
+  Recognize Current Page → `Aktuális oldal szövegfelismerése`
+- release asset (a file attached to a release) → fájl, never `eszköz`
+- save image as → kép mentése másként
 - screen reader → képernyőolvasó
 - section → szakasz
 - selection → kijelölés; selection start → kijelölés eleje
+- semver → verziószám
 - settings → beállítások; option → beállítás
 - share → megosztás
 - sleep timer → elalvási időzítő
+- Speech for This Book → `A könyv felolvasási beállításai`
 - swipe (touch gesture, on iOS and Android alike) → legyintés; swipe up → felfelé legyintés;
   never `csúsztatás`, which is a different gesture
 - system tray → rendszertálca
+- System-Wide (the tab of Keyboard Shortcuts) → Rendszerszintű; window hotkey → az ablak
+  billentyűparancsa
 - table of contents → tartalomjegyzék
+- text in a picture → a képen lévő szöveg (`képen`, never `képben`); read text in picture → kép
+  szövegének felismerése; image text (the title of its view) → képből felismert szöveg
 - word wrap → sortörés
+- With VoiceOver, … / With TalkBack, … (a hint for one screen reader) → `VoiceOver használata
+  esetén …` / `TalkBack használata esetén …`, never `VoiceOverrel …`
 
 ## JAWS
 

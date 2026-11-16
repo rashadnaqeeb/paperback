@@ -1,25 +1,22 @@
-//! Building a PDF's table of contents from its bookmark outline, snapping each bookmark to
-//! the nearest matching line on its target page (bookmark destinations only carry a page,
-//! not an in-page offset), plus the shared flat-list-to-tree builder used both here and by
-//! [`super::structure`]'s tagged heading extraction.
+//! Bookmark destinations only carry a page, not an offset within it, so each bookmark is snapped to the matching line on its page.
 
 use std::collections::HashSet;
 
 use super::text::sanitize_pdf_text;
 use crate::{
-	document::TocItem,
-	pdfium::PdfDocument,
+	document::{DocLen, DocPos, TocItem},
+	parser::layout::build_toc_tree,
+	pdf_engine::Document,
 	util::text::{collapse_whitespace, trim_string},
 };
 
-/// How deep into a nested outline to read. Beyond this the entries stop being navigation and
-/// start being the document over again.
+/// Beyond this the entries stop being navigation and start being the document over again.
 const MAX_OUTLINE_DEPTH: u32 = 16;
 
 pub(super) fn extract_toc(
-	document: &PdfDocument,
-	page_offsets: &[usize],
-	page_lines_info: &[Vec<(usize, String)>],
+	document: &Document,
+	page_offsets: &[DocPos],
+	page_lines_info: &[Vec<(DocPos, String)>],
 ) -> Vec<TocItem> {
 	let bookmarks = document.outline(MAX_OUTLINE_DEPTH);
 	if bookmarks.is_empty() {
@@ -36,10 +33,7 @@ pub(super) fn extract_toc(
 			skipped_count += 1;
 			continue;
 		}
-		let Ok(page_index) = usize::try_from(bookmark.page) else {
-			skipped_count += 1;
-			continue;
-		};
+		let page_index = bookmark.page;
 		let Some(&page_start_offset) = page_offsets.get(page_index) else {
 			skipped_count += 1;
 			continue;
@@ -68,7 +62,7 @@ pub(super) fn extract_toc(
 			}
 		}
 		while used_offsets.contains(&actual_offset) {
-			actual_offset += 1;
+			actual_offset += DocLen::ONE;
 		}
 		used_offsets.insert(actual_offset);
 		items.push((level, TocItem::new(actual_title, String::new(), actual_offset)));
@@ -77,32 +71,4 @@ pub(super) fn extract_toc(
 		tracing::warn!(skipped_count, bookmark_count, "skipped some bookmarks while building pdf toc");
 	}
 	build_toc_tree(items)
-}
-
-pub(super) fn build_toc_tree(flat_items: Vec<(u32, TocItem)>) -> Vec<TocItem> {
-	let mut root = Vec::<TocItem>::new();
-	let mut path = Vec::<usize>::new();
-	let mut level_stack = Vec::<u32>::new();
-	for (level, item) in flat_items {
-		while let Some(&last_level) = level_stack.last() {
-			if last_level < level {
-				break;
-			}
-			level_stack.pop();
-			path.pop();
-		}
-		let siblings = children_at_path_mut(&mut root, &path);
-		siblings.push(item);
-		path.push(siblings.len() - 1);
-		level_stack.push(level);
-	}
-	root
-}
-
-fn children_at_path_mut<'a>(nodes: &'a mut Vec<TocItem>, path: &[usize]) -> &'a mut Vec<TocItem> {
-	let mut current = nodes;
-	for &index in path {
-		current = &mut current[index].children;
-	}
-	current
 }

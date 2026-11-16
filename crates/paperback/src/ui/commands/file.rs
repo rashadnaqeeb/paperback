@@ -1,12 +1,6 @@
-//! Opening and closing documents: the behaviour behind the File menu's own commands.
-//!
-//! The dynamic recent-document ids and the All Documents dialog are still in
-//! `main_window/menu_file.rs`, since neither is a fixed command with an [`ActionId`]:
-//! they are a range of ids generated from the recent list.
-//!
-//! [`ActionId`]: paperback_core::config::ActionId
+//! Recent-document ids and the All Documents dialog stay in `main_window/menu_file.rs`: they are a generated id range, not a fixed `ActionId`.
 
-use std::{path::Path, process};
+use std::path::Path;
 
 use paperback_core::parser::{build_file_filter_string, is_remote_url};
 use patois::t;
@@ -66,10 +60,7 @@ pub fn open(ctx: &Ctx) {
 	let menu_bar = menu::create_menu_bar(&ctx.config.lock().unwrap());
 	ctx.frame.set_menu_bar(menu_bar);
 	menu::update_menu_item_states(ctx.frame, true);
-	// The rebuilt menu bar comes back with every item enabled, so the reopen item has
-	// to be told again whether there is anything to reopen. Every other place that
-	// rebuilds the bar does this; this one did not, which left Reopen Last Closed
-	// enabled and doing nothing after opening a document from a fresh start.
+	// A rebuilt menu bar has every item enabled; skipping this left Reopen Last Closed enabled and inert after a fresh-start open.
 	let has_reopen = ctx.dm.lock().unwrap().has_recently_closed();
 	menu::update_reopen_state(ctx.frame, has_reopen);
 }
@@ -125,7 +116,7 @@ pub fn reopen_last_closed(ctx: &Ctx) {
 		} else if ctx.dm.lock().unwrap().open_file(ctx.dm, &path) {
 			let dm_ref = ctx.dm.lock().unwrap();
 			update_title_from_manager(ctx.frame, &dm_ref);
-			dm_ref.focus_document_text();
+			dm_ref.focus_document_text_announced();
 			drop(dm_ref);
 			let menu_bar = menu::create_menu_bar(&ctx.config.lock().unwrap());
 			ctx.frame.set_menu_bar(menu_bar);
@@ -136,9 +127,7 @@ pub fn reopen_last_closed(ctx: &Ctx) {
 	}
 }
 
-/// Re-reads the current document from disk, whether or not it changed and whether or not automatic reloading is on.
-///
-/// `try_lock`, because `reload_tab` can raise a password prompt whose event loop re-enters the menu handlers. A missing file or a failed parse is silent, as on the automatic path: the document they were reading stays put.
+// `try_lock`, because `reload_tab` can raise a password prompt whose event loop re-enters the menu handlers.
 pub fn reload(ctx: &Ctx) {
 	let Ok(mut dm) = ctx.dm.try_lock() else {
 		return;
@@ -166,10 +155,7 @@ pub fn reload(ctx: &Ctx) {
 fn announce_reloaded(frame: &Frame, dm: &DocumentManager, live_region_label: StaticText, from_keyboard: bool) {
 	update_title_from_manager(frame, dm);
 	dm.update_status_bar();
-	// High, unlike the automatic reload's Medium: here the reader asked for it. `announce` is
-	// `announce_with_priority` at High, so going through `announce_for_command` keeps the
-	// priority and adds the menu delay that lets the message land after the chain a closed
-	// menu starts.
+	// High, unlike the automatic reload's Medium, since the reader asked; `announce_for_command` adds the delay that lets it land after a closing menu's chain.
 	// TRANSLATORS: Announced by screen readers after a document was re-read from disk, either because the reader asked for it with F5 or because its file changed on disk
 	announce_for_command(live_region_label, from_keyboard, t("Document reloaded."));
 }
@@ -190,11 +176,10 @@ pub fn clear_recent_documents(ctx: &Ctx) {
 	announce_for_command(ctx.live_region_label, ctx.from_keyboard, t("Recent documents cleared."));
 }
 
+// Forced, so macOS quits rather than hiding the window, and the close handler saves geometry, the active tab and positions.
 pub fn exit(ctx: &Ctx) {
-	{
-		let mut dm = ctx.dm.lock().unwrap();
-		dm.save_all_positions();
-		dm.remove_working_copies();
+	ctx.frame.close(true);
+	if let Some(app) = wxdragon::app::get_app_instance() {
+		app.exit_main_loop();
 	}
-	process::exit(0);
 }

@@ -22,7 +22,7 @@ use super::{
 	toc::compute_nav_offset,
 };
 use crate::{
-	document::{DocumentBuffer, TocItem},
+	document::{DocLen, DocPos, DocumentBuffer, TocItem},
 	parser::{is_external_url, util::xml::collect_element_text},
 	util::{
 		text::{collapse_whitespace, trim_string},
@@ -54,7 +54,7 @@ pub(super) enum TitleRole {
 /// A classed chapter title as conversion found it: its role, where it starts, and its `path#id`.
 pub(super) struct ChapterTitle {
 	pub(super) role: TitleRole,
-	pub(super) offset: usize,
+	pub(super) offset: DocPos,
 	pub(super) reference: String,
 }
 
@@ -121,11 +121,11 @@ pub(super) fn repair_toc<R: Read + Seek>(
 	archive: &mut ZipArchive<R>,
 	buffer: &DocumentBuffer,
 	sections: &[SectionMeta],
-	id_positions: &HashMap<String, usize>,
+	id_positions: &HashMap<String, DocPos>,
 	titles: &[ChapterTitle],
 	toc: Vec<TocItem>,
 ) -> Vec<TocItem> {
-	let length = buffer.total_display_len();
+	let length = buffer.len().get();
 	let mut toc = toc;
 	let own_gap = largest_gap(&toc, length);
 	if own_gap * 10 > length * GAP_TENTHS
@@ -144,10 +144,11 @@ pub(super) fn repair_toc<R: Read + Seek>(
 	toc
 }
 
-/// The longest stretch of the book, in display units, that no entry starts inside.
+/// The longest stretch of the book, in characters, that no entry starts inside.
 fn largest_gap(toc: &[TocItem], length: usize) -> usize {
 	let mut offsets = Vec::new();
 	collect_offsets(toc, &mut offsets);
+	let mut offsets: Vec<usize> = offsets.into_iter().map(DocPos::get).collect();
 	offsets.push(length);
 	offsets.sort_unstable();
 	let mut previous = 0;
@@ -159,37 +160,37 @@ fn largest_gap(toc: &[TocItem], length: usize) -> usize {
 	largest
 }
 
-fn collect_offsets(items: &[TocItem], out: &mut Vec<usize>) {
+fn collect_offsets(items: &[TocItem], out: &mut Vec<DocPos>) {
 	for item in items {
 		out.push(item.offset);
 		collect_offsets(&item.children, out);
 	}
 }
 
-/// Line lookups over the converted text, by display offset.
+/// Line lookups over the converted text, by position.
 struct Lines<'a> {
 	buffer: &'a DocumentBuffer,
 }
 
 impl Lines<'_> {
-	fn index(&self, offset: usize) -> usize {
-		let char_index = self.buffer.char_index_for_display(offset);
-		self.buffer.newline_positions().partition_point(|newline| *newline < char_index)
+	fn index(&self, offset: DocPos) -> usize {
+		self.buffer.newline_positions().partition_point(|newline| *newline < offset)
 	}
 
-	fn starts_line(&self, offset: usize) -> bool {
-		let char_index = self.buffer.char_index_for_display(offset);
-		char_index == 0 || self.buffer.newline_positions().binary_search(&(char_index - 1)).is_ok()
+	fn starts_line(&self, offset: DocPos) -> bool {
+		offset == DocPos::ZERO || self.buffer.newline_positions().binary_search(&(offset - DocLen::ONE)).is_ok()
 	}
 
 	fn text(&self, line: usize) -> &str {
 		let newlines = self.buffer.newline_positions();
-		let start = if line == 0 { 0 } else { newlines.get(line - 1).map_or(usize::MAX, |newline| newline + 1) };
-		if start == usize::MAX {
-			return "";
-		}
-		let end = newlines.get(line).copied().unwrap_or_else(|| self.buffer.char_count());
-		self.buffer.slice(self.buffer.byte_index_for_char(start)..self.buffer.byte_index_for_char(end)).trim()
+		let start = if line == 0 {
+			DocPos::ZERO
+		} else {
+			let Some(newline) = newlines.get(line - 1) else { return "" };
+			*newline + DocLen::ONE
+		};
+		let end = newlines.get(line).copied().unwrap_or_else(|| self.buffer.end());
+		self.buffer.text(start..end).trim()
 	}
 }
 
@@ -198,10 +199,10 @@ fn best_printed_contents<R: Read + Seek>(
 	archive: &mut ZipArchive<R>,
 	buffer: &DocumentBuffer,
 	sections: &[SectionMeta],
-	id_positions: &HashMap<String, usize>,
+	id_positions: &HashMap<String, DocPos>,
 ) -> Option<Vec<TocItem>> {
 	let lines = Lines { buffer };
-	let length = buffer.total_display_len();
+	let length = buffer.len().get();
 	let mut best: Option<(usize, Vec<TocItem>)> = None;
 	for section in sections {
 		let Ok(content) = read_zip_entry_by_name(archive, &section.path) else {
@@ -239,7 +240,7 @@ fn contents_runs(
 	doc: &XmlDocument<'_>,
 	path: &str,
 	sections: &[SectionMeta],
-	id_positions: &HashMap<String, usize>,
+	id_positions: &HashMap<String, DocPos>,
 	lines: &Lines<'_>,
 ) -> Vec<Vec<Entry>> {
 	let mut runs = Vec::new();
@@ -269,7 +270,7 @@ fn contents_entry(
 	href: &str,
 	path: &str,
 	sections: &[SectionMeta],
-	id_positions: &HashMap<String, usize>,
+	id_positions: &HashMap<String, DocPos>,
 	lines: &Lines<'_>,
 ) -> Option<Entry> {
 	if is_external_url(href) {
@@ -342,7 +343,7 @@ fn is_part(name: &str) -> bool {
 /// at the notes before it), and the entry is moved to the title.
 fn add_missing_titles(toc: &mut Vec<TocItem>, buffer: &DocumentBuffer, titles: &[ChapterTitle]) -> usize {
 	let lines = Lines { buffer };
-	let mut covered: Vec<usize> = Vec::new();
+	let mut covered: Vec<DocPos> = Vec::new();
 	collect_offsets(toc, &mut covered);
 	let mut covered: Vec<usize> = covered.into_iter().map(|offset| lines.index(offset)).collect();
 	covered.sort_unstable();
@@ -380,7 +381,7 @@ fn same_name(a: &str, b: &str) -> bool {
 }
 
 /// Every entry's offset with the child indices that lead to it.
-fn entry_paths(items: &[TocItem], prefix: &mut Vec<usize>, out: &mut Vec<(usize, Vec<usize>)>) {
+fn entry_paths(items: &[TocItem], prefix: &mut Vec<usize>, out: &mut Vec<(DocPos, Vec<usize>)>) {
 	for (index, item) in items.iter().enumerate() {
 		prefix.push(index);
 		out.push((item.offset, prefix.clone()));
@@ -400,7 +401,7 @@ struct TitleGroup {
 	/// The first line's text alone, which is what an entry for the same title would be called.
 	first_text: String,
 	reference: String,
-	offset: usize,
+	offset: DocPos,
 	first_line: usize,
 	last_line: usize,
 }

@@ -41,8 +41,8 @@ msgid "OCR is not available on this system."
 msgstr "OCR nie jest dostępne w tym systemie."
 
 #. TRANSLATORS: Error message shown when another app instance's IPC pipe already exists and a new one can't be created
-msgid "Failed to create IPC server"
-msgstr "Nie udało się utworzyć serwera IPC"
+#~ msgid "Failed to create IPC server"
+#~ msgstr "Nie udało się utworzyć serwera IPC"
 
 #. TRANSLATORS: Title of a warning dialog
 msgid "Warning"
@@ -1005,9 +1005,8 @@ msgstr "Przekreślenie"
 msgid "Choose a font"
 msgstr "Wybierz czcionkę"
 
-#. TRANSLATORS: Title of the hotkey customization dialog
-msgid "Window Hotkey"
-msgstr "Skrót okna"
+#~ msgid "Window Hotkey"
+#~ msgstr "Skrót okna"
 
 #. TRANSLATORS: Checkbox label for Control modifier key
 #. TRANSLATORS: Checkbox in the Set Shortcut dialog that includes the Ctrl modifier in the shortcut.
@@ -1037,9 +1036,8 @@ msgstr "&Klawisz:"
 msgid "Clear"
 msgstr "Wyczyść"
 
-#. TRANSLATORS: Representation of the Spacebar key
-msgid "Space"
-msgstr "Spacja"
+#~ msgid "Space"
+#~ msgstr "Spacja"
 
 #. TRANSLATORS: Title of the Settings dialog
 msgid "Settings"
@@ -1070,8 +1068,8 @@ msgid "Render tables &inline"
 msgstr "Wyświetlaj tabele w &treści"
 
 #. TRANSLATORS: Option to join the wrapped lines of a PDF page back into paragraphs. Turning it off keeps every line separate, which suits code listings and poetry.
-msgid "&Join wrapped lines into paragraphs in PDFs"
-msgstr "&Scalaj zawinięte wiersze w akapity w plikach PDF"
+#~ msgid "&Join wrapped lines into paragraphs in PDFs"
+#~ msgstr "&Scalaj zawinięte wiersze w akapity w plikach PDF"
 
 #. TRANSLATORS: Option to show a compact Go navigation menu in the menu bar
 msgid "Show compact &go menu"
@@ -1121,9 +1119,8 @@ msgstr "Deweloperski"
 msgid "Log Level:"
 msgstr "Poziom szczegółowości dziennika:"
 
-#. TRANSLATORS: Button label to open the hotkey customization dialog
-msgid "Customize &Window Hotkey..."
-msgstr "Dostosuj &skrót okna..."
+#~ msgid "Customize &Window Hotkey..."
+#~ msgstr "Dostosuj &skrót okna..."
 
 #. TRANSLATORS: Button label to open the Keyboard Shortcuts customization dialog
 msgid "Customize &Keyboard Shortcuts..."
@@ -1173,9 +1170,8 @@ msgstr "&Odstęp między wierszami:"
 msgid "Normal"
 msgstr "Normalny"
 
-#. TRANSLATORS: 1.5x line spacing option
-msgid "1.5\\u{00d7}"
-msgstr "1,5\\u{00d7}"
+#~ msgid "1.5\\u{00d7}"
+#~ msgstr "1,5\\u{00d7}"
 
 #. TRANSLATORS: Double line spacing option
 msgid "Double"
@@ -2259,12 +2255,11 @@ msgstr "Przejdź do &procentu"
 msgid "Go to percent"
 msgstr "Przejdź do procentu"
 
-#. TRANSLATORS: Announced after text is copied, with Ctrl+C or from the marked beginning of a selection. The %d placeholder is replaced with the number of characters copied. Plural form is chosen by that count.
-msgid "Copied %d character."
-msgid_plural "Copied %d characters."
-msgstr[0] "Skopiowano %d znak."
-msgstr[1] "Skopiowano %d znaki."
-msgstr[2] "Skopiowano %d znaków."
+#~ msgid "Copied %d character."
+#~ msgid_plural "Copied %d characters."
+#~ msgstr[0] "Skopiowano %d znak."
+#~ msgstr[1] "Skopiowano %d znaki."
+#~ msgstr[2] "Skopiowano %d znaków."
 
 #. TRANSLATORS: Announced when the reader marks the beginning of a selection to copy from later.
 msgid "Beginning of selection set."
@@ -2282,12 +2277,11 @@ msgstr "Nie ma nic do skopiowania."
 msgid "Could not copy to the clipboard."
 msgstr "Nie udało się skopiować tekstu do schowka."
 
-#. TRANSLATORS: Announced after Select All, from the Edit menu or with Ctrl+A. The %d placeholder is replaced with the number of characters in the document. Plural form is chosen by that count.
-msgid "Selected %d character."
-msgid_plural "Selected %d characters."
-msgstr[0] "Zaznaczono %d znak."
-msgstr[1] "Zaznaczono %d znaki."
-msgstr[2] "Zaznaczono %d znaków."
+#~ msgid "Selected %d character."
+#~ msgid_plural "Selected %d characters."
+#~ msgstr[0] "Zaznaczono %d znak."
+#~ msgstr[1] "Zaznaczono %d znaki."
+#~ msgstr[2] "Zaznaczono %d znaków."
 
 #. TRANSLATORS: Announced when the shortcut that jumps back to the beginning of a marked selection is pressed with no beginning marked.
 msgid "Cannot jump; set beginning of selection first."
@@ -2702,8 +2696,8 @@ msgid "[Image only. This page has no text to read.]"
 msgstr "[Tylko obraz. Ta strona nie zawiera tekstu do przeczytania.]"
 
 #. TRANSLATORS: Error shown when opening a comic book archive packed with RAR (.cbr), which Paperback cannot read
-msgid "Paperback cannot read RAR comic archives. Repack it as a .cbz to read it here."
-msgstr "Paperback nie odczytuje archiwów komiksów RAR. Przepakuj je do formatu .cbz, aby je tu przeczytać."
+#~ msgid "Paperback cannot read RAR comic archives. Repack it as a .cbz to read it here."
+#~ msgstr "Paperback nie odczytuje archiwów komiksów RAR. Przepakuj je do formatu .cbz, aby je tu przeczytać."
 
 #. TRANSLATORS: Error shown when a comic book archive (.cbz) cannot be opened; {} is the underlying error
 msgid "Failed to parse comic archive: {}"
@@ -2741,9 +2735,8 @@ msgstr "Archiwum ZIP nie wygląda na prawidłową książkę w formacie DAISY 3 
 msgid "rootfile not found in container.xml"
 msgstr "nie znaleziono elementu rootfile w pliku container.xml"
 
-#. TRANSLATORS: Error shown when an EPUB spine item's content type cannot be converted
-msgid "unsupported content"
-msgstr "nieobsługiwana treść"
+#~ msgid "unsupported content"
+#~ msgstr "nieobsługiwana treść"
 
 #. TRANSLATORS: Error shown when an EPUB's OPF document has no <package> element
 msgid "OPF package element missing"
@@ -2777,13 +2770,11 @@ msgstr "Temat {}"
 msgid "HTML file is empty: {}"
 msgstr "Plik HTML jest pusty: {}"
 
-#. TRANSLATORS: Error shown when an HTML file fails to convert to plain text; {} is the file path
-msgid "Failed to convert HTML to text: {}"
-msgstr "Nie udało się przekonwertować kodu HTML na tekst: {}"
+#~ msgid "Failed to convert HTML to text: {}"
+#~ msgstr "Nie udało się przekonwertować kodu HTML na tekst: {}"
 
-#. TRANSLATORS: Error shown when a Markdown file fails to convert to plain text; {} is the file path
-msgid "Failed to convert Markdown to text: {}"
-msgstr "Nie udało się przekonwertować pliku Markdown na tekst: {}"
+#~ msgid "Failed to convert Markdown to text: {}"
+#~ msgstr "Nie udało się przekonwertować pliku Markdown na tekst: {}"
 
 #. TRANSLATORS: Error shown when a MOBI file's header is missing Huffman compression parameters
 msgid "Missing HUFF parameters in header"
@@ -2998,8 +2989,8 @@ msgstr "Nie udało się pobrać bieżącej ścieżki pliku exe"
 msgid "Failed to launch update script"
 msgstr "Nie udało się uruchomić skryptu aktualizacji"
 
-msgid "Update failed"
-msgstr "Aktualizacja nie powiodła się"
+#~ msgid "Update failed"
+#~ msgstr "Aktualizacja nie powiodła się"
 
 msgid ""
 "Update downloaded to: %s\n"
@@ -4250,8 +4241,8 @@ msgid "Re-read the current document from disk"
 msgstr "Przeładuj bieżący dokument z dysku"
 
 #. TRANSLATORS: Option to take the headers and footers a PDF repeats on every page out of the text. Turning it off keeps them, which suits a document whose page-edge lines are content.
-msgid "Remove repeated page &headers and footers in PDFs"
-msgstr "&Usuwaj powtarzające się nagłówki i stopki stron w plikach PDF"
+#~ msgid "Remove repeated page &headers and footers in PDFs"
+#~ msgstr "&Usuwaj powtarzające się nagłówki i stopki stron w plikach PDF"
 
 msgid "Installing the update. Paperback will restart."
 msgstr "Trwa instalowanie aktualizacji. Paperback uruchomi się ponownie."
@@ -4929,3 +4920,589 @@ msgstr "obraz"
 #: swift
 msgid "Progress"
 msgstr "Postęp"
+
+#. TRANSLATORS: Announced on Linux when OCR is requested but the Tesseract OCR engine isn't installed
+msgid "OCR needs Tesseract. Install it from your package manager."
+msgstr "OCR wymaga programu Tesseract. Zainstaluj go za pomocą menedżera pakietów."
+
+#. TRANSLATORS: Announced on Linux when Tesseract is installed but has no language data for OCR
+msgid "No OCR language is installed. Install a Tesseract language package from your package manager."
+msgstr "Nie zainstalowano żadnego języka OCR. Zainstaluj pakiet językowy programu Tesseract za pomocą menedżera pakietów."
+
+#. TRANSLATORS: Label for the dropdown choosing which entries to export
+msgid "&Export:"
+msgstr "&Eksportuj:"
+
+#. TRANSLATORS: Option to export both bookmarks and notes
+msgid "Bookmarks and notes"
+msgstr "Zakładki i notatki"
+
+#. TRANSLATORS: Option to export only bookmarks that have no note
+msgid "Bookmarks only"
+msgstr "Tylko zakładki"
+
+#. TRANSLATORS: Option to export only bookmarks that have a note
+msgid "Notes only"
+msgstr "Tylko notatki"
+
+#. TRANSLATORS: Checkbox to include the bookmarked text next to each note
+msgid "Include the &passage each note is attached to"
+msgstr "Dołącz &fragment tekstu, do którego przypięta jest każda notatka"
+
+#. TRANSLATORS: Checkbox to number the exported entries
+msgid "&Number the entries"
+msgstr "&Numeruj wpisy"
+
+#. TRANSLATORS: Label for the button that continues to the save dialog
+msgid "Export"
+msgstr "Eksportuj"
+
+#. TRANSLATORS: Announced after Select All, from the Edit menu or with Ctrl+A. The %d placeholder is replaced with the number of characters in the document. Plural form is chosen by that count.
+msgid "%d character selected."
+msgid_plural "%d characters selected."
+msgstr[0] "Zaznaczono %d znak."
+msgstr[1] "Zaznaczono %d znaki."
+msgstr[2] "Zaznaczono %d znaków."
+
+#. TRANSLATORS: File filter shown in the "Export notes and bookmarks" save dialog
+msgid "Text files (*.txt)|*.txt|HTML files (*.html)|*.html"
+msgstr "Pliki tekstowe (*.txt)|*.txt|Pliki HTML (*.html)|*.html"
+
+#. TRANSLATORS: Error dialog shown when exporting notes and bookmarks as text or HTML fails
+msgid "Failed to export notes and bookmarks."
+msgstr "Nie udało się wyeksportować zakładek i notatek."
+
+#. TRANSLATORS: Menu item in the File menu to export bookmarks and notes as a readable text or HTML file.
+msgid "Export &Notes and Bookmarks as Text or HTML..."
+msgstr "Eksportuj zakładki i no&tatki jako tekst lub HTML..."
+
+#. TRANSLATORS: Status-bar help text for the Export Notes and Bookmarks menu item.
+msgid "Export bookmarks and notes in a readable format"
+msgstr "Eksportuj zakładki i notatki w czytelnym formacie"
+
+#. TRANSLATORS: Announced after text is copied, with Ctrl+C or from the marked beginning of a selection. The %d placeholder is replaced with the number of characters copied. Plural form is chosen by that count.
+msgid "%d character copied."
+msgid_plural "%d characters copied."
+msgstr[0] "Skopiowano %d znak."
+msgstr[1] "Skopiowano %d znaki."
+msgstr[2] "Skopiowano %d znaków."
+
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+msgid "Export Notes and Bookmarks as Text or HTML..."
+msgstr "Eksportuj zakładki i notatki jako tekst lub HTML..."
+
+#. TRANSLATORS: A shortcut in the Customize Keyboard Shortcuts list whose key is not on the keyboard layout in use, so it cannot be pressed. The {} placeholder is replaced with the shortcut, for example "Ctrl+;".
+msgid "{} (not on this keyboard layout)"
+msgstr "{} (niedostępny w tym układzie klawiatury)"
+
+#. TRANSLATORS: Title of the view showing the text recognized in a picture
+msgid "Image Text"
+msgstr "Tekst z obrazu"
+
+#. TRANSLATORS: Announced when the picture under the caret cannot be read out of the document
+#. TRANSLATORS: Announced when the picture under the caret is not an image this build can decode
+msgid "The picture could not be read."
+msgstr "Nie udało się odczytać obrazu."
+
+#. TRANSLATORS: Announced when a picture is read and the OCR engine finds no text in it
+msgid "No text was found in the picture."
+msgstr "Na obrazie nie znaleziono tekstu."
+
+#. TRANSLATORS: Announced when Recognize Current Page is chosen in a document that is not a PDF or a comic book
+msgid "Only PDF and comic book pages can be recognized."
+msgstr "Tekst można rozpoznawać tylko na stronach plików PDF i komiksów."
+
+#. TRANSLATORS: Tools menu item that recognizes the page the cursor is on with OCR, replacing any text it already has
+msgid "&Recognize Current Page"
+msgstr "&Rozpoznaj bieżącą stronę"
+
+msgid "Read &text in picture"
+msgstr "Odczytaj &tekst z obrazu"
+
+msgid "Read the text in the picture"
+msgstr "Odczytaj tekst z obrazu"
+
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+msgid "Recognize Current Page"
+msgstr "Rozpoznaj bieżącą stronę"
+
+#. TRANSLATORS: Spoken for a comic book page that is its front cover
+msgid "Front cover"
+msgstr "Przednia okładka"
+
+#. TRANSLATORS: Spoken for a comic book page that is an inside cover
+msgid "Inside cover"
+msgstr "Wewnętrzna strona okładki"
+
+#. TRANSLATORS: Spoken for a comic book page that recaps the story so far
+msgid "Recap"
+msgstr "Streszczenie"
+
+#. TRANSLATORS: Spoken for a comic book page that is an advertisement
+msgid "Advertisement"
+msgstr "Reklama"
+
+#. TRANSLATORS: Spoken for a comic book page written by the editors
+msgid "Editorial"
+msgstr "Od redakcji"
+
+#. TRANSLATORS: Spoken for a comic book page of letters from readers
+msgid "Letters"
+msgstr "Listy czytelników"
+
+#. TRANSLATORS: Spoken for a comic book page previewing another comic
+msgid "Preview"
+msgstr "Zapowiedź"
+
+#. TRANSLATORS: Spoken for a comic book page that is its back cover
+msgid "Back cover"
+msgstr "Tylna okładka"
+
+#. TRANSLATORS: Written after a presentation slide's text, before the presenter's notes for that slide; {} is the notes
+msgid "Speaker notes: {}"
+msgstr "Notatki prelegenta: {}"
+
+#. TRANSLATORS: Written after a presentation slide, for a comment a reviewer left on it without a name; {} is the comment
+msgid "Comment: {}"
+msgstr "Komentarz: {}"
+
+#. TRANSLATORS: Written after a presentation slide, for a comment a reviewer left on it: the first {} is the reviewer, the second the comment
+msgid "Comment from {}: {}"
+msgstr "Komentarz ({}): {}"
+
+#. TRANSLATORS: Heading over the comments reviewers left on a document, written after its text
+msgid "Comments"
+msgstr "Komentarze"
+
+#. TRANSLATORS: Names a comment's author when the document does not say who wrote it
+msgid "Comment"
+msgstr "Komentarz"
+
+#~ msgid "{} on \\u{201c}{}\\u{201d}: {}"
+#~ msgstr "{}, do fragmentu „{}”: {}"
+
+#. TRANSLATORS: One comment made on a point rather than on words, after the document's text: the first {} is its author, the second the comment
+msgid "{}: {}"
+msgstr "{}: {}"
+
+#. TRANSLATORS: Shown in place of a presentation slide that has no text, such as one holding only pictures
+msgid "This slide has no text."
+msgstr "Ten slajd nie zawiera tekstu."
+
+msgid "Current version is not a valid semver."
+msgstr "Numer bieżącej wersji nie jest zgodny ze schematem semver."
+
+msgid "Latest release tag is not a valid semver."
+msgstr "Znacznik najnowszego wydania nie jest zgodny ze schematem semver."
+
+msgid "Invalid public key"
+msgstr "Nieprawidłowy klucz publiczny"
+
+msgid "Failed to read signature"
+msgstr "Nie udało się odczytać podpisu"
+
+msgid "Invalid signature"
+msgstr "Nieprawidłowy podpis"
+
+msgid "Failed to create private download directory"
+msgstr "Nie udało się utworzyć prywatnego folderu pobierania"
+
+msgid "Failed to create file"
+msgstr "Nie udało się utworzyć pliku"
+
+msgid "Failed to write file"
+msgstr "Nie udało się zapisać pliku"
+
+msgid "Failed to read file for verification"
+msgstr "Nie udało się odczytać pliku do weryfikacji"
+
+msgid "Signature verification failed"
+msgstr "Błąd weryfikacji podpisu"
+
+msgid "Failed to rename verified file"
+msgstr "Nie udało się zmienić nazwy zweryfikowanego pliku"
+
+msgid "Failed to parse release JSON"
+msgstr "Nie udało się przetworzyć danych JSON o wydaniu"
+
+msgid "Latest release does not include downloadable assets."
+msgstr "Najnowsze wydanie nie zawiera plików do pobrania."
+
+msgid "Update is available but no matching download asset or signature was found."
+msgstr "Aktualizacja jest dostępna, ale nie znaleziono pasującego pliku do pobrania lub jego podpisu."
+
+msgid "Failed to determine exe path"
+msgstr "Nie udało się ustalić ścieżki pliku exe"
+
+msgid "Failed to get exe directory"
+msgstr "Nie udało się ustalić folderu pliku exe"
+
+msgid "Could not determine a cache directory: neither XDG_CACHE_HOME nor HOME is set"
+msgstr "Nie udało się ustalić folderu pamięci podręcznej: nie ustawiono zmiennych XDG_CACHE_HOME ani HOME"
+
+msgid "Failed to create cache directory"
+msgstr "Nie udało się utworzyć folderu pamięci podręcznej"
+
+msgid "The update server returned HTTP error %s."
+msgstr "Serwer aktualizacji zwrócił błąd HTTP %s."
+
+msgid "Could not reach the update server: %s"
+msgstr "Nie udało się połączyć z serwerem aktualizacji: %s"
+
+msgid "System-Wide"
+msgstr "Globalne"
+
+msgid "Show or Hide Paperback"
+msgstr "Pokaż lub ukryj Paperback"
+
+#. TRANSLATORS: One comment, after the document's text: the first {} is its author, the second the words it was made on, and the third the comment
+msgid "{} on “{}”: {}"
+msgstr "{}, do fragmentu „{}”: {}"
+
+#. TRANSLATORS: VoiceOver label for the read-aloud bar's control that speeds up or slows down a book's recorded audio
+#: kt
+#: swift
+msgid "Audio Speed"
+msgstr "Szybkość odtwarzania dźwięku"
+
+#: swift
+msgid "Speech for This Book"
+msgstr "Synteza mowy dla tej książki"
+
+#. TRANSLATORS: Spoken on entering a list in text mode; {} is how many items it has. Which of the three forms is used depends on the language's plural rule, and the "many" form's trailing character isn't a typo.
+#: swift
+msgid "{} item"
+msgstr "Liczba elementów: {}"
+
+#. TRANSLATORS: Spoken on entering a list in text mode; {} is how many items it has. Which of the three forms is used depends on the language's plural rule, and the "many" form's trailing character isn't a typo.
+#: swift
+msgid "{} items"
+msgstr "Liczba elementów: {}"
+
+#. TRANSLATORS: Spoken on entering a list in text mode; {} is how many items it has. Which of the three forms is used depends on the language's plural rule, and the "many" form's trailing character isn't a typo.
+#: swift
+msgid "{} items⁣"
+msgstr "Liczba elementów: {}"
+
+#. TRANSLATORS: Spoken for an empty table cell in text mode
+#: swift
+msgid "Blank"
+msgstr "Pusta"
+
+#. TRANSLATORS: Name of the VoiceOver rotor setting that moves between the entries of a document's table of contents in text mode
+#: swift
+msgid "Sections"
+msgstr "Sekcje"
+
+#. TRANSLATORS: Switch in Speech for This Book giving the open book a voice of its own instead of the one in Settings
+#: swift
+msgid "Own Voice"
+msgstr "Własny głos"
+
+#. TRANSLATORS: Switch in Speech for This Book giving the open book a speech rate of its own instead of the one in Settings
+#: swift
+msgid "Own Rate"
+msgstr "Własne tempo"
+
+#. TRANSLATORS: Switch in Speech for This Book giving the open book a pitch of its own instead of the one in Settings
+#: swift
+msgid "Own Pitch"
+msgstr "Własna wysokość głosu"
+
+#. TRANSLATORS: Footer in Speech for This Book explaining what a switch left off does
+#: swift
+msgid "Whatever is switched off follows Settings."
+msgstr "Dla wyłączonych przełączników obowiązują wartości z Ustawień."
+
+#. TRANSLATORS: Row label for the number of audio files in the document
+#: kt
+#: swift
+msgid "Number of files"
+msgstr "Liczba plików"
+
+#. TRANSLATORS: Row label for the total playback duration across all of the document's audio files
+#: kt
+#: swift
+msgid "Total duration"
+msgstr "Czas całkowity"
+
+#. TRANSLATORS: Row label for the average playback duration per audio file in the document
+#: kt
+#: swift
+msgid "Average duration"
+msgstr "Średni czas"
+
+#. TRANSLATORS: TalkBack action on the read-aloud bar's audio speed control, which opens the list of speeds
+#: kt
+msgid "Select audio speed"
+msgstr "wybrać szybkość odtwarzania dźwięku"
+
+#. TRANSLATORS: Title of the question asked after the app closed unexpectedly
+#. TRANSLATORS: Title of the dialog for sending a problem report to the developer
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+msgid "Report a Problem"
+msgstr "Zgłoś problem"
+
+#. TRANSLATORS: Asked at startup after the app crashed or was closed unexpectedly. %s is the app's name.
+msgid "%s closed unexpectedly the last time it ran. Would you like to report the problem?"
+msgstr "Podczas poprzedniego uruchomienia program %s nieoczekiwanie się zamknął. Czy chcesz zgłosić problem?"
+
+#. TRANSLATORS: Check box in the question asked after a crash, which stops the question being asked again
+msgid "&Don't ask again"
+msgstr "Nie pytaj &ponownie"
+
+#. TRANSLATORS: Shown at the top of the Report a Problem dialog after a crash. %s is the app's name.
+msgid "%s closed unexpectedly the last time it ran. Describe what you were doing when it happened."
+msgstr "Podczas poprzedniego uruchomienia program %s nieoczekiwanie się zamknął. Opisz, w jakich okolicznościach do tego doszło."
+
+#. TRANSLATORS: Shown at the top of the Report a Problem dialog
+msgid "Describe the problem, and what you were doing when it happened."
+msgstr "Opisz problem i okoliczności jego wystąpienia."
+
+#. TRANSLATORS: Label of the field for describing the problem in the Report a Problem dialog
+msgid "&What happened:"
+msgstr "&Co się stało:"
+
+msgid "&Your email address, if you'd like a reply:"
+msgstr "Twój &adres e-mail, jeśli chcesz otrzymać odpowiedź:"
+
+#. TRANSLATORS: Check box in the Report a Problem dialog that attaches the app's log to the report
+msgid "&Include the log"
+msgstr "&Dołącz dziennik"
+
+#. TRANSLATORS: Explains what a problem report contains, in the Report a Problem dialog. %s is the app's name.
+msgid "The report also includes %s's version and your operating system. Select Preview to see everything that will be sent."
+msgstr "Zgłoszenie zawiera też numer wersji programu %s i informacje o systemie operacyjnym. Wybierz Podgląd, aby zobaczyć całą wysyłaną zawartość."
+
+#. TRANSLATORS: Button in the Report a Problem dialog that shows the report before it is sent
+msgid "&Preview"
+msgstr "&Podgląd"
+
+#. TRANSLATORS: Button in the Report a Problem dialog that sends the report
+msgid "&Send"
+msgstr "&Wyślij"
+
+#. TRANSLATORS: Title of the window that shows a problem report before it is sent
+msgid "Report Preview"
+msgstr "Podgląd zgłoszenia"
+
+#. TRANSLATORS: Shown when Send is pressed in the Report a Problem dialog with the description empty
+msgid "Describe the problem before sending the report."
+msgstr "Opisz problem przed wysłaniem zgłoszenia."
+
+#. TRANSLATORS: Shown when a problem report breaks a limit, such as being too long. %s is the reason, in English.
+msgid "The report can't be sent: %s"
+msgstr "Nie można wysłać zgłoszenia: %s"
+
+#. TRANSLATORS: Message in the progress window shown while a problem report is sent
+msgid "Sending the report..."
+msgstr "Wysyłanie zgłoszenia..."
+
+#. TRANSLATORS: Shown after a problem report was sent
+#. TRANSLATORS: Title of a message saying something worked
+msgid "Thank you. Your report was sent."
+msgstr "Dziękujemy. Zgłoszenie zostało wysłane."
+
+msgid "Success"
+msgstr "Sukces"
+
+msgid "Email can't be delivered to that address. Check it for typing mistakes, or leave it blank."
+msgstr "Nie można dostarczyć wiadomości na ten adres e-mail. Sprawdź, czy nie ma w nim literówek, lub pozostaw pole puste."
+
+#. TRANSLATORS: Shown when the report server has taken as many reports as it will for the day
+msgid "Too many reports have been sent today."
+msgstr "Osiągnięto dzienny limit zgłoszeń."
+
+#. TRANSLATORS: Shown when sending a problem report failed. %s is the reason, in English.
+msgid "The report couldn't be sent: %s"
+msgstr "Nie udało się wysłać zgłoszenia: %s"
+
+#. TRANSLATORS: Asked after a problem report couldn't be sent. %s explains what went wrong.
+msgid ""
+"%s\n"
+"\n"
+"Would you like to save the report to a file, so you can send it another way?"
+msgstr "%s\n\nCzy chcesz zapisać zgłoszenie do pliku, aby wysłać je w inny sposób?"
+
+#. TRANSLATORS: Title of the dialog for saving a problem report to a file
+msgid "Save Report"
+msgstr "Zapisz zgłoszenie"
+
+#. TRANSLATORS: Default file name for a saved problem report
+msgid "Problem report"
+msgstr "Zgłoszenie problemu"
+
+#. TRANSLATORS: File type filter in the dialog for saving a problem report
+msgid "Text files (*.txt)|*.txt"
+msgstr "Pliki tekstowe (*.txt)|*.txt"
+
+#. TRANSLATORS: Shown after a problem report was saved to a file
+msgid "The report was saved."
+msgstr "Zgłoszenie zostało zapisane."
+
+msgid "The report couldn't be saved: %s"
+msgstr "Nie udało się zapisać zgłoszenia: %s"
+
+#. TRANSLATORS: Menu item in the Help menu that opens a dialog for sending a problem report to the developer.
+msgid "&Report a Problem..."
+msgstr "&Zgłoś problem..."
+
+#. TRANSLATORS: Status-bar help text for the Help > Report a Problem menu item.
+msgid "Send a problem report to the developer"
+msgstr "Wyślij zgłoszenie problemu do autora programu"
+
+msgid "No release has a valid semver tag."
+msgstr "Żadne wydanie nie ma znacznika zgodnego ze schematem semver."
+
+#. TRANSLATORS: Announced when skipping forward while read aloud is on the last paragraph
+msgid "No next paragraph."
+msgstr "Brak następnego akapitu."
+
+#. TRANSLATORS: Announced when skipping back while read aloud is on the first paragraph
+msgid "No previous paragraph."
+msgstr "Brak poprzedniego akapitu."
+
+#. TRANSLATORS: Announced when the read aloud rate changes; {} is the rate from 0 to 100, where 50 is the voice's normal speed
+msgid "Rate {}"
+msgstr "Tempo {}"
+
+#. TRANSLATORS: Label of the list of speech engines, such as OneCore or SAPI 5, on the Audio tab of Settings
+msgid "&Engine:"
+msgstr "S&ilnik:"
+
+#. TRANSLATORS: Label of the list of voices on the Audio tab of Settings
+msgid "&Voice:"
+msgstr "&Głos:"
+
+#. TRANSLATORS: Label of the speech rate slider on the Audio tab of Settings
+msgid "&Rate:"
+msgstr "&Tempo:"
+
+#. TRANSLATORS: Label of the speech pitch slider on the Audio tab of Settings
+msgid "Pi&tch:"
+msgstr "&Wysokość głosu:"
+
+msgid "Pause after each para&graph (milliseconds):"
+msgstr "Pauza po każdym &akapicie (milisekundy):"
+
+msgid "Use this voice, rate and pitch for this &book only"
+msgstr "Używaj tego głosu, tempa i wysokości głosu tylko dla tej &książki"
+
+#. TRANSLATORS: Button on the Audio tab of Settings that speaks a sample with the chosen voice, rate and pitch
+msgid "Play Sa&mple"
+msgstr "Odtwórz p&róbkę"
+
+#. TRANSLATORS: First choice in the voice list on the Audio tab of Settings, which leaves the choice of voice to the system
+msgid "System default"
+msgstr "Domyślny głos systemowy"
+
+#. TRANSLATORS: Note at the top of the Documents tab of Settings, whose options change how a file is read
+msgid "Changing these reads your open documents again when you press OK."
+msgstr "Zmiana tych ustawień spowoduje ponowne wczytanie otwartych dokumentów po naciśnięciu OK."
+
+#. TRANSLATORS: Option to join the wrapped lines of a page back into paragraphs, in documents laid out as pages, such as PDFs, taking away the hyphen at a line break that split a word. Turning it off keeps every line and every hyphen as they are, which suits poetry and anything whose line breaks are the content.
+msgid "&Join wrapped lines into paragraphs"
+msgstr "&Scalaj zawinięte wiersze w akapity"
+
+#. TRANSLATORS: Option to take the headers and footers a document repeats on every page out of the text, in documents laid out as pages, such as PDFs. Turning it off keeps them, which suits a document whose page-edge lines are content.
+msgid "Remove repeated page &headers and footers"
+msgstr "&Usuwaj powtarzające się nagłówki i stopki stron"
+
+#. TRANSLATORS: Label for the dropdown choosing the braille code that Braille Ready Files (BRF) and PEF books are written in, so Paperback can turn their braille back into print
+msgid "&Braille code of BRF and PEF books:"
+msgstr "Zapis &brajlowski książek BRF i PEF:"
+
+#. TRANSLATORS: Tab label for the Settings panel about how a file is read, such as whether tables are shown inline
+msgid "Documents"
+msgstr "Dokumenty"
+
+#. TRANSLATORS: Tab label for the Settings panel with options most people never need, such as the update channel and log level
+msgid "Advanced"
+msgstr "Zaawansowane"
+
+#. TRANSLATORS: Spoken by the Play Sample button on the Audio tab of Settings
+msgid "This is a sample of the current voice and speed settings."
+msgstr "To próbka bieżących ustawień głosu i tempa."
+
+#. TRANSLATORS: Announced when read aloud is asked for on a system Paperback has no speech engine for yet
+msgid "Read aloud isn't available on this system yet."
+msgstr "Czytanie na głos nie jest jeszcze dostępne w tym systemie."
+
+#. TRANSLATORS: A table of contents entry for one volume of a braille book; {} is the volume's number
+msgid "Volume {}"
+msgstr "Tom {}"
+
+#. TRANSLATORS: Error shown when an XPS document has no pages
+msgid "XPS file contains no pages"
+msgstr "Plik XPS nie zawiera stron"
+
+#. TRANSLATORS: Shown in place of an XPS page that has no text, such as a scanned one
+msgid "This page has no text."
+msgstr "Ta strona nie zawiera tekstu."
+
+msgid "This book doesn't say how long its audio runs, so Paperback can't go to a time in it."
+msgstr "Ta książka nie zawiera informacji o długości nagrania, więc Paperback nie może przejść do wskazanego czasu."
+
+#. TRANSLATORS: Menu item in the Audio menu to jump to a time typed in, such as 1:23:45.
+msgid "Go to &Time..."
+msgstr "Przejdź do &czasu..."
+
+#. TRANSLATORS: Status-bar help text for the Go to Time menu item.
+msgid "Go to a time in the recording"
+msgstr "Przejdź do wskazanego czasu w nagraniu"
+
+#. TRANSLATORS: Title of the Go to Time dialog, which jumps to a time typed in, in an audiobook
+msgid "Go to Time"
+msgstr "Przejdź do czasu"
+
+msgid "Go to time ({}/{}):"
+msgstr "Przejdź do czasu ({}/{}):"
+
+#. TRANSLATORS: Announced when what was typed in the Go to Time dialog is not a time
+msgid "Type a time like 1:23:45, 23:45 or 45."
+msgstr "Wpisz czas w postaci 1:23:45, 23:45 lub 45."
+
+#. TRANSLATORS: Announced when the time typed in the Go to Time dialog is past the end of the recording, or before its start
+msgid "Time out of range."
+msgstr "Czas poza zakresem."
+
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+msgid "Go to Time..."
+msgstr "Przejdź do czasu..."
+
+#. TRANSLATORS: Error shown when an OS/2 help file (.inf or .hlp) cannot be read; {} is the underlying error
+msgid "Failed to parse OS/2 help file: {}"
+msgstr "Nie udało się przetworzyć pliku pomocy OS/2: {}"
+
+#. TRANSLATORS: Announced when asking for the time in an audiobook's chapter while the length of its files isn't known, such as in many DAISY books
+msgid "This book doesn't say how long its audio runs."
+msgstr "Ta książka nie zawiera informacji o długości nagrania."
+
+#. TRANSLATORS: Menu item in the Audio menu that says how far into the current chapter of an audiobook the reader is, and how much of it is left.
+msgid "Announce &Chapter Time"
+msgstr "Odczytaj czas w &rozdziale"
+
+#. TRANSLATORS: Status-bar help text for the Announce Chapter Time menu item.
+msgid "Say how far into this chapter you are and how much is left"
+msgstr "Odczytaj bieżącą pozycję w rozdziale i ile zostało do końca"
+
+#. TRANSLATORS: Name of this keyboard-shortcut action, shown in the Customize Keyboard Shortcuts dialog (its list of assignable actions, and the "Set Shortcut for {}" / conflict-reassignment prompts).
+msgid "Announce Chapter Time"
+msgstr "Odczytaj czas w rozdziale"
+
+#. TRANSLATORS: Announced with how far into an audiobook's chapter the reader is: the time left in it; {} is written like 12:05
+msgid "{} left"
+msgstr "pozostało {}"
+
+#. TRANSLATORS: Announced for how far into an audiobook the reader is: the first {} is the time played so far and the second how long it runs, both written like 1:02:03
+msgid "{} of {}"
+msgstr "{} z {}"
+
+msgid "Paperback can't open a RAR archive split into parts. Join the parts into one archive to read it here."
+msgstr "Paperback nie może otworzyć archiwum RAR podzielonego na części. Połącz części w jedno archiwum, aby je tu przeczytać."
+
+#. TRANSLATORS: Go To mode option: navigate to a time in an audiobook, such as 1:23:45
+#: kt
+#: swift
+msgid "Time"
+msgstr "Czas"

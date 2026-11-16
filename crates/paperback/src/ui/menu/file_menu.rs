@@ -1,17 +1,12 @@
-//! Assembles the File menu: the document commands from the command table, the export and
-//! document data items, and the Recent Documents submenu, whose items are generated from the
-//! recent list rather than being fixed commands.
-
 use paperback_core::config::{ActionId, ConfigManager, document_name};
 use patois::t;
 
 use super::builder::{MenuEntry, format_menu_label, item, item_with_help, submenu};
 use crate::ui::{commands, menu_ids};
 
-/// Shown only on Windows and Linux; macOS puts Quit in the application menu.
+/// macOS puts Quit in the application menu.
 const EXIT_ITEM: ActionId = ActionId::Exit;
 
-/// Last item of the Recent Documents submenu, below the generated entries and Show All.
 const CLEAR_RECENT_ITEM: ActionId = ActionId::ClearRecentDocuments;
 
 pub fn entries(config: &ConfigManager) -> Vec<MenuEntry> {
@@ -86,7 +81,7 @@ fn recent_document_entries(config: &ConfigManager) -> Vec<MenuEntry> {
 			if let Ok(offset) = i32::try_from(index) {
 				entries.push(item_with_help(
 					menu_ids::RECENT_DOCUMENT_BASE + offset,
-					recent_label(index, path),
+					recent_label(config, index, path),
 					path.clone(),
 				));
 			}
@@ -100,9 +95,8 @@ fn recent_document_entries(config: &ConfigManager) -> Vec<MenuEntry> {
 	entries
 }
 
-/// The Recent Documents item for the `index`th entry, numbered from 1 as its access key.
-fn recent_label(index: usize, path: &str) -> String {
-	format!("&{} {}", index + 1, document_name(path).unwrap_or_else(|| path.to_string()))
+fn recent_label(config: &ConfigManager, index: usize, path: &str) -> String {
+	format!("&{} {}", index + 1, document_name(config, path))
 }
 
 pub fn recent_documents_for_menu(config: &ConfigManager) -> Vec<String> {
@@ -113,15 +107,20 @@ pub fn recent_documents_for_menu(config: &ConfigManager) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-	use super::recent_label;
+	use super::{ConfigManager, recent_label};
 
 	#[test]
 	fn a_recent_link_is_named_after_its_file_name() {
-		assert_eq!(recent_label(0, "https://example.org/books/Moby%20Dick.epub?from=list"), "&1 Moby Dick.epub");
+		let config = ConfigManager::new();
+		assert_eq!(
+			recent_label(&config, 0, "https://example.org/books/Moby%20Dick.epub?from=list"),
+			"&1 Moby Dick.epub"
+		);
 	}
 
 	#[test]
 	fn a_recent_file_is_named_after_its_file_name() {
-		assert_eq!(recent_label(1, "books/novel.epub"), "&2 novel.epub");
+		let config = ConfigManager::new();
+		assert_eq!(recent_label(&config, 1, "books/novel.epub"), "&2 novel.epub");
 	}
 }

@@ -1,18 +1,9 @@
-//! Single source of truth for which document formats Paperback supports.
-//!
-//! Parsers in `paperback-core` are registered against the statics here, and packaging
-//! scripts (Windows installer, macOS bundle) read the same statics to generate file
-//! associations. Add a format to the `formats!` table below and every consumer picks
-//! it up automatically.
+//! Packaging scripts read these statics too, to generate file associations.
 
 use bitflags::bitflags;
 
 bitflags! {
-	/// Navigation and structure features a format's parser can produce.
-	///
-	/// The reader uses these to decide which navigation commands to offer, so a flag
-	/// belongs here when the format itself can carry the feature, whether or not a
-	/// particular document uses it.
+	/// The reader offers navigation by these, so a flag belongs here when the format can carry the feature, whether or not a given document uses it.
 	#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 	pub struct ParserFlags: u32 {
 		const NONE = 0;
@@ -26,50 +17,29 @@ bitflags! {
 	}
 }
 
-/// How the Windows installer should treat a format's file associations.
 pub struct InstallerMeta {
-	/// Whether the installer should offer this association pre-checked.
 	pub default_checked: bool,
-	/// Whether the installer should register Paperback as the extension's default
-	/// handler outright, rather than just adding it to "Open with". Reserve this for
-	/// formats unlikely to already have another default app on Windows.
+	/// Reserve this for formats unlikely to already have another default app on Windows.
 	pub default_handler: bool,
 }
 
 impl InstallerMeta {
-	/// Offered unchecked, and only ever added to "Open with". The right default for
-	/// formats that other Windows apps already claim.
+	/// The right default for formats that other Windows apps already claim.
 	pub const OPT_IN: Self = Self { default_checked: false, default_handler: false };
-	/// Offered unchecked, but becomes the default handler when the user opts in.
 	pub const OPT_IN_HANDLER: Self = Self { default_checked: false, default_handler: true };
-	/// Offered pre-checked, added to "Open with" only.
 	pub const CHECKED: Self = Self { default_checked: true, default_handler: false };
-	/// Offered pre-checked and becomes the default handler.
 	pub const CHECKED_HANDLER: Self = Self { default_checked: true, default_handler: true };
 }
 
-/// Metadata describing one user-facing document format.
 pub struct FormatMeta {
-	/// Display name, shown in the app's open-file dialog and in packaging UI (installer checkboxes).
 	pub name: &'static str,
-	/// Lowercase extensions (without the leading dot) this format is known by.
 	pub extensions: &'static [&'static str],
-	/// IANA media types this format is known by, used to register Linux (`xdg-mime`) file
-	/// associations. Excludes `application/zip`, even for formats whose `extensions` includes
-	/// `zip`: that extension is shared by multiple formats and gets its own standalone
-	/// association entry instead, same as the Windows installer's `assoc_zip` task.
+	/// Never `application/zip`: several formats share `.zip`, which gets its own standalone association, like the Windows installer's `assoc_zip` task.
 	pub mime_types: &'static [&'static str],
-	/// Navigation features the format's parser can produce.
 	pub flags: ParserFlags,
-	/// Packaging-only settings; ignored outside the Windows installer and the Linux file
-	/// association dialog.
 	pub installer: InstallerMeta,
 }
 
-/// Declares the format table: one static per entry, plus `ALL` listing them in declaration order.
-///
-/// `installer` defaults to [`InstallerMeta::OPT_IN`] and names an associated constant of
-/// [`InstallerMeta`] when given; `flags` names [`ParserFlags`] constants joined with `|`.
 macro_rules! formats {
 	(@installer) => { InstallerMeta::OPT_IN };
 	(@installer $installer:ident) => { InstallerMeta::$installer };
@@ -95,27 +65,31 @@ macro_rules! formats {
 			};
 		)+
 
-		/// Every registered format, in the order parsers are registered and packaging
-		/// entries are emitted.
+		/// Order matters: parsers are registered in it.
 		pub static ALL: &[&FormatMeta] = &[$(&$konst),+];
 	};
 }
 
 formats! {
-	/// Named apart from [`CBZ`] because the installer builds a task name out of it, and two
-	/// formats named the same would write the same task twice. Without brackets, because the
-	/// open dialog's filter puts the extensions in brackets after the name.
+	/// Not named like [`CBZ`], since the installer builds a task name from it; no brackets, since the open dialog adds the extensions in brackets.
 	CBR {
 		name: "RAR comic book archives",
 		extensions: ["cbr"],
 		mime_types: ["application/vnd.comicbook-rar"],
 		flags: SUPPORTS_PAGES | SUPPORTS_IMAGES,
 	},
+	/// Opened as a zip copy of itself, so it holds what a zip can: one book or several, a DAISY book, an audiobook in parts. The flags are those of the formats that claim `.zip`.
+	RAR {
+		name: "RAR archives",
+		extensions: ["rar"],
+		mime_types: ["application/vnd.rar", "application/x-rar-compressed"],
+		flags: SUPPORTS_SECTIONS | SUPPORTS_TOC | SUPPORTS_LISTS | SUPPORTS_PAGES | SUPPORTS_IMAGES,
+	},
 	CBZ {
 		name: "Comic book archives",
 		extensions: ["cbz"],
 		mime_types: ["application/vnd.comicbook+zip"],
-		flags: SUPPORTS_PAGES | SUPPORTS_IMAGES,
+		flags: SUPPORTS_PAGES | SUPPORTS_IMAGES | SUPPORTS_TOC,
 	},
 	CHM {
 		name: "Compiled HTML Help files",
@@ -129,42 +103,59 @@ formats! {
 		mime_types: ["application/winhlp"],
 		flags: SUPPORTS_TOC | SUPPORTS_SECTIONS | SUPPORTS_IMAGES,
 	},
-	/// Declared ahead of [`WORD`] so that it gets first crack at the `.zip` both claim.
-	///
-	/// `application/x-daisy-opf` isn't a registered freedesktop.org media type (DAISY's `.opf`
-	/// has no standard one), so the Linux association dialog installs a small supplementary
-	/// shared-mime-info entry for it alongside the desktop file, the same way the Windows
-	/// installer needs no such thing since it maps extensions directly rather than through a
-	/// system-wide type registry.
+	/// OS/2 application help shares WinHelp's `.hlp`, and the WinHelp parser hands it over, so only books' `.inf` is claimed here; Windows setup files share that and open as text.
+	OS2_HELP {
+		name: "OS/2 help files",
+		extensions: ["inf"],
+		mime_types: ["application/x-os2-inf"],
+		flags: SUPPORTS_TOC | SUPPORTS_SECTIONS | SUPPORTS_IMAGES,
+	},
+	/// Declared ahead of [`WORD`] so it gets first crack at the `.zip` both claim.
+	/// `application/x-daisy-opf` isn't a registered freedesktop.org type, so the Linux association dialog installs a shared-mime-info entry for it.
 	DAISY {
 		name: "DAISY Books",
 		extensions: ["opf", "zip"],
 		mime_types: ["application/x-daisy-opf"],
 		flags: SUPPORTS_SECTIONS | SUPPORTS_TOC | SUPPORTS_LISTS | SUPPORTS_PAGES,
 	},
+	/// NLS BARD's braille books, a zip or a folder of BRF volumes with a braille package. After [`DAISY`], which keeps `.zip`'s association, and turns down a zip that's no DAISY book.
+	BARD_BRAILLE {
+		name: "BARD braille books",
+		extensions: ["bopf", "zip"],
+		mime_types: ["application/x-bopf+xml"],
+		flags: SUPPORTS_PAGES | SUPPORTS_TOC,
+	},
 	WORD {
 		name: "Word Documents",
 		extensions: ["docx", "docm", "doc", "zip"],
 		mime_types: ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"],
-		flags: SUPPORTS_TOC | SUPPORTS_SECTIONS,
+		flags: SUPPORTS_TOC | SUPPORTS_SECTIONS | SUPPORTS_LISTS | SUPPORTS_PAGES | SUPPORTS_IMAGES,
 	},
+	/// An EPUB 3 in braille, read back into print with the braille table its package names. Ahead of [`EPUB`], so an unpacked one's `.opf` is taken as braille before the EPUB parser would show its braille as it is.
+	EBRAILLE {
+		name: "eBraille books",
+		extensions: ["ebrl", "opf"],
+		mime_types: ["application/ebrl+zip"],
+		flags: SUPPORTS_SECTIONS | SUPPORTS_TOC | SUPPORTS_LISTS | SUPPORTS_PAGES | SUPPORTS_IMAGES | SUPPORTS_FIGURES,
+	},
+	/// `.opf` is an unpacked EPUB's package document, which DAISY and eBraille, declared ahead, decline.
 	EPUB {
 		name: "EPUB Books",
-		extensions: ["epub"],
+		extensions: ["epub", "opf"],
 		mime_types: ["application/epub+zip"],
 		flags: SUPPORTS_SECTIONS | SUPPORTS_TOC | SUPPORTS_LISTS | SUPPORTS_PAGES | SUPPORTS_IMAGES | SUPPORTS_FIGURES,
 		installer: CHECKED_HANDLER,
 	},
 	FB2 {
 		name: "FictionBook Documents",
-		extensions: ["fb2"],
+		extensions: ["fb2", "zip"],
 		mime_types: ["application/x-fictionbook+xml"],
 		flags: SUPPORTS_TOC | SUPPORTS_SECTIONS,
 		installer: OPT_IN_HANDLER,
 	},
 	HTML {
 		name: "HTML Files",
-		extensions: ["htm", "html", "xhtml"],
+		extensions: ["htm", "html", "shtml", "xhtml"],
 		mime_types: ["text/html", "application/xhtml+xml"],
 		flags: SUPPORTS_TOC | SUPPORTS_LISTS,
 	},
@@ -175,15 +166,32 @@ formats! {
 		flags: SUPPORTS_PAGES | SUPPORTS_TOC | SUPPORTS_LISTS | SUPPORTS_IMAGES | SUPPORTS_FIGURES,
 		installer: CHECKED,
 	},
-	/// An installed manual page is named for its section and gzipped on top of that, as
-	/// `printf.3.gz`, so `gz` is claimed here to have such a file offered in an open dialog
-	/// at all. The parser reads what is inside before accepting it, so a gzipped anything
-	/// else is turned away rather than read as a page.
+	/// `gz` is claimed for installed pages like `printf.3.gz`; the parser checks what is inside, so other gzipped files are turned away.
 	MAN {
 		name: "Manual pages",
 		extensions: ["man", "roff", "gz", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
 		mime_types: ["application/x-troff-man", "text/troff"],
 		flags: SUPPORTS_TOC | SUPPORTS_LISTS,
+	},
+	/// Installed manuals are gzipped and split, `find.info.gz` and `find.info-1.gz`, which the parser recognizes by name rather than by extension.
+	INFO {
+		name: "GNU Info Manuals",
+		extensions: ["info"],
+		mime_types: ["application/x-info"],
+		flags: SUPPORTS_TOC | SUPPORTS_LISTS,
+	},
+	/// Back-translated to print with the reader's braille table.
+	BRF {
+		name: "Braille Ready Files",
+		extensions: ["brf"],
+		mime_types: ["application/x-brf"],
+		flags: SUPPORTS_PAGES,
+	},
+	PEF {
+		name: "Portable Embosser Format",
+		extensions: ["pef"],
+		mime_types: ["application/x-pef+xml"],
+		flags: SUPPORTS_PAGES | SUPPORTS_TOC,
 	},
 	MARKDOWN {
 		name: "Markdown Files",
@@ -197,10 +205,6 @@ formats! {
 		mime_types: ["audio/x-m4b"],
 		flags: SUPPORTS_SECTIONS | SUPPORTS_TOC | SUPPORTS_AUDIO,
 	},
-	/// A chapterless MP3 becomes one full-length section, same as a chapterless M4B; a chaptered
-	/// one splits into sections via its ID3v2 `CHAP`/`CTOC` frames (see `parser::mp3`), the
-	/// standard mechanism podcast apps use, which is why this gets the same
-	/// `SUPPORTS_SECTIONS | SUPPORTS_TOC` as M4B despite not every MP3 using it.
 	MP3 {
 		name: "MP3 Audiobooks",
 		extensions: ["mp3"],
@@ -211,33 +215,32 @@ formats! {
 		name: "MOBI Books",
 		extensions: ["mobi", "azw", "azw3"],
 		mime_types: ["application/x-mobipocket-ebook", "application/vnd.amazon.ebook"],
-		// KF8 books carry the file boundaries of the EPUB they were compiled from; older
-		// Mobipocket ones do not, and simply produce no section markers.
+		// Only KF8 books carry the EPUB file boundaries that sections come from; older Mobipocket ones produce none.
 		flags: SUPPORTS_TOC | SUPPORTS_LISTS | SUPPORTS_SECTIONS,
 	},
 	FODP {
 		name: "Flat OpenDocument Presentations",
 		extensions: ["fodp"],
 		mime_types: ["application/vnd.oasis.opendocument.presentation-flat-xml"],
-		flags: NONE,
+		flags: SUPPORTS_IMAGES,
 	},
 	ODP {
 		name: "OpenDocument Presentations",
 		extensions: ["odp"],
 		mime_types: ["application/vnd.oasis.opendocument.presentation"],
-		flags: NONE,
+		flags: SUPPORTS_IMAGES,
 	},
 	FODT {
 		name: "Flat OpenDocument Text Files",
 		extensions: ["fodt"],
 		mime_types: ["application/vnd.oasis.opendocument.text-flat-xml"],
-		flags: SUPPORTS_TOC,
+		flags: SUPPORTS_TOC | SUPPORTS_IMAGES,
 	},
 	ODT {
 		name: "OpenDocument Text Files",
 		extensions: ["odt"],
 		mime_types: ["application/vnd.oasis.opendocument.text"],
-		flags: SUPPORTS_TOC,
+		flags: SUPPORTS_TOC | SUPPORTS_IMAGES,
 	},
 	POWERPOINT {
 		name: "PowerPoint Presentations",
@@ -264,16 +267,32 @@ formats! {
 		mime_types: ["text/plain"],
 		flags: NONE,
 	},
-	/// Windows Write. Real `.wri` files in the wild are almost always RTF or plain text under a
-	/// `.wri` name; the parser sniffs the content and routes accordingly, and reads the genuine
-	/// Windows Write binary format too. Flags stay `NONE` because a routed file's real features
-	/// depend on what it turns out to be, and under-promising is safer than the reverse.
+	/// Real `.wri` files are mostly RTF or plain text that the parser routes elsewhere, so the flags stay `NONE` rather than over-promise.
 	WRI {
 		name: "Windows Write Documents",
 		extensions: ["wri"],
 		mime_types: ["application/x-mswrite"],
 		flags: NONE,
 	},
+	XPS {
+		name: "XPS Documents",
+		extensions: ["xps", "oxps"],
+		mime_types: ["application/vnd.ms-xpsdocument", "application/oxps"],
+		flags: SUPPORTS_PAGES | SUPPORTS_TOC | SUPPORTS_LISTS,
+	},
+}
+
+/// The extensions `format` is associated with: those no format declared before it also claims, so an extension several formats open, such as `.opf` for DAISY, eBraille and EPUB books, is associated once, by the first. `.zip` is the first claimer's too, though installers give it a task of its own.
+#[must_use]
+pub fn associated_extensions(format: &FormatMeta) -> Vec<&'static str> {
+	format
+		.extensions
+		.iter()
+		.copied()
+		.filter(|ext| {
+			ALL.iter().find(|other| other.extensions.contains(ext)).is_some_and(|first| first.name == format.name)
+		})
+		.collect()
 }
 
 #[cfg(test)]
@@ -305,9 +324,6 @@ mod tests {
 			assert!(!format.mime_types.is_empty(), "{}: must declare at least one MIME type", format.name);
 			for mime in format.mime_types {
 				assert!(mime.contains('/'), "{}: '{mime}' doesn't look like a MIME type", format.name);
-				// `application/zip` is shared by DAISY and Word-in-zip and gets its own
-				// standalone association entry on Linux instead (see the doc comment on
-				// `FormatMeta::mime_types`).
 				assert_ne!(
 					*mime, "application/zip",
 					"{}: application/zip belongs to the standalone zip task",
@@ -315,6 +331,22 @@ mod tests {
 				);
 			}
 		}
+	}
+
+	/// An unpacked EPUB or eBraille book opens by its `.opf`, but installing Paperback must not take `.opf` from DAISY, which has always held it, nor make Paperback its default handler through EPUB's checkbox.
+	#[test]
+	fn opf_is_associated_through_daisy_alone() {
+		assert_eq!(associated_extensions(&DAISY), ["opf", "zip"]);
+		assert_eq!(associated_extensions(&EBRAILLE), ["ebrl"]);
+		assert_eq!(associated_extensions(&EPUB), ["epub"]);
+		assert_eq!(associated_extensions(&WORD), ["docx", "docm", "doc"]);
+	}
+
+	#[test]
+	fn xps_covers_both_generations_of_the_format() {
+		assert_eq!(XPS.extensions, ["xps", "oxps"]);
+		assert_eq!(XPS.mime_types, ["application/vnd.ms-xpsdocument", "application/oxps"]);
+		assert_eq!(XPS.flags, ParserFlags::SUPPORTS_PAGES | ParserFlags::SUPPORTS_TOC | ParserFlags::SUPPORTS_LISTS);
 	}
 
 	#[test]
@@ -327,5 +359,17 @@ mod tests {
 		assert!(!TEXT.installer.default_checked, "unspecified installer settings default to OPT_IN");
 		assert!(EPUB.installer.default_checked && EPUB.installer.default_handler);
 		assert!(!FB2.installer.default_checked && FB2.installer.default_handler);
+	}
+
+	/// A `.shtml` page is HTML with server-side includes already filled in by the server, as on old sites such as sfw.org (#1310).
+	#[test]
+	fn html_covers_server_side_include_pages() {
+		assert_eq!(HTML.extensions, ["htm", "html", "shtml", "xhtml"]);
+	}
+
+	/// The Word parser marks lists, their items and pages, and the mobile apps only offer those to step through for a format that claims them.
+	#[test]
+	fn word_documents_offer_list_and_page_navigation() {
+		assert!(WORD.flags.contains(ParserFlags::SUPPORTS_LISTS | ParserFlags::SUPPORTS_PAGES));
 	}
 }

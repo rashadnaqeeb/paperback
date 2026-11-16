@@ -1,3 +1,5 @@
+use crate::document::{DocLen, DocPos};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NavDirection {
 	Next,
@@ -21,84 +23,93 @@ pub enum NavTarget {
 
 #[derive(Debug, Clone)]
 pub struct HeadingInfo {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub level: i32,
 	pub text: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct FormatInfo {
-	pub offset: usize,
-	pub length: usize,
+	pub offset: DocPos,
+	pub length: DocLen,
 }
 
 #[derive(Debug, Clone)]
 pub struct LinkInfo {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub text: String,
 	pub reference: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct ImageInfo {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub alt_text: String,
-	/// Display-unit span of the emitted placeholder, brackets and label included.
-	pub length: usize,
-	/// Where the picture lives, as the markup wrote it: an `<img>`'s `src` or an SVG or FB2 `<image>`'s `href`. Empty when there is none.
+	/// Brackets and label included.
+	pub length: DocLen,
+	/// As the markup wrote it, unresolved; empty when there is none.
 	pub source: String,
 }
 
 #[derive(Debug, Clone)]
+pub struct BlockInfo {
+	pub offset: DocPos,
+	pub length: DocLen,
+	pub tag: &'static str,
+}
+
+#[derive(Debug, Clone)]
 pub struct ListInfo {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub item_count: i32,
-	/// Display-unit span of the list, from its start offset to the end of its content.
-	pub length: usize,
+	pub length: DocLen,
+	/// The tag HTML export opens the list with.
+	pub opening_tag: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct ListItemInfo {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub level: i32,
 	pub text: String,
+	/// How much of the text is the bullet or number the converter wrote in front of it.
+	pub prefix_length: DocLen,
+	/// `None` for a bulleted item.
+	pub number: Option<i32>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TableInfo {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub text: String,
 	pub html_content: String,
-	/// Display-unit span of the emitted table text.
-	pub length: usize,
+	pub length: DocLen,
 }
 
 #[derive(Debug, Clone)]
 pub struct FormulaInfo {
-	pub offset: usize,
-	/// Text rendering emitted into the buffer (also the marker text).
+	pub offset: DocPos,
 	pub text: String,
-	/// Original `MathML` markup, shown in the `WebView` on activation.
 	pub mathml: String,
-	/// Display-unit span of the emitted formula text, excluding surrounding line breaks.
-	pub length: usize,
+	/// Excludes the surrounding line breaks.
+	pub length: DocLen,
 }
 
 #[derive(Debug, Clone)]
 pub struct SeparatorInfo {
-	pub offset: usize,
-	pub length: usize,
+	pub offset: DocPos,
+	pub length: DocLen,
 }
 
 #[derive(Debug, Clone)]
 pub struct PageBreakInfo {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub text: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct NavRequest {
-	pub position: i64,
+	pub position: DocPos,
 	pub wrap: bool,
 	pub direction: NavDirection,
 	pub target: NavTarget,
@@ -109,7 +120,7 @@ pub struct NavRequest {
 pub struct NavResult {
 	pub found: bool,
 	pub wrapped: bool,
-	pub offset: usize,
+	pub offset: DocPos,
 	pub marker_level: i32,
 	pub marker_text: String,
 }
@@ -118,7 +129,10 @@ pub struct NavResult {
 pub struct SearchResult {
 	pub found: bool,
 	pub wrapped: bool,
-	pub position: i64,
+	/// The start of the document when nothing was found.
+	pub position: DocPos,
+	/// Where the match ends, which only for a plain query is its length past `position`.
+	pub end: DocPos,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,7 +145,7 @@ pub enum BookmarkFilterType {
 #[derive(Debug, Clone)]
 pub struct BookmarkNavResult {
 	pub found: bool,
-	pub start: i64,
+	pub start: DocPos,
 	pub note: String,
 	pub index: i32,
 	pub wrapped: bool,
@@ -139,11 +153,10 @@ pub struct BookmarkNavResult {
 
 #[derive(Debug, Clone)]
 pub struct BookmarkDisplayItem {
-	pub start: i64,
-	pub end: i64,
+	pub start: DocPos,
+	pub end: DocPos,
 	pub note: String,
 	pub is_whole_line: bool,
-	/// See [`BookmarkDisplayEntry::audio_ms`].
 	pub audio_ms: Option<u64>,
 }
 
@@ -162,7 +175,7 @@ pub struct BookmarkDisplayAtPosition {
 
 #[derive(Debug, Clone)]
 pub struct LinkListItem {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub text: String,
 }
 
@@ -174,7 +187,7 @@ pub struct LinkList {
 
 #[derive(Debug, Clone)]
 pub struct ElementListItem {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub text: String,
 }
 
@@ -186,7 +199,7 @@ pub struct ElementList {
 
 #[derive(Debug, Clone)]
 pub struct HeadingTreeItem {
-	pub offset: usize,
+	pub offset: DocPos,
 	pub text: String,
 	pub parent_index: i32,
 }
@@ -199,9 +212,9 @@ pub struct HeadingTree {
 
 #[derive(Debug, Clone)]
 pub struct BookmarkDisplayEntry {
-	pub start: i64,
-	pub end: i64,
-	/// The playback time of an audio bookmark, which is what tells two in one chapter apart.
+	pub start: DocPos,
+	pub end: DocPos,
+	/// What tells two audio bookmarks in one chapter apart.
 	pub audio_ms: Option<u64>,
 }
 

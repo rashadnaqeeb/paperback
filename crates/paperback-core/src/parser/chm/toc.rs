@@ -9,9 +9,14 @@ use super::{
 	encoding::{encoding_for_lcid, reinterpret_latin1},
 	href::normalize_path,
 };
-use crate::{document::TocItem, util::encoding::decode_html};
+use crate::{
+	document::{DocPos, TocItem},
+	util::encoding::decode_html,
+};
 
-/// What the `#SYSTEM` file says about the book as a whole.
+/// Where an entry whose page the book doesn't have points: past the end, as no position in the book is.
+const UNRESOLVED: DocPos = DocPos::from_raw(usize::MAX);
+
 pub(super) struct SystemInfo {
 	pub title: Option<String>,
 	pub encoding: Option<&'static Encoding>,
@@ -121,9 +126,8 @@ fn parse_hhc_node(node: ElementRef, items: &mut Vec<TocItem>) {
 					}
 				}
 				if !name.is_empty() {
-					let mut item = TocItem::new(name, local, usize::MAX);
+					let mut item = TocItem::new(name, local, UNRESOLVED);
 					let mut found_child_ul = false;
-					// PATTERN 1: Check for child UL (standard CHM pattern)
 					for nested_child in child_ref.children() {
 						if let Some(nested_element) = nested_child.value().as_element()
 							&& nested_element.name() == "ul"
@@ -133,7 +137,7 @@ fn parse_hhc_node(node: ElementRef, items: &mut Vec<TocItem>) {
 							found_child_ul = true;
 						}
 					}
-					// PATTERN 2: Check for sibling UL elements, as seen in nvgt.chm.
+					// Some CHMs, such as nvgt.chm, nest a topic's children in a sibling UL rather than a child one.
 					if !found_child_ul {
 						let mut next_element = None;
 						for (next_idx, child) in children.iter().enumerate().skip(index + 1) {
@@ -175,7 +179,7 @@ pub(super) fn build_ordered_file_list(html_files: &[String], toc_items: &[TocIte
 	let mut toc_files = Vec::new();
 	collect_toc_files(toc_items, &mut toc_files);
 	for toc_file in toc_files {
-		let normalized = normalize_path(&toc_file);
+		let normalized = normalize_path(toc_file);
 		if let Some(actual_path) = path_map.get(&normalized)
 			&& seen.insert(normalized)
 		{
@@ -191,13 +195,12 @@ pub(super) fn build_ordered_file_list(html_files: &[String], toc_items: &[TocIte
 	ordered
 }
 
-fn collect_toc_files(items: &[TocItem], files: &mut Vec<String>) {
+/// Duplicates are left in; the caller drops them as it normalizes.
+fn collect_toc_files<'a>(items: &'a [TocItem], files: &mut Vec<&'a str>) {
 	for item in items {
-		if !item.reference.is_empty() {
-			let file_path = item.reference.split_once('#').map_or(item.reference.as_str(), |(path, _)| path);
-			if !file_path.is_empty() && !files.contains(&file_path.to_string()) {
-				files.push(file_path.to_string());
-			}
+		let file_path = item.reference.split_once('#').map_or(item.reference.as_str(), |(path, _)| path);
+		if !file_path.is_empty() {
+			files.push(file_path);
 		}
 		collect_toc_files(&item.children, files);
 	}
@@ -205,8 +208,8 @@ fn collect_toc_files(items: &[TocItem], files: &mut Vec<String>) {
 
 pub(super) fn calculate_toc_offsets(
 	items: &mut [TocItem],
-	file_positions: &HashMap<String, usize>,
-	id_positions: &HashMap<String, usize>,
+	file_positions: &HashMap<String, DocPos>,
+	id_positions: &HashMap<String, DocPos>,
 ) {
 	for item in items {
 		if !item.reference.is_empty() {
@@ -218,9 +221,9 @@ pub(super) fn calculate_toc_offsets(
 
 fn calculate_offset_from_reference(
 	reference: &str,
-	file_positions: &HashMap<String, usize>,
-	id_positions: &HashMap<String, usize>,
-) -> usize {
+	file_positions: &HashMap<String, DocPos>,
+	id_positions: &HashMap<String, DocPos>,
+) -> DocPos {
 	let (file_path, fragment) =
 		reference.find('#').map_or((reference, None), |pos| (&reference[..pos], Some(&reference[pos + 1..])));
 	let normalized_path = normalize_path(file_path);
@@ -230,5 +233,5 @@ fn calculate_offset_from_reference(
 			return offset;
 		}
 	}
-	file_positions.get(&normalized_path).copied().unwrap_or(usize::MAX)
+	file_positions.get(&normalized_path).copied().unwrap_or(UNRESOLVED)
 }

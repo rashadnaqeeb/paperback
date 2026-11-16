@@ -1,13 +1,21 @@
-//! Playback commands: play/pause, seeking, and the seek amount.
-
 use std::{rc::Rc, sync::Mutex};
 
-use paperback_core::{audio::AudioTimeline, config::ConfigManager};
+use paperback_core::{
+	audio::{AudioTimeline, clock},
+	config::ConfigManager,
+};
 use patois::t;
 use wxdragon::prelude::*;
 
-use super::{dialogs, document_manager::DocumentManager, navigation::set_caret_to_doc_offset};
-use crate::{audio_player::AudioPlayer, ui::navigation::announce_for_command};
+use super::{
+	dialogs,
+	document_manager::DocumentManager,
+	navigation::{self, set_caret_to_doc_offset},
+};
+use crate::{
+	audio_player::{self, AudioPlayer},
+	ui::navigation::{announce, announce_for_command},
+};
 
 pub fn handle_toggle_play_pause_audio(
 	doc_manager: &Rc<Mutex<DocumentManager>>,
@@ -24,33 +32,23 @@ pub fn handle_toggle_play_pause_audio(
 			false
 		}
 	};
+	if has_audio {
+		return;
+	}
+	// A document without recorded audio is read aloud instead.
+	let result = dm.toggle_read_aloud();
 	drop(dm);
-	if !has_audio {
-		// TRANSLATORS: Announced when trying to play/pause audio on a document that has none
-		announce_for_command(live_region_label, from_keyboard, t("This document has no audio."));
+	if let Err(message) = result {
+		announce_for_command(live_region_label, from_keyboard, message);
 	}
 }
 
-/// Where seeking `amount_ms` forward from wherever `player` is now would land, if that runs
-/// past the real end of the currently loaded file and "continue into the next file" is
-/// enabled: the elapsed time in the document that continuing from the very start of whatever
-/// comes next resolves to. `None` if the seek doesn't run off the file's real end, there's no
-/// next source, or the next source's own narration hasn't started by that raw position yet
-/// (an extremely long seek amount over a very short next file) - the caller falls back to the
-/// ordinary clamped-at-`total_duration_ms` target in every one of those cases.
 fn spilled_seek_target_ms(player: &AudioPlayer, amount_ms: u64) -> Option<u64> {
 	let (source, raw_ms, length_ms) = player.current_file_position_and_length_ms()?;
 	spill_overflow_into_next_source(player.timeline(), source, raw_ms, length_ms, amount_ms)
 }
 
-/// The arithmetic behind `spilled_seek_target_ms`, split out so it's testable without a real
-/// decoder backing `AudioPlayer`.
-///
-/// This has to go through the *real* decoder-reported file length (`length_ms`) rather than the
-/// document's own declared clip duration, since a plain-audio-zip bundle's placeholder clip
-/// duration (see `build_plain_audio_zip_document`) is hours longer than the real file, so the
-/// ordinary elapsed-time-based target would just resolve back into the same file, past its real
-/// end, where the seek is clamped to the file's own last frame instead of advancing.
+// Uses the decoder's real file length, not the clip duration: a plain-audio-zip bundle's placeholder clips run hours past the real file, so an elapsed-time target would land back in the same file.
 fn spill_overflow_into_next_source(
 	timeline: &AudioTimeline,
 	source: usize,
@@ -67,10 +65,6 @@ fn spill_overflow_into_next_source(
 	timeline.elapsed_for_source_position(next_source, overflow_ms)
 }
 
-/// Skips the active document's audio narration backward or forward by the configured seek
-/// amount (`audio_seek_amount_seconds`, default 10). When "sync caret to audio" is on, the
-/// caret follows the new audio position, mirroring what `pump_audio` does during playback;
-/// this is the one-shot equivalent for an explicit seek rather than passive following.
 pub fn handle_seek_audio(
 	doc_manager: &Rc<Mutex<DocumentManager>>,
 	config: &Rc<Mutex<ConfigManager>>,
@@ -90,9 +84,19 @@ pub fn handle_seek_audio(
 	let mut dm = doc_manager.lock().unwrap();
 	let Some(tab) = dm.active_tab_mut() else { return };
 	let Some(player) = tab.audio_player.as_mut() else {
+		// Without recorded audio, the seek keys move read aloud by a paragraph.
+		let skipped = dm.skip_read_aloud(forward);
 		drop(dm);
-		// TRANSLATORS: Announced when trying to seek audio on a document that has none
-		announce_for_command(live_region_label, from_keyboard, t("This document has no audio."));
+		let message = match skipped {
+			Some(true) => return,
+			// TRANSLATORS: Announced when skipping forward while read aloud is on the last paragraph
+			Some(false) if forward => t("No next paragraph."),
+			// TRANSLATORS: Announced when skipping back while read aloud is on the first paragraph
+			Some(false) => t("No previous paragraph."),
+			// TRANSLATORS: Announced when trying to seek audio on a document that has none
+			None => t("This document has no audio."),
+		};
+		announce_for_command(live_region_label, from_keyboard, message);
 		return;
 	};
 	let Some(current_ms) = player.resume_point_ms() else {
@@ -116,17 +120,93 @@ pub fn handle_seek_audio(
 	let sync_position = sync_enabled
 		.then(|| player.timeline().cursor_at_elapsed(target_ms))
 		.flatten()
-		.and_then(|cursor| player.timeline().clip(cursor.clip).map(|clip| i64::try_from(clip.start).unwrap_or(0)));
+		.and_then(|cursor| player.timeline().clip(cursor.clip).map(|clip| clip.start));
 	if let Some(position) = sync_position {
 		set_caret_to_doc_offset(tab, position);
 	}
 }
 
-/// Nudges the active document's audio playback speed up or down by one step, and announces the
-/// new speed. Unlike the seek amount (a global setting), speed lives on the `AudioPlayer`
-/// itself, so this needs an active document with audio, like `handle_toggle_play_pause_audio`.
+pub fn handle_go_to_time(
+	frame: &Frame,
+	doc_manager: &Rc<Mutex<DocumentManager>>,
+	config: &Rc<Mutex<ConfigManager>>,
+	live_region_label: StaticText,
+	from_keyboard: bool,
+) {
+	let times = {
+		let dm = doc_manager.lock().unwrap();
+		let Some(tab) = dm.active_tab() else { return };
+		tab.audio_player.as_ref().map(|player| {
+			let timeline = player.timeline();
+			let caret_ms = || timeline.point_for_position(navigation::doc_caret(tab)).map(|point| point.time_ms);
+			(
+				timeline.durations_are_known(),
+				player.resume_point_ms().or_else(caret_ms).unwrap_or(0),
+				timeline.total_duration_ms(),
+			)
+		})
+	};
+	let (current_ms, total_ms) = match times {
+		Some((true, current_ms, total_ms)) => (current_ms, total_ms),
+		// Without every file's length, a time can't be placed: the timeline gives an unprobed file a placeholder length.
+		Some((false, ..)) => {
+			// TRANSLATORS: Announced by Go to Time in an audiobook whose files don't say how long they run, such as many DAISY books
+			announce_for_command(
+				live_region_label,
+				from_keyboard,
+				t("This book doesn't say how long its audio runs, so Paperback can't go to a time in it."),
+			);
+			return;
+		}
+		None => {
+			// TRANSLATORS: Announced when trying to seek audio on a document that has none
+			announce_for_command(live_region_label, from_keyboard, t("This document has no audio."));
+			return;
+		}
+	};
+	let Some(target_ms) = dialogs::show_go_to_time_dialog(frame, current_ms, total_ms, live_region_label) else {
+		return;
+	};
+	let mut dm = doc_manager.lock().unwrap();
+	let Some(tab) = dm.active_tab_mut() else { return };
+	let Some(player) = tab.audio_player.as_mut() else { return };
+	player.seek_to_ms(target_ms);
+	let clip_start = player
+		.timeline()
+		.cursor_at_elapsed(target_ms)
+		.and_then(|cursor| player.timeline().clip(cursor.clip))
+		.map(|clip| clip.start);
+	let Some(clip_start) = clip_start else { return };
+	let update = navigation::move_caret_and_record_history(tab, clip_start);
+	// As Go to Percent does, the landing line says where the time falls, such as a chapter's title.
+	let content = tab.session.get_line_text(clip_start);
+	let message = if content.trim().is_empty() { clock::format_ms(target_ms) } else { content.trim().to_string() };
+	drop(dm);
+	navigation::persist_navigation_history(config, Some(&update));
+	announce(live_region_label, message);
+}
+
+pub fn handle_announce_chapter_progress(
+	doc_manager: &Rc<Mutex<DocumentManager>>,
+	live_region_label: StaticText,
+	from_keyboard: bool,
+) {
+	let message = {
+		let dm = doc_manager.lock().unwrap();
+		let Some(tab) = dm.active_tab() else { return };
+		tab.session.chapter_announcement(navigation::doc_caret(tab), navigation::audio_elapsed_ms(tab)).unwrap_or_else(
+			|| {
+				// TRANSLATORS: Announced when asking for the time in an audiobook's chapter while the length of its files isn't known, such as in many DAISY books
+				t("This book doesn't say how long its audio runs.")
+			},
+		)
+	};
+	announce_for_command(live_region_label, from_keyboard, message);
+}
+
 pub fn handle_change_audio_speed(
 	doc_manager: &Rc<Mutex<DocumentManager>>,
+	config: &Rc<Mutex<ConfigManager>>,
 	live_region_label: StaticText,
 	increase: bool,
 	from_keyboard: bool,
@@ -137,12 +217,27 @@ pub fn handle_change_audio_speed(
 		let after = if increase { player.increase_speed() } else { player.decrease_speed() };
 		(after, (after - before).abs() < f32::EPSILON)
 	});
-	drop(dm);
+	// One speed for every book, so the other open recordings change with it.
+	if let Some((speed, _)) = result {
+		dm.set_audio_speed(speed);
+		config.lock().unwrap().set_app_string(audio_player::SPEED_KEY, &speed.to_string());
+	}
 	let Some((speed, at_limit)) = result else {
-		// TRANSLATORS: Announced when trying to change audio playback speed on a document that has none
-		announce_for_command(live_region_label, from_keyboard, t("This document has no audio."));
+		// Without recorded audio, the speed keys change the speech rate.
+		let changed = dm.change_read_aloud_rate(increase);
+		drop(dm);
+		let message = match changed {
+			Ok((rate, at_limit)) => {
+				// TRANSLATORS: Announced when the read aloud rate changes; {} is the rate from 0 to 100, where 50 is the voice's normal speed
+				limit_message(&t("Rate {}").replace("{}", &rate.to_string()), at_limit, increase)
+			}
+			Err(message) if message.is_empty() => return,
+			Err(message) => message,
+		};
+		announce_for_command(live_region_label, from_keyboard, message);
 		return;
 	};
+	drop(dm);
 	let label = speed_label(speed);
 	let message = if at_limit && increase {
 		// TRANSLATORS: Announced when the audio speed is already at its fastest; {} is the current speed, e.g. "2x"
@@ -156,7 +251,7 @@ pub fn handle_change_audio_speed(
 	announce_for_command(live_region_label, from_keyboard, message);
 }
 
-/// Steps the active document's audio volume up or down, and announces the new volume. Like speed, it belongs to the document's `AudioPlayer`, because recordings differ in how loud they are.
+/// Volume is per `AudioPlayer` rather than global because recordings differ in how loud they are.
 pub fn handle_change_audio_volume(
 	doc_manager: &Rc<Mutex<DocumentManager>>,
 	live_region_label: StaticText,
@@ -169,6 +264,8 @@ pub fn handle_change_audio_volume(
 		let after = if increase { player.increase_volume() } else { player.decrease_volume() };
 		(after, (after - before).abs() < f32::EPSILON)
 	});
+	// Without recorded audio, the volume keys change the volume of read aloud.
+	let result = result.or_else(|| dm.change_read_aloud_volume(increase));
 	drop(dm);
 	let Some((volume, at_limit)) = result else {
 		// TRANSLATORS: Announced when trying to change audio volume on a document that has none
@@ -188,12 +285,21 @@ pub fn handle_change_audio_volume(
 	announce_for_command(live_region_label, from_keyboard, message);
 }
 
-/// A volume as a whole percentage, e.g. `80%` or `150%`.
+/// `label`, marked as the limit when a step couldn't go any further.
+fn limit_message(label: &str, at_limit: bool, increase: bool) -> String {
+	match (at_limit, increase) {
+		// TRANSLATORS: Announced when a setting is already at its highest; {} is its value
+		(true, true) => t("{} (maximum)").replace("{}", label),
+		// TRANSLATORS: Announced when a setting is already at its lowest; {} is its value
+		(true, false) => t("{} (minimum)").replace("{}", label),
+		_ => label.to_owned(),
+	}
+}
+
 fn volume_label(volume: f32) -> String {
 	format!("{}%", (volume * 100.0).round())
 }
 
-/// A human-readable label for a playback speed multiplier, e.g. `1.5x`, `1x`, `0.75x`.
 fn speed_label(speed: f32) -> String {
 	let mut label = format!("{speed:.2}");
 	while label.ends_with('0') {
@@ -205,9 +311,6 @@ fn speed_label(speed: f32) -> String {
 	format!("{label}x")
 }
 
-/// A human-readable label for one of `dialogs::AUDIO_SEEK_AMOUNTS_SECONDS`, matching the text
-/// shown for it in the Options dialog's seek-amount dropdown, for the live-region announcement
-/// made when the amount changes via keyboard shortcut.
 fn seek_amount_label(seconds: i32) -> String {
 	match seconds {
 		// TRANSLATORS: Audio seek amount, announced after changing it via keyboard shortcut
@@ -232,10 +335,6 @@ fn seek_amount_label(seconds: i32) -> String {
 	}
 }
 
-/// Nudges the configured audio seek amount (used by `handle_seek_audio`) one step up or down
-/// through the same preset list shown in the Options dialog's dropdown, and announces the new
-/// value. A global setting rather than a per-document action, so unlike `handle_seek_audio` this
-/// doesn't need an active document or audio player.
 pub fn handle_change_seek_amount(
 	config: &Rc<Mutex<ConfigManager>>,
 	live_region_label: StaticText,
@@ -273,7 +372,10 @@ pub fn handle_change_seek_amount(
 
 #[cfg(test)]
 mod tests {
-	use paperback_core::audio::{AudioLocation, AudioTimelineBuilder};
+	use paperback_core::{
+		audio::{AudioLocation, AudioTimelineBuilder},
+		document::DocPos,
+	};
 
 	use super::*;
 
@@ -284,23 +386,20 @@ mod tests {
 		assert_eq!(volume_label(1.5), "150%");
 	}
 
-	/// Two "files", each one placeholder-duration clip covering its whole 24h declared length
-	/// (like `build_plain_audio_zip_document`'s clips), so a real file length far shorter than
-	/// that placeholder is what has to trigger the spill, not the document's own clip bounds.
+	/// 24h placeholder clips like `build_plain_audio_zip_document`'s, so only the real file length can trigger the spill.
 	fn plain_audio_zip_timeline() -> AudioTimeline {
 		const PLACEHOLDER_MS: u64 = 24 * 60 * 60 * 1000;
 		let mut builder = AudioTimelineBuilder::new();
 		let file1 = builder.add_source(AudioLocation::File("chapter1.mp3".to_string()), None);
 		let file2 = builder.add_source(AudioLocation::File("chapter2.mp3".to_string()), None);
-		builder.add_clip(file1, 0, PLACEHOLDER_MS, 0, 1);
-		builder.add_clip(file2, 0, PLACEHOLDER_MS, 1, 2);
+		builder.add_clip(file1, 0, PLACEHOLDER_MS, DocPos::from_raw(0), DocPos::from_raw(1));
+		builder.add_clip(file2, 0, PLACEHOLDER_MS, DocPos::from_raw(1), DocPos::from_raw(2));
 		builder.build()
 	}
 
 	#[test]
 	fn spill_overflow_into_next_source_is_none_when_the_seek_stays_within_the_real_file() {
 		let timeline = plain_audio_zip_timeline();
-		// 30s into a 45s file, seeking 10s: lands at 40s, still short of the real 45s end.
 		assert_eq!(spill_overflow_into_next_source(&timeline, 0, 30_000, 45_000, 10_000), None);
 	}
 
@@ -313,7 +412,6 @@ mod tests {
 	#[test]
 	fn spill_overflow_into_next_source_lands_the_overflow_into_the_next_files_start() {
 		let timeline = plain_audio_zip_timeline();
-		// 40s into a 45s file, seeking 10s: 5s of that seek belongs to whatever plays next.
 		let target = spill_overflow_into_next_source(&timeline, 0, 40_000, 45_000, 10_000);
 		assert_eq!(target, timeline.elapsed_for_source_position(1, 5_000));
 	}

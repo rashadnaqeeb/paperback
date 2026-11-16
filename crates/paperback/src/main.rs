@@ -10,11 +10,11 @@ mod legacy_config;
 mod links;
 #[cfg(target_os = "linux")]
 mod linux_integration;
-mod logging;
 mod ocr;
+mod problem_report;
+mod read_aloud;
 #[cfg(any(target_os = "windows", test))]
 mod rtf;
-mod search;
 mod shell;
 #[cfg(test)]
 mod test_locale;
@@ -23,22 +23,39 @@ mod text_window;
 mod translation_manager;
 mod ui;
 mod updater;
+#[cfg(target_os = "windows")]
+mod windows_audio;
 mod working_copy;
 
 use std::{env, fs, io};
 
-use paperback_core::{set_pdfium_library_path, version};
+use logkeeper::Logkeeper;
+use paperback_core::version;
 use ui::PaperbackApp;
 use wxdragon::prelude::{Appearance, set_appearance};
 
 fn main() {
-	let _log_guard = logging::init(&config_ext::config_dir(), config_ext::log_level_from_disk());
+	// Before logging or wxWidgets start, so a second copy hands over its files and exits without touching the running copy's log.
+	#[cfg(any(target_os = "linux", target_os = "windows"))]
+	let door = match doorbell::ring(ipc::APP_NAME, &ipc::message_from_args(env::args().skip(1))) {
+		Ok(doorbell::Ring::Delivered) => return,
+		Ok(doorbell::Ring::First(door)) => Ok(door),
+		Err(e) => Err(e),
+	};
+	let _log_guard = Logkeeper::new(config_ext::config_dir(), "paperback")
+		.with_crates(["paperback", "paperback_core"])
+		.init(config_ext::log_level_from_disk());
 	tracing::info!(version = env!("CARGO_PKG_VERSION"), commit = version::COMMIT_HASH, "starting");
-	set_pdfium_path_from_exe();
+	#[cfg(any(target_os = "linux", target_os = "windows"))]
+	match door {
+		Ok(door) => ui::keep_door(door),
+		Err(e) => {
+			tracing::warn!(error = %e, "couldn't check for a running copy, so files opened from now on start another");
+		}
+	}
+	problem_report::begin_session();
 	cleanup_legacy_files();
-	// When running in dev via `cargo run`, make sure the app gets a proper menu bar on Mac OS.
-	// Binaries not inside an app bundle are essentially treated as background processes of Terminal.app, which leads to all sorts of nastiness.
-	// This needs to be called before WX initializes to properly take effect.
+	// Under `cargo run` macOS treats the unbundled binary as a Terminal background process with no menu bar; must run before wx initializes.
 	#[cfg(target_os = "macos")]
 	promote_unbundled_to_regular_app();
 	#[cfg(target_os = "windows")]
@@ -48,13 +65,10 @@ fn main() {
 		let app_state = PaperbackApp::new(app);
 		let _ = Box::leak(Box::new(app_state));
 	});
+	problem_report::end_session();
 }
 
-/// Keeps the rich edit library loaded until the process ends.
-///
-/// At exit wxWidgets frees the rich edit library before it shuts COM down. A screen reader still holds
-/// accessibility objects that live in that library, so COM's shutdown then calls into unloaded
-/// code and the process crashes. Holding a reference of our own means wx's free never unloads it.
+/// wx frees the rich edit library before COM shuts down, so a screen reader's accessibility objects in it crashed the process at exit.
 #[cfg(target_os = "windows")]
 fn pin_rich_edit() {
 	use windows::{Win32::System::LibraryLoader::LoadLibraryW, core::w};
@@ -65,32 +79,22 @@ fn pin_rich_edit() {
 
 #[cfg(target_os = "macos")]
 fn promote_unbundled_to_regular_app() {
-	use objc::{class, msg_send, runtime::Object, sel, sel_impl};
+	use objc2::MainThreadMarker;
+	use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 	// When in a bundle, MacOS handles this for us.
-	let in_bundle = env::current_exe().is_ok_and(|exe| exe.to_string_lossy().contains(".app/Contents/MacOS/"));
-	if in_bundle {
+	if config_ext::home().kind() == homeport::InstallKind::MacBundle {
 		return;
 	}
-	// NSApplicationActivationPolicyRegular = 0.
-	unsafe {
-		let ns_app: *mut Object = msg_send![class!(NSApplication), sharedApplication];
-		let _: () = msg_send![ns_app, setActivationPolicy: 0_isize];
-		let _: () = msg_send![ns_app, activateIgnoringOtherApps: true];
-	}
-}
-
-fn set_pdfium_path_from_exe() {
-	if let Ok(exe) = env::current_exe()
-		&& let Some(dir) = exe.parent()
-	{
-		set_pdfium_library_path(dir.to_string_lossy().into_owned());
-	}
+	let Some(main_thread) = MainThreadMarker::new() else { return };
+	let app = NSApplication::sharedApplication(main_thread);
+	app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
+	#[allow(deprecated, reason = "its replacement, activate, needs macOS 14")]
+	app.activateIgnoringOtherApps(true);
 }
 
 fn cleanup_legacy_files() {
-	let Ok(exe) = env::current_exe() else { return };
-	let Some(dir) = exe.parent() else { return };
-	for name in ["nvdaControllerClient64.dll", "SAAPI64.dll"] {
+	let dir = config_ext::home().exe_dir();
+	for name in ["nvdaControllerClient64.dll", "SAAPI64.dll", "pdfium.dll", "libpdfium.so"] {
 		let path = dir.join(name);
 		if let Err(e) = fs::remove_file(&path)
 			&& e.kind() != io::ErrorKind::NotFound

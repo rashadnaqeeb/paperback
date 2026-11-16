@@ -1,7 +1,4 @@
-//! Marker types: the tagged positions ([`Marker`]) a parser scatters through a
-//! [`super::buffer::DocumentBuffer`] to record headings, links, formatting spans, and other
-//! structure, plus the small helpers ([`is_heading_marker`], [`is_container_marker`],
-//! [`ContainerSpan`]) that classify them.
+use super::position::{DocLen, DocPos};
 
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -26,11 +23,16 @@ pub enum MarkerType {
 	Bold = 16,
 	Italic = 17,
 	Underline = 18,
-	/// A PDF page that holds an image but no extractable text. Sits at the start of the page's
-	/// OCR placeholder line and is what the OCR flow matches on, so the feature never depends on
-	/// comparing against a translated string.
+	/// OCR matches on this rather than the placeholder line, so it never compares against a translated string.
 	ImageOnlyPage = 19,
 	Formula = 20,
+	/// Line breaks and indentation mean something here, as in a code listing, which only an export can show: the text keeps them either way.
+	Preformatted = 21,
+	Code = 22,
+	Superscript = 23,
+	Subscript = 24,
+	/// Structure only an export shows, with its tag name in `reference`.
+	Block = 25,
 }
 
 impl From<MarkerType> for i32 {
@@ -39,9 +41,6 @@ impl From<MarkerType> for i32 {
 	}
 }
 
-/// Yields the character-formatting marker types implied by the given
-/// bold/italic/underline flags, in a stable order. Shared by the parsers so
-/// the flag-triple → marker fan-out lives in one place.
 pub(crate) fn format_marker_types(bold: bool, italic: bool, underline: bool) -> impl Iterator<Item = MarkerType> {
 	[(bold, MarkerType::Bold), (italic, MarkerType::Italic), (underline, MarkerType::Underline)]
 		.into_iter()
@@ -74,6 +73,11 @@ impl TryFrom<i32> for MarkerType {
 			18 => Ok(Self::Underline),
 			19 => Ok(Self::ImageOnlyPage),
 			20 => Ok(Self::Formula),
+			21 => Ok(Self::Preformatted),
+			22 => Ok(Self::Code),
+			23 => Ok(Self::Superscript),
+			24 => Ok(Self::Subscript),
+			25 => Ok(Self::Block),
 			_ => Err(()),
 		}
 	}
@@ -82,17 +86,27 @@ impl TryFrom<i32> for MarkerType {
 #[derive(Debug, Clone)]
 pub struct Marker {
 	pub mtype: MarkerType,
-	pub position: usize,
+	pub position: DocPos,
 	pub text: String,
 	pub reference: String,
 	pub level: i32,
-	pub length: usize,
+	pub length: DocLen,
+	/// The bullet or number a list item's text starts with, which HTML leaves out because `<li>` draws its own.
+	pub prefix_length: DocLen,
 }
 
 impl Marker {
 	#[must_use]
-	pub const fn new(mtype: MarkerType, position: usize) -> Self {
-		Self { mtype, position, text: String::new(), reference: String::new(), level: 0, length: 0 }
+	pub const fn new(mtype: MarkerType, position: DocPos) -> Self {
+		Self {
+			mtype,
+			position,
+			text: String::new(),
+			reference: String::new(),
+			level: 0,
+			length: DocLen::ZERO,
+			prefix_length: DocLen::ZERO,
+		}
 	}
 
 	#[must_use]
@@ -114,8 +128,14 @@ impl Marker {
 	}
 
 	#[must_use]
-	pub const fn with_length(mut self, length: usize) -> Self {
+	pub const fn with_length(mut self, length: DocLen) -> Self {
 		self.length = length;
+		self
+	}
+
+	#[must_use]
+	pub const fn with_prefix_length(mut self, prefix_length: DocLen) -> Self {
+		self.prefix_length = prefix_length;
 		self
 	}
 }
@@ -133,18 +153,15 @@ pub const fn is_heading_marker(marker_type: MarkerType) -> bool {
 	)
 }
 
-/// Whether a marker type denotes a navigable container (an element the caret can be *inside* of,
-/// such as a list or table). The single place to extend the set of container types.
 #[must_use]
 pub const fn is_container_marker(marker_type: MarkerType) -> bool {
 	matches!(marker_type, MarkerType::List | MarkerType::Table)
 }
 
-/// The display-unit span of a container marker: `[start, end)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ContainerSpan {
-	pub start: usize,
-	pub end: usize,
+	pub start: DocPos,
+	pub end: DocPos,
 	pub mtype: MarkerType,
 }
 
@@ -154,21 +171,21 @@ mod tests {
 
 	#[test]
 	fn marker_type_round_trip_for_all_known_values() {
-		for raw in 0..=20 {
+		for raw in 0..=25 {
 			let marker = MarkerType::try_from(raw).unwrap();
 			assert_eq!(i32::from(marker), raw);
 		}
-		assert!(MarkerType::try_from(21).is_err());
+		assert!(MarkerType::try_from(26).is_err());
 		assert!(MarkerType::try_from(-1).is_err());
 	}
 
 	#[test]
 	fn marker_builder_helpers_set_all_fields() {
-		let marker = Marker::new(MarkerType::Table, 42)
+		let marker = Marker::new(MarkerType::Table, 42.into())
 			.with_text("Title".to_string())
 			.with_reference("ref".to_string())
 			.with_level(3)
-			.with_length(9);
+			.with_length(9.into());
 		assert_eq!(marker.position, 42);
 		assert_eq!(marker.text, "Title");
 		assert_eq!(marker.reference, "ref");

@@ -22,13 +22,11 @@ use builder::{build_menu, claim_access_key, deduplicate_access_keys};
 pub use file_menu::recent_documents_for_menu;
 pub use state::{update_menu_item_states, update_reopen_state};
 
-/// One menu of the menu bar, holding the commands of one shortcut category.
 pub struct TopMenu {
 	pub category: ShortcutCategory,
 	pub entries: Vec<MenuEntry>,
 }
 
-/// The menu bar's menus, in order.
 pub fn menus(config: &ConfigManager, compact_go: bool) -> Vec<TopMenu> {
 	let mut menus = vec![
 		TopMenu { category: ShortcutCategory::File, entries: file_menu::entries(config) },
@@ -46,7 +44,6 @@ pub fn menus(config: &ConfigManager, compact_go: bool) -> Vec<TopMenu> {
 	menus
 }
 
-/// The menu bar labels of `menus`, each with an access key of its own where it has a free letter.
 fn titles(menus: &[TopMenu]) -> Vec<String> {
 	let mut used = Vec::new();
 	menus
@@ -59,7 +56,6 @@ fn titles(menus: &[TopMenu]) -> Vec<String> {
 		.collect()
 }
 
-/// The menu bar label of the menu holding `category`'s commands.
 fn title(category: ShortcutCategory) -> String {
 	match category {
 		// TRANSLATORS: Top-level "File" menu label in the menu bar
@@ -81,18 +77,33 @@ fn title(category: ShortcutCategory) -> String {
 	}
 }
 
-/// Commands reachable only through their keyboard shortcut.
 pub const fn is_keyboard_only(action: ActionId) -> bool {
 	matches!(action, ActionId::AnnouncePercent)
 }
 
-/// Whether `chord` is on a punctuation key, which on Windows is run by the frame's char hook rather than by a menu accelerator.
-///
-/// wxMSW finds a punctuation accelerator's key with `VkKeyScan`, drops the modifiers it reports the character needing, and does it once, for the layout active when the menu is built. Where `;` is Shift+, as on Finnish, German and Bosnian keyboards, Ctrl+; lands on Ctrl+, and runs in its place (#1134). The char hook matches the key as the live layout reports it, so these chords are kept out of the accelerator table.
+/// Kept out of the accelerator table: wxMSW maps punctuation with `VkKeyScan` once for the layout at build time and drops its modifiers, so on layouts where `;` is Shift+comma (Finnish, German), Ctrl+; ran Ctrl+comma (#1134).
 #[cfg(target_os = "windows")]
 pub fn is_punctuation_chord(chord: &KeyChord) -> bool {
 	let mut chars = chord.key.chars();
 	matches!((chars.next(), chars.next()), (Some(ch), None) if !ch.is_ascii_alphanumeric())
+}
+
+/// The action a key runs: the one bound to what the key reports, or else the one bound to the punctuation the same key types on a US keyboard. On a Hungarian keyboard the `;` shortcuts are on the key labelled `é` (#1251), and GTK reports Shift+, as `<` on any layout (#1250). A key that reports a letter or digit keeps it, so a layout's own letters never become punctuation shortcuts.
+pub fn shortcut_for_key(
+	config: &ConfigManager,
+	key: i32,
+	ctrl: bool,
+	alt: bool,
+	shift: bool,
+	raw_key_flags: Option<u32>,
+) -> Option<ActionId> {
+	config.find_shortcut_action(key, ctrl, alt, shift).or_else(|| {
+		if u8::try_from(key).is_ok_and(|key| key.is_ascii_alphanumeric()) {
+			return None;
+		}
+		let us = wx_utils::shortcuts::us_punctuation_at(raw_key_flags?)?;
+		config.find_shortcut_action(i32::from(us as u8), ctrl, alt, shift)
+	})
 }
 
 pub fn create_menu_bar(config: &ConfigManager) -> MenuBar {
@@ -114,6 +125,66 @@ mod tests {
 	use super::*;
 	use crate::ui::menu_ids;
 
+	/// Raw flags as Windows gives them for a key press: a repeat count of 1 and the scan code in bits 16 to 23.
+	#[cfg(target_os = "windows")]
+	const fn scan_code(code: u32) -> u32 {
+		1 | (code << 16)
+	}
+
+	#[cfg(target_os = "windows")]
+	#[test]
+	fn the_hungarian_keys_at_us_punctuation_run_its_shortcuts() {
+		let config = ConfigManager::new();
+		// wxMSW reports the key by the Latin-1 letter it types, uppercased.
+		let e_acute = i32::from(b'\xC9');
+		let a_acute = i32::from(b'\xC1');
+		assert_eq!(
+			shortcut_for_key(&config, e_acute, false, false, false, Some(scan_code(0x27))),
+			Some(ActionId::SeekAudioBackward)
+		);
+		assert_eq!(
+			shortcut_for_key(&config, a_acute, true, false, false, Some(scan_code(0x28))),
+			Some(ActionId::IncreaseAudioVolume)
+		);
+	}
+
+	#[cfg(target_os = "windows")]
+	#[test]
+	fn what_a_key_reports_wins_over_its_place() {
+		let config = ConfigManager::new();
+		// Shift+1 types ' on Hungarian, and stays Previous Heading rather than becoming Shift+'.
+		let by_report = shortcut_for_key(&config, i32::from(b'1'), false, false, true, Some(scan_code(0x02)));
+		assert_eq!(by_report, config.find_shortcut_action(i32::from(b'1'), false, false, true));
+		assert_ne!(by_report, Some(ActionId::IncreaseAudioSeekAmount));
+		// A letter at a US punctuation place, as `M` is on a French keyboard, is never taken for `;`.
+		let unbound = (b'A'..=b'Z')
+			.map(i32::from)
+			.find(|&letter| config.find_shortcut_action(letter, false, false, false).is_none());
+		let unbound = unbound.expect("a letter with no shortcut");
+		assert_eq!(shortcut_for_key(&config, unbound, false, false, false, Some(scan_code(0x27))), None);
+	}
+
+	#[cfg(target_os = "linux")]
+	#[test]
+	fn gtk_shift_comma_runs_the_shift_comma_shortcut() {
+		let config = ConfigManager::new();
+		// GTK reports Shift+, as <; the comma key's hardware code is its evdev code, 51, plus 8.
+		assert_eq!(
+			shortcut_for_key(&config, i32::from(b'<'), false, false, true, Some(59)),
+			Some(ActionId::ContainerStart)
+		);
+	}
+
+	#[test]
+	fn without_raw_flags_only_what_the_key_reports_counts() {
+		let config = ConfigManager::new();
+		assert_eq!(
+			shortcut_for_key(&config, i32::from(b';'), false, false, false, None),
+			Some(ActionId::SeekAudioBackward)
+		);
+		assert_eq!(shortcut_for_key(&config, i32::from(b'\xC9'), false, false, false, None), None);
+	}
+
 	fn ids(entries: &[MenuEntry], out: &mut Vec<i32>) {
 		for entry in entries {
 			match entry {
@@ -128,18 +199,12 @@ mod tests {
 		ActionId::all().iter().copied().find(|&action| menu_ids::action_to_menu_id(action) == id)
 	}
 
-	/// macOS puts Exit and Settings in the application menu, and Linux has no OCR engine.
+	/// macOS puts Exit and Settings in the application menu.
 	const fn omitted_on_this_platform(action: ActionId) -> bool {
-		if cfg!(target_os = "macos") {
-			matches!(action, ActionId::Exit | ActionId::Options)
-		} else if cfg!(target_os = "linux") {
-			matches!(action, ActionId::BatchOcr)
-		} else {
-			false
-		}
+		cfg!(target_os = "macos") && matches!(action, ActionId::Exit | ActionId::Options)
 	}
 
-	/// The letter after the label's `&`, lowercased; the shortcut after a tab is not part of it.
+	#[cfg(not(target_os = "macos"))]
 	fn access_key(label: &str) -> Option<char> {
 		let text = label.split('\t').next().unwrap_or(label);
 		let mut chars = text.chars();
@@ -155,6 +220,7 @@ mod tests {
 		None
 	}
 
+	#[cfg(not(target_os = "macos"))]
 	fn top_level_labels(entries: &[MenuEntry]) -> Vec<&str> {
 		entries
 			.iter()
@@ -166,7 +232,7 @@ mod tests {
 			.collect()
 	}
 
-	/// One line per label whose access key an earlier label already has.
+	#[cfg(not(target_os = "macos"))]
 	fn access_key_clashes<'a>(labels: impl IntoIterator<Item = &'a str>) -> Vec<String> {
 		let mut seen: Vec<(char, &str)> = Vec::new();
 		let mut clashes = Vec::new();

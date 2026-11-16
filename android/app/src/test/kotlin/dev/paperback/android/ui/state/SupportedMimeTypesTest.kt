@@ -5,13 +5,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SupportedMimeTypesTest {
-	// The picker filters on type, so a format missing from this table is a book the reader cannot
-	// pick at all, however readable it is once opened.
+	// The picker filters on type, so a format missing here can't be picked at all.
 	@Test
 	fun `the formats Android does not know still have a type`() {
 		assertTrue(extraMimeTypesFor("epub").contains("application/epub+zip"))
 		assertTrue(extraMimeTypesFor("mobi").contains("application/x-mobipocket-ebook"))
 		assertTrue(extraMimeTypesFor("chm").contains("application/vnd.ms-htmlhelp"))
+	}
+
+	@Test
+	fun `XPS and OpenXPS documents have their types`() {
+		assertEquals(setOf("application/vnd.ms-xpsdocument"), extraMimeTypesFor("xps"))
+		assertEquals(setOf("application/oxps"), extraMimeTypesFor("oxps"))
 	}
 
 	@Test

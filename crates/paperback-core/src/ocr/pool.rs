@@ -1,8 +1,4 @@
-//! Reading a document's pages on several threads at once.
-//!
-//! Recognizing scales across threads but rasterizing does not, because `pdfium-render`'s `thread_safe` feature serializes every call through one process-wide lock. So each worker both rasterizes and reads its own pages with a renderer of its own, and one worker's rasterizing overlaps another's reading.
-//!
-//! Pages are handed back in page order however they finish, because the app refreshes the reader's window and counts progress on the assumption that pages land in ascending order.
+//! Pages are handed back in page order however they finish, because the app refreshes the reader and counts progress assuming ascending order.
 
 use std::{
 	collections::HashMap,
@@ -16,7 +12,7 @@ use std::{
 
 use crate::ocr::PageRenderer;
 
-/// Past this, pages queue behind pdfium's lock, so more threads buy memory and contention rather than throughput.
+/// Every worker holds a page drawn at OCR resolution, tens of megabytes each, so past this more threads buy memory pressure rather than throughput.
 const MAX_WORKERS: usize = 4;
 
 /// One core is left free so the UI and the screen reader stay responsive while the pages are read.
@@ -27,28 +23,21 @@ pub fn default_workers() -> usize {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Run {
-	/// True when the job stopped at a page boundary because `cancel` was raised, rather than
-	/// reaching the end of the page list.
 	pub stopped: bool,
 }
 
-/// Renders and reads `pages` (1-based page numbers) on up to `workers` threads, handing each page's result to `on_page` on the calling thread in ascending page order.
-///
-/// `recognize_page` is passed in because the OCR engine is platform-specific and lives in the front end. A page that fails to read still reaches `on_page`, so one bad page does not stop the rest. Raising `cancel` stops each worker at its next page boundary, and pages already read are still handed over so the caller can say how much was read.
-///
-/// # Errors
-///
-/// Returns an error if the document cannot be opened for rendering.
-pub fn recognize_pages<E>(
+/// `recognize_page` is passed in because the OCR engine is platform-specific and lives in the front end.
+pub fn recognize_pages<T, E>(
 	file_path: &str,
 	password: Option<&str>,
 	pages: &[i32],
 	workers: usize,
 	cancel: &AtomicBool,
-	recognize_page: impl Fn(&mut PageRenderer, i32) -> Result<String, E> + Sync,
-	mut on_page: impl FnMut(i32, Result<String, E>),
+	recognize_page: impl Fn(&mut PageRenderer, i32) -> Result<T, E> + Sync,
+	mut on_page: impl FnMut(i32, Result<T, E>),
 ) -> anyhow::Result<Run>
 where
+	T: Send,
 	E: Send,
 {
 	if pages.is_empty() {
@@ -59,7 +48,7 @@ where
 	// Every other worker would fail to open the document too, so one failure sends them all home.
 	let stop = AtomicBool::new(false);
 	let open_failure: Mutex<Option<anyhow::Error>> = Mutex::new(None);
-	let (sender, receiver) = mpsc::channel::<(usize, Result<String, E>)>();
+	let (sender, receiver) = mpsc::channel::<(usize, Result<T, E>)>();
 	let emitted = thread::scope(|scope| {
 		// Borrowed so each `move` closure captures a reference rather than the first one taking the call.
 		let recognize_page = &recognize_page;
@@ -100,13 +89,13 @@ where
 	Ok(Run { stopped: emitted < pages.len() })
 }
 
-/// Returns how many pages were handed over. A short count means the job stopped, since every claimed page is sent.
-fn collect<E>(
-	receiver: mpsc::Receiver<(usize, Result<String, E>)>,
+/// A short count means the job stopped, since every claimed page is sent.
+fn collect<T, E>(
+	receiver: mpsc::Receiver<(usize, Result<T, E>)>,
 	pages: &[i32],
-	on_page: &mut impl FnMut(i32, Result<String, E>),
+	on_page: &mut impl FnMut(i32, Result<T, E>),
 ) -> usize {
-	let mut held: HashMap<usize, Result<String, E>> = HashMap::new();
+	let mut held: HashMap<usize, Result<T, E>> = HashMap::new();
 	let mut next = 0usize;
 	let mut emitted = 0usize;
 	for (index, result) in receiver {
@@ -118,7 +107,7 @@ fn collect<E>(
 		}
 	}
 	// A stop can leave read pages behind an unread gap. They are still handed over, since the app reports how much was read.
-	let mut rest: Vec<(usize, Result<String, E>)> = held.into_iter().collect();
+	let mut rest: Vec<(usize, Result<T, E>)> = held.into_iter().collect();
 	rest.sort_unstable_by_key(|(index, _)| *index);
 	for (index, result) in rest {
 		on_page(pages[index], result);
@@ -160,6 +149,7 @@ mod tests {
 
 	type Read = Result<String, String>;
 
+	#[allow(clippy::unnecessary_wraps, reason = "has the signature recognize_pages takes for its recognizer")]
 	fn says_which_page(_renderer: &mut PageRenderer, page: i32) -> Read {
 		Ok(format!("text of page {page}"))
 	}
@@ -334,7 +324,6 @@ mod tests {
 		.unwrap();
 		assert!(outcome.stopped, "a job stopped after two pages should say so");
 		assert!(seen.len() < 16, "the job read the whole range after being stopped: {} pages", seen.len());
-		// Whatever it did read arrives in order and without duplicates.
 		let order: Vec<i32> = seen.iter().map(|(page, _)| *page).collect();
 		let mut sorted = order.clone();
 		sorted.sort_unstable();

@@ -11,10 +11,7 @@
 
 use std::collections::HashSet;
 
-use crate::{
-	document::{Document, Edit, MarkerType, TocItem},
-	util::text::ch_width,
-};
+use crate::document::{DocLen, DocPos, Document, Edit, MarkerType, TocItem};
 
 /// The shortest piece that can start a cut paragraph: shorter than any full printed line.
 const MIN_FIRST_PIECE: usize = 40;
@@ -36,8 +33,8 @@ const BOOK_FORMATS: &[&str] = &[
 
 struct Line<'a> {
 	text: &'a str,
-	/// Display position of the newline ending this line.
-	newline: usize,
+	/// Position of the newline ending this line.
+	newline: DocPos,
 	/// Set when the line holds structure a join must not cross: a heading, list, table, image, and the like.
 	blocked: bool,
 	/// Set when a section, chapter, or table of contents entry begins here, which nothing joins across.
@@ -62,7 +59,7 @@ pub(super) fn join_cut_paragraphs(doc: &mut Document) {
 	shift_toc(&mut doc.toc_items, &|position| outcome.shift(position));
 }
 
-fn shift_toc(items: &mut [TocItem], shift: &dyn Fn(usize) -> usize) {
+fn shift_toc(items: &mut [TocItem], shift: &dyn Fn(DocPos) -> DocPos) {
 	for item in items {
 		item.offset = shift(item.offset);
 		shift_toc(&mut item.children, shift);
@@ -90,10 +87,10 @@ fn find_joins(doc: &Document) -> Vec<Edit> {
 					&& spellings.get_or_insert_with(|| Spellings::new(&doc.buffer.content)).is_one_word(before, after)
 				{
 					// Its own edit beside the newline's, so no marker sits inside either and is lost.
-					edits.push(Edit { start: line.newline - 1, end: line.newline, text: String::new() });
+					edits.push(Edit { start: line.newline - DocLen::ONE, end: line.newline, text: String::new() });
 				}
 				let text = if line.text.ends_with('-') || line.text.ends_with(char::is_whitespace) { "" } else { " " };
-				edits.push(Edit { start: line.newline, end: line.newline + 1, text: text.to_string() });
+				edits.push(Edit { start: line.newline, end: line.newline + DocLen::ONE, text: text.to_string() });
 			}
 		}
 		first = last;
@@ -145,9 +142,9 @@ fn lines(doc: &Document) -> Vec<Line<'_>> {
 	let content = &doc.buffer.content;
 	let mut lines = Vec::new();
 	let mut starts = Vec::new();
-	let mut display = 0;
+	let mut display = DocPos::ZERO;
 	let mut line_start = 0;
-	starts.push(0);
+	starts.push(DocPos::ZERO);
 	for (byte, ch) in content.char_indices() {
 		if ch == '\n' {
 			lines.push(Line {
@@ -157,23 +154,28 @@ fn lines(doc: &Document) -> Vec<Line<'_>> {
 				starts_section: false,
 			});
 			line_start = byte + 1;
-			starts.push(display + 1);
+			starts.push(display + DocLen::ONE);
 		}
-		display += ch_width(ch);
+		display += DocLen::ONE;
 	}
 	lines.push(Line { text: &content[line_start..], newline: display, blocked: false, starts_section: false });
-	let line_at = |position: usize| starts.partition_point(|&start| start <= position).saturating_sub(1);
+	let line_at = |position: DocPos| starts.partition_point(|&start| start <= position).saturating_sub(1);
 	for marker in &doc.buffer.markers {
 		let first = line_at(marker.position);
 		match marker.mtype {
 			MarkerType::SectionBreak | MarkerType::TocItem => lines[first].starts_section = true,
+			// Block marks quotations, asides and line breaks for export only, and a quotation can be cut by a page too.
 			MarkerType::PageBreak
 			| MarkerType::Link
 			| MarkerType::Bold
 			| MarkerType::Italic
-			| MarkerType::Underline => {}
+			| MarkerType::Underline
+			| MarkerType::Code
+			| MarkerType::Superscript
+			| MarkerType::Subscript
+			| MarkerType::Block => {}
 			_ => {
-				let last = line_at(marker.position + marker.length.saturating_sub(1));
+				let last = line_at(marker.position + marker.length.saturating_sub(DocLen::ONE));
 				for line in &mut lines[first..=last.max(first)] {
 					line.blocked = true;
 				}
@@ -189,7 +191,7 @@ fn lines(doc: &Document) -> Vec<Line<'_>> {
 	lines
 }
 
-fn collect_toc_offsets(items: &[TocItem], out: &mut Vec<usize>) {
+fn collect_toc_offsets(items: &[TocItem], out: &mut Vec<DocPos>) {
 	for item in items {
 		out.push(item.offset);
 		collect_toc_offsets(&item.children, out);
@@ -309,10 +311,10 @@ mod tests {
 		let first = "Nobody in the village could say with any confidence or any cer-";
 		let mut doc = doc(&format!("{first}\ntainty where the river went.\nWith certainty.\n"));
 		let newline = first.chars().count();
-		doc.buffer.add_marker(Marker::new(MarkerType::PageBreak, newline + 1));
+		doc.buffer.add_marker(Marker::new(MarkerType::PageBreak, DocPos::from_raw(newline + 1)));
 		join_cut_paragraphs(&mut doc);
 		let page = doc.buffer.markers.iter().find(|marker| marker.mtype == MarkerType::PageBreak).expect("page kept");
-		assert_eq!(&doc.buffer.content[page.position..page.position + 6], "tainty");
+		assert_eq!(doc.buffer.text(page.position..page.position + DocLen::from_raw(6)), "tainty");
 	}
 
 	#[test]
@@ -420,7 +422,8 @@ mod tests {
 	fn no_join_crosses_a_heading_list_or_table() {
 		for mtype in [MarkerType::Heading2, MarkerType::ListItem, MarkerType::Table] {
 			let mut doc = doc(&format!("{FIRST}\n{SECOND}"));
-			doc.buffer.add_marker(Marker::new(mtype, FIRST.len() + 1).with_length(SECOND.len()));
+			doc.buffer
+				.add_marker(Marker::new(mtype, DocPos::from_raw(FIRST.len() + 1)).with_length(DocLen::of(SECOND)));
 			join_cut_paragraphs(&mut doc);
 			assert!(doc.buffer.content.contains('\n'), "{mtype:?}");
 		}
@@ -429,7 +432,7 @@ mod tests {
 	#[test]
 	fn no_join_crosses_a_section_or_table_of_contents_entry() {
 		let mut doc = doc(&format!("{FIRST}\n{SECOND}"));
-		doc.buffer.add_marker(Marker::new(MarkerType::SectionBreak, FIRST.len() + 1));
+		doc.buffer.add_marker(Marker::new(MarkerType::SectionBreak, DocPos::from_raw(FIRST.len() + 1)));
 		join_cut_paragraphs(&mut doc);
 		assert!(doc.buffer.content.contains('\n'));
 		let mut doc = doc_with_toc(FIRST.len() + 1);
@@ -439,29 +442,31 @@ mod tests {
 
 	fn doc_with_toc(offset: usize) -> Document {
 		let mut doc = doc(&format!("{FIRST}\n{SECOND}"));
-		doc.toc_items = vec![TocItem::new("Two".to_string(), String::new(), offset)];
+		doc.toc_items = vec![TocItem::new("Two".to_string(), String::new(), DocPos::from_raw(offset))];
 		doc
 	}
 
 	#[test]
 	fn a_page_break_between_the_pieces_stays_inside_the_joined_paragraph() {
 		let mut doc = doc(&format!("{FIRST}\n{SECOND}"));
-		doc.buffer.add_marker(Marker::new(MarkerType::PageBreak, FIRST.len() + 1).with_text("12".to_string()));
+		doc.buffer.add_marker(
+			Marker::new(MarkerType::PageBreak, DocPos::from_raw(FIRST.len() + 1)).with_text("12".to_string()),
+		);
 		join_cut_paragraphs(&mut doc);
 		assert_eq!(doc.buffer.content, format!("{FIRST} {SECOND}"));
-		assert_eq!(doc.buffer.markers[0].position, FIRST.len() + 1);
+		assert_eq!(doc.buffer.markers[0].position, DocPos::from_raw(FIRST.len() + 1));
 	}
 
 	#[test]
 	fn positions_after_a_hyphen_join_move_back_with_their_text() {
 		let first = "He had been around the world sixty-five times, and every time well-";
 		let mut doc = doc(&format!("{first}\nknown faces met him.\nChapter two"));
-		let chapter = first.len() + 22;
-		doc.buffer.add_marker(Marker::new(MarkerType::Heading1, chapter).with_length(11));
+		let chapter = DocPos::from_raw(first.len() + 22);
+		doc.buffer.add_marker(Marker::new(MarkerType::Heading1, chapter).with_length(DocLen::from_raw(11)));
 		doc.id_positions.insert("two".to_string(), chapter);
 		doc.toc_items = vec![TocItem::new("Two".to_string(), "two".to_string(), chapter)];
 		join_cut_paragraphs(&mut doc);
-		let expected = doc.buffer.content.find("Chapter").unwrap();
+		let expected = DocPos::from_raw(doc.buffer.content.find("Chapter").unwrap());
 		assert_eq!(doc.buffer.markers[0].position, expected);
 		assert_eq!(doc.id_positions["two"], expected);
 		assert_eq!(doc.toc_items[0].offset, expected);

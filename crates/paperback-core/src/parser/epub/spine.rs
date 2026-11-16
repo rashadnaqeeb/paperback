@@ -1,14 +1,15 @@
-//! Converting an EPUB's spine items to text: each spine item's XHTML is read from the zip
-//! and run through the XML/HTML converters in parallel, then the resulting sections are
-//! stitched into one [`DocumentBuffer`] with section-break/link markers and id positions
-//! placed at their absolute offsets.
-
-use std::{collections::HashMap, fs::File, io::BufReader, mem};
+use std::{
+	collections::{HashMap, HashSet},
+	fs::File,
+	io::{BufReader, Read, Seek},
+	mem,
+	sync::Arc,
+};
 
 use anyhow::Result;
 use rayon::prelude::*;
 use scraper::Html;
-use zip::ZipArchive;
+use zip::{ZipArchive, read::ZipArchiveMetadata};
 
 use super::{
 	fork_toc::{self, ChapterTitle, TitleRole},
@@ -16,20 +17,22 @@ use super::{
 	package::ManifestItem,
 };
 use crate::{
-	document::{DocumentBuffer, Marker, MarkerType},
+	document::{DocPos, DocumentBuffer, Marker, MarkerType},
 	parser::{
 		ConverterOutput, add_converter_markers_excluding_links,
 		convert::{
 			html_to_text::{HtmlSourceMode, HtmlToText},
+			image_text,
 			xml_to_text::XmlToText,
 		},
 		fork_spacing, is_data_uri,
 	},
 	t,
 	types::{
-		FormatInfo, FormulaInfo, HeadingInfo, ImageInfo, LinkInfo, ListInfo, ListItemInfo, SeparatorInfo, TableInfo,
+		BlockInfo, FormatInfo, FormulaInfo, HeadingInfo, ImageInfo, LinkInfo, ListInfo, ListItemInfo, SeparatorInfo,
+		TableInfo,
 	},
-	util::zip::read_zip_entry_by_name,
+	util::zip::{read_zip_entry_by_name, read_zip_entry_bytes},
 };
 
 struct SectionContent {
@@ -46,14 +49,17 @@ struct SectionContent {
 	bolds: Vec<FormatInfo>,
 	italics: Vec<FormatInfo>,
 	underlines: Vec<FormatInfo>,
-	id_positions: HashMap<String, usize>,
-	/// Whether the section's markup holds an image element at all, described or not. The converters
-	/// only record an image that carries a description, so this is the only sign that a page whose
-	/// whole body is one undescribed picture is a picture and not simply empty.
+	preformatted: Vec<FormatInfo>,
+	code: Vec<FormatInfo>,
+	superscripts: Vec<FormatInfo>,
+	subscripts: Vec<FormatInfo>,
+	blocks: Vec<BlockInfo>,
+	id_positions: HashMap<String, DocPos>,
+	/// The converters only record described images, so this is the only sign that a page whose whole body is one undescribed picture isn't simply empty.
 	has_image_markup: bool,
-	/// The first picture a page with no text shows, as its markup wrote it. The converters only record a described image, and the plates of a picture book mostly are not, so this is how such a page's picture can still be saved.
+	/// Picture-book plates are mostly undescribed and so unrecorded by the converters; this is how such a page's picture can still be saved.
 	image_source: String,
-	/// Why the section was read as HTML rather than XML, for the one summary line a book gets: an EPUB whose XHTML is not well-formed usually has every section like that.
+	/// An EPUB whose XHTML isn't well-formed usually has every section like that, so the book gets one summary line rather than one per section.
 	xml_error: Option<String>,
 	title_ids: Vec<(TitleRole, String)>,
 }
@@ -95,53 +101,73 @@ impl ConverterOutput for SectionContent {
 	fn get_underlines(&self) -> &[FormatInfo] {
 		&self.underlines
 	}
+	fn get_preformatted(&self) -> &[FormatInfo] {
+		&self.preformatted
+	}
+	fn get_code(&self) -> &[FormatInfo] {
+		&self.code
+	}
+	fn get_superscripts(&self) -> &[FormatInfo] {
+		&self.superscripts
+	}
+	fn get_subscripts(&self) -> &[FormatInfo] {
+		&self.subscripts
+	}
+	fn get_blocks(&self) -> &[BlockInfo] {
+		&self.blocks
+	}
 }
 
 pub(super) struct SectionMeta {
 	pub(super) path: String,
-	pub(super) start: usize,
-	pub(super) end: usize,
+	pub(super) start: DocPos,
+	pub(super) end: DocPos,
 }
 
 pub(super) struct SpineConversionResult {
 	pub(super) buffer: DocumentBuffer,
-	pub(super) id_positions: HashMap<String, usize>,
+	pub(super) id_positions: HashMap<String, DocPos>,
 	pub(super) sections: Vec<SectionMeta>,
 	pub(super) conversion_errors: Vec<String>,
 	pub(super) titles: Vec<ChapterTitle>,
 }
 
-/// Reads and converts every spine item to text. Each rayon worker opens its own independent
-/// `ZipArchive` (via `map_init`, so this happens once per task rather than once per item) so the
-/// zip-read I/O and the HTML-to-text conversion both run across cores instead of the read being
-/// serialized through one shared archive handle before conversion can start.
+/// Each rayon worker opens its own file so zip reads run across cores instead of serializing through one shared handle. They share `metadata` because rayon runs `map_init` per split rather than per thread, and parsing the directory there took 19 seconds on a book with 165,000 entries.
 pub(super) fn convert_spine_items(
 	file_path: &str,
+	metadata: &Arc<ZipArchiveMetadata>,
 	manifest: &HashMap<String, ManifestItem>,
 	spine: &[String],
 	render_tables_inline: bool,
 ) -> SpineConversionResult {
-	let converted: Vec<Result<(&ManifestItem, SectionContent), String>> = spine
+	let open_archive = || {
+		File::open(file_path).map_err(|err| err.to_string()).map(|file| {
+			// SAFETY: the contract is only that reader and metadata describe the same archive, and `metadata` was read from this same path when this parse began. A file swapped in between gives read errors or wrong text for that book, not undefined behavior.
+			unsafe { ZipArchive::unsafe_new_with_metadata(BufReader::new(file), Arc::clone(metadata)) }
+		})
+	};
+	let read: Vec<Result<(&ManifestItem, String), String>> = spine
 		.par_iter()
-		.map_init(
-			|| {
-				File::open(file_path)
-					.map_err(|err| err.to_string())
-					.and_then(|file| ZipArchive::new(BufReader::new(file)).map_err(|err| err.to_string()))
-			},
-			|archive_result, idref| {
-				let item = manifest.get(idref).ok_or_else(|| format!("missing manifest item for {idref}"))?;
-				let archive = archive_result.as_mut().map_err(|err| format!("{} ({err})", item.path))?;
-				let data =
-					read_zip_entry_by_name(archive, &item.path).map_err(|err| format!("{} ({err})", item.path))?;
-				let section = convert_section(&fork_spacing::tidy_markup(&data), render_tables_inline)
-					.map_err(|err| format!("{} ({err})", item.path))?;
-				Ok((item, section))
-			},
-		)
+		.map_init(open_archive, |archive_result, idref| {
+			let item = manifest.get(idref).ok_or_else(|| format!("missing manifest item for {idref}"))?;
+			let archive = archive_result.as_mut().map_err(|err| format!("{} ({err})", item.path))?;
+			let data = read_zip_entry_by_name(archive, &item.path).map_err(|err| format!("{} ({err})", item.path))?;
+			Ok((item, data))
+		})
 		.collect();
-	// Keep each spine item's original index (for the "Section N" label, which reflects spine
-	// position even across skipped items) alongside its manifest item and converted section.
+	let repeated = repeated_pictures(&read);
+	let converted: Vec<Result<(&ManifestItem, SectionContent), String>> = read
+		.into_par_iter()
+		.map_init(open_archive, |archive_result, section| {
+			let (item, data) = section?;
+			let content_images = match archive_result.as_mut() {
+				Ok(archive) => content_images(archive, &item.path, &data, &repeated),
+				Err(_) => HashSet::new(),
+			};
+			Ok((item, convert_section(&fork_spacing::tidy_markup(&data), render_tables_inline, content_images)))
+		})
+		.collect();
+	// The original index is kept because the "Section N" label reflects spine position even across skipped items.
 	let mut ok_entries: Vec<(usize, &ManifestItem, SectionContent)> = Vec::with_capacity(converted.len());
 	let mut conversion_errors = Vec::new();
 	for (idx, slot) in converted.into_iter().enumerate() {
@@ -166,20 +192,11 @@ pub(super) fn convert_spine_items(
 			"epub sections were not well-formed xml, so they were read as html"
 		);
 	}
-	// `DocumentBuffer::from_parts` builds the buffer's content and per-char indices for every
-	// section in parallel, in one pass, instead of appending them one at a time; it hands back
-	// each section's `[start, end)` span so markers and id positions (below) can still be placed
-	// relative to where each section landed.
-	// A spine item that is a picture, or a wrapper page whose whole body is one image, converts to
-	// no text and would otherwise leave the reader a blank stretch of book with no sign a page is
-	// there. Each such section is given a one-line image placeholder so the book is navigable and
-	// the picture can be reached; see [`section_is_image`].
+	// A picture spine item or one-image wrapper page converts to no text, which would leave a blank stretch with no sign a page is there.
 	let image_sections: Vec<bool> =
 		ok_entries.iter().map(|(_, item, section)| section_is_image(item, section)).collect();
 	let image_placeholder = format!("[{}]", t("Image"));
-	// A section is replaced by the placeholder when it is a picture with no real text of its own.
-	// Its converter markers and id positions point into the text that was dropped, so they are not
-	// applied below.
+	// A replaced section's converter markers and id positions point into the dropped text, so they are not applied below.
 	let mut replaced = vec![false; ok_entries.len()];
 	let texts: Vec<String> = ok_entries
 		.iter_mut()
@@ -187,9 +204,7 @@ pub(super) fn convert_spine_items(
 		.enumerate()
 		.map(|(index, ((_, item, section), is_image))| {
 			let text = mem::take(&mut section.text);
-			// A raster image read as a spine item comes through as the decode garbage of its own
-			// bytes, which is never real text, so it is always replaced. An SVG or a wrapper page
-			// keeps whatever real text it has and takes the placeholder only when it has none.
+			// A raster spine item decodes to garbage, never real text, so it is always replaced; an SVG or wrapper page keeps any real text it has.
 			if is_binary_image(&item.media_type) || (*is_image && text.trim().is_empty()) {
 				replaced[index] = true;
 				image_placeholder.clone()
@@ -211,9 +226,7 @@ pub(super) fn convert_spine_items(
 				.with_text(section_label)
 				.with_reference(item.path.clone()),
 		);
-		// An image page gets an Image marker so it is announced and reachable with the image
-		// navigation key, the same as a picture inside a text page. The picture's path rides along
-		// as the reference, as it does for a comic archive's pages, so it can be saved.
+		// The picture's path rides along as the reference, as for a comic archive's pages, so it can be saved.
 		if *is_image {
 			let source = if item.media_type.starts_with("image/") {
 				item.path.clone()
@@ -224,11 +237,9 @@ pub(super) fn convert_spine_items(
 			};
 			buffer.add_marker(Marker::new(MarkerType::Image, section_start).with_reference(source));
 		}
-		// A section whose text was replaced by the placeholder has no content its markers or id
-		// positions still line up with, so only its section break and image marker are kept.
 		if !was_replaced {
 			for (id, relative) in &section.id_positions {
-				let absolute = section_start + relative;
+				let absolute = section_start + relative.from_start();
 				// Keep the first occurrence for bare ids to avoid later sections overwriting earlier ones.
 				id_positions.entry(id.clone()).or_insert(absolute);
 				id_positions.insert(format!("{}#{id}", item.path), absolute);
@@ -236,7 +247,7 @@ pub(super) fn convert_spine_items(
 			for (role, id) in &section.title_ids {
 				if let Some(relative) = section.id_positions.get(id) {
 					let reference = format!("{}#{id}", item.path);
-					titles.push(ChapterTitle { role: *role, offset: section_start + relative, reference });
+					titles.push(ChapterTitle { role: *role, offset: section_start + relative.from_start(), reference });
 				}
 			}
 			add_converter_markers_excluding_links(&mut buffer, section, section_start, &|source| {
@@ -245,7 +256,7 @@ pub(super) fn convert_spine_items(
 			for link in &section.links {
 				let resolved = resolve_href(&item.path, &link.reference);
 				buffer.add_marker(
-					Marker::new(MarkerType::Link, section_start + link.offset)
+					Marker::new(MarkerType::Link, section_start + link.offset.from_start())
 						.with_text(link.text.clone())
 						.with_reference(resolved),
 				);
@@ -256,52 +267,86 @@ pub(super) fn convert_spine_items(
 	SpineConversionResult { buffer, id_positions, sections, conversion_errors, titles }
 }
 
-/// Whether a spine item is a page the reader meets as a picture rather than as text.
-///
-/// Two shapes count. A spine item that is itself an image (`image/svg+xml`, `image/jpeg`, and the
-/// like) is a page-as-picture, which is how the fixed-layout books in the EPUB sample set are
-/// built. A wrapper page whose media type is XHTML but whose whole body came through as an image
-/// with no text of its own is the other, which is how a picture book puts one plate on each page.
-/// A page that has any text is not one of these, whatever else it also holds.
+/// Fixed-layout books in the EPUB sample set make pictures spine items; picture books wrap one plate per text-less XHTML page.
 fn section_is_image(item: &ManifestItem, section: &SectionContent) -> bool {
 	if item.media_type.starts_with("image/") {
 		return true;
 	}
-	section.has_image_markup && section.text.trim().is_empty()
+	section.has_image_markup
 }
 
-/// Whether a section's markup contains an image element (`<img>`, SVG `<image>`, or a `<figure>`),
-/// described or not. A plain substring test is enough: it only decides whether a text-less page is
-/// a picture to announce, and a false positive there costs one image line on an already empty page.
+/// The text first, since looking for markup lowercases a copy of the whole section.
+fn is_image_only(content: &str, text: &str) -> bool {
+	text.trim().is_empty() && content_has_image_markup(content)
+}
+
+/// A substring test is enough: a false positive costs one image line on an already empty page.
 fn content_has_image_markup(content: &str) -> bool {
 	let lowered = content.to_ascii_lowercase();
 	lowered.contains("<img") || lowered.contains("<image") || lowered.contains("<figure")
 }
 
-/// Whether a spine item is a raster image, whose bytes are not text and decode to garbage when
-/// read as any. SVG is left out: it is real XML and may hold text worth keeping.
+/// SVG is left out: it is real XML and may hold text worth keeping.
 fn is_binary_image(media_type: &str) -> bool {
 	media_type.starts_with("image/") && media_type != "image/svg+xml"
 }
 
-/// The first picture in a page's markup. Only asked of a page with no text, which is rare enough that parsing it a second time costs nothing.
-fn first_image_source(content: &str, text: &str) -> String {
-	if !text.trim().is_empty() || !content_has_image_markup(content) {
+/// Only asked of a page with no text, which is rare enough that parsing it a second time costs nothing.
+fn first_image_source(content: &str, has_image_markup: bool) -> String {
+	if !has_image_markup {
 		return String::new();
 	}
 	HtmlToText::image_source(Html::parse_document(content).tree.root())
 }
 
-fn convert_section(content: &str, render_tables_inline: bool) -> Result<SectionContent> {
-	let mut xml_converter = XmlToText::with_render_tables_inline(render_tables_inline);
+/// Ebooks give every picture an empty `alt`, scanned letters and maps included, so the section's pictures with one are measured from the archive, and those big enough to be content are shown.
+fn content_images<R: Read + Seek>(
+	archive: &mut ZipArchive<R>,
+	section_path: &str,
+	content: &str,
+	repeated: &HashSet<String>,
+) -> HashSet<String> {
+	image_text::empty_alt_sources(content)
+		.into_iter()
+		.filter(|source| !is_data_uri(source))
+		.filter(|source| {
+			let path = picture_path(section_path, source);
+			!repeated.contains(&path)
+				&& read_zip_entry_bytes(archive, &path).is_ok_and(|bytes| image_text::is_content_sized(&bytes))
+		})
+		.collect()
+}
+
+/// A picture placed more than once in the book is an ornament however big it is, such as a scene break drawn at 566 by 377 and set between every scene of a novel; a letter, a figure or an illustration appears once.
+fn repeated_pictures(sections: &[Result<(&ManifestItem, String), String>]) -> HashSet<String> {
+	let mut uses: HashMap<String, usize> = HashMap::new();
+	for (item, content) in sections.iter().flatten() {
+		for source in image_text::empty_alt_sources(content) {
+			if !is_data_uri(&source) {
+				*uses.entry(picture_path(&item.path, &source)).or_default() += 1;
+			}
+		}
+	}
+	uses.into_iter().filter(|&(_, count)| count > 1).map(|(path, _)| path).collect()
+}
+
+/// The archive path of a picture a section names with `source`.
+fn picture_path(section_path: &str, source: &str) -> String {
+	split_href(&resolve_href(section_path, source)).0
+}
+
+fn convert_section(content: &str, render_tables_inline: bool, content_images: HashSet<String>) -> SectionContent {
+	let mut xml_converter =
+		XmlToText::with_render_tables_inline(render_tables_inline).with_content_images(content_images.clone());
 	let xml_error = match xml_converter.try_convert(content) {
 		Ok(()) => None,
 		Err(error) => Some(error.to_string()),
 	};
 	if xml_error.is_none() {
-		let text = xml_converter.get_text();
-		return Ok(SectionContent {
-			image_source: first_image_source(content, &text),
+		let text = xml_converter.take_text();
+		let has_image_markup = is_image_only(content, &text);
+		return SectionContent {
+			image_source: first_image_source(content, has_image_markup),
 			text,
 			headings: xml_converter.get_headings().to_vec(),
 			links: xml_converter.get_links().to_vec(),
@@ -315,58 +360,128 @@ fn convert_section(content: &str, render_tables_inline: bool) -> Result<SectionC
 			bolds: xml_converter.get_bolds().to_vec(),
 			italics: xml_converter.get_italics().to_vec(),
 			underlines: xml_converter.get_underlines().to_vec(),
+			preformatted: xml_converter.get_preformatted().to_vec(),
+			code: xml_converter.get_code().to_vec(),
+			superscripts: xml_converter.get_superscripts().to_vec(),
+			subscripts: xml_converter.get_subscripts().to_vec(),
+			blocks: xml_converter.get_blocks().to_vec(),
 			id_positions: xml_converter.get_id_positions().clone(),
-			has_image_markup: content_has_image_markup(content),
+			has_image_markup,
 			xml_error: None,
 			title_ids: fork_toc::title_ids(content),
-		});
+		};
 	}
-	let mut html_converter = HtmlToText::with_render_tables_inline(render_tables_inline);
-	if html_converter.convert(content, HtmlSourceMode::NativeHtml) {
-		let text = html_converter.get_text();
-		return Ok(SectionContent {
-			image_source: first_image_source(content, &text),
-			text,
-			headings: html_converter.get_headings().to_vec(),
-			links: html_converter.get_links().to_vec(),
-			images: html_converter.get_images().to_vec(),
-			figures: html_converter.get_figures().to_vec(),
-			tables: html_converter.get_tables().to_vec(),
-			formulas: html_converter.get_formulas().to_vec(),
-			separators: html_converter.get_separators().to_vec(),
-			lists: html_converter.get_lists().to_vec(),
-			list_items: html_converter.get_list_items().to_vec(),
-			bolds: html_converter.get_bolds().to_vec(),
-			italics: html_converter.get_italics().to_vec(),
-			underlines: html_converter.get_underlines().to_vec(),
-			id_positions: html_converter.get_id_positions().clone(),
-			has_image_markup: content_has_image_markup(content),
-			xml_error,
-			title_ids: fork_toc::title_ids(content),
-		});
+	let mut html_converter =
+		HtmlToText::with_render_tables_inline(render_tables_inline).with_content_images(content_images);
+	html_converter.convert(content, HtmlSourceMode::NativeHtml);
+	let text = html_converter.take_text();
+	let has_image_markup = is_image_only(content, &text);
+	SectionContent {
+		image_source: first_image_source(content, has_image_markup),
+		text,
+		headings: html_converter.get_headings().to_vec(),
+		links: html_converter.get_links().to_vec(),
+		images: html_converter.get_images().to_vec(),
+		figures: html_converter.get_figures().to_vec(),
+		tables: html_converter.get_tables().to_vec(),
+		formulas: html_converter.get_formulas().to_vec(),
+		separators: html_converter.get_separators().to_vec(),
+		lists: html_converter.get_lists().to_vec(),
+		list_items: html_converter.get_list_items().to_vec(),
+		bolds: html_converter.get_bolds().to_vec(),
+		italics: html_converter.get_italics().to_vec(),
+		underlines: html_converter.get_underlines().to_vec(),
+		preformatted: html_converter.get_preformatted().to_vec(),
+		code: html_converter.get_code().to_vec(),
+		superscripts: html_converter.get_superscripts().to_vec(),
+		subscripts: html_converter.get_subscripts().to_vec(),
+		blocks: html_converter.get_blocks().to_vec(),
+		id_positions: html_converter.get_id_positions().clone(),
+		has_image_markup,
+		xml_error,
+		title_ids: fork_toc::title_ids(content),
 	}
-	// currently unreachable, HtmlToText::convert always returns true today
-	tracing::warn!("epub section content unsupported by both xml and html converters");
-	// TRANSLATORS: Error shown when an EPUB spine item's content type cannot be converted
-	anyhow::bail!(t("unsupported content"))
 }
 
 #[cfg(test)]
 mod tests {
-	use super::{content_has_image_markup, convert_section, is_binary_image};
+	use std::{
+		collections::HashSet,
+		io::{Cursor, Write},
+	};
+
+	use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
+
+	use super::{
+		ManifestItem, content_has_image_markup, content_images, convert_section, is_binary_image, repeated_pictures,
+	};
 
 	#[test]
 	fn a_section_that_is_not_well_formed_xml_is_read_as_html_and_says_why() {
 		let section =
-			convert_section("<html><body><p>Before <img src='a.jpg'> after</p></body></html>", false).unwrap();
+			convert_section("<html><body><p>Before <img src='a.jpg'> after</p></body></html>", false, HashSet::new());
 		assert!(section.text.contains("Before"), "{:?}", section.text);
 		assert!(section.xml_error.is_some());
 	}
 
 	#[test]
 	fn a_well_formed_section_records_no_xml_error() {
-		let section = convert_section("<html><body><p>Fine</p></body></html>", false).unwrap();
+		let section = convert_section("<html><body><p>Fine</p></body></html>", false, HashSet::new());
 		assert_eq!(section.xml_error, None);
+	}
+
+	fn png(width: u32, height: u32) -> Vec<u8> {
+		let mut bytes = Vec::new();
+		image::DynamicImage::new_luma8(width, height)
+			.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
+			.expect("encode a png");
+		bytes
+	}
+
+	/// The back matter of Rex Stout's The Silent Speaker is two scanned letters, each `<img alt="">` like the book's ornaments.
+	#[test]
+	fn pictures_with_an_empty_alt_are_shown_when_big_enough_to_be_content() {
+		let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
+		for (name, bytes) in [("OEBPS/images/letter.png", png(600, 800)), ("OEBPS/images/rule.png", png(400, 12))] {
+			zip.start_file(name, SimpleFileOptions::default()).unwrap();
+			zip.write_all(&bytes).unwrap();
+		}
+		let mut archive = ZipArchive::new(Cursor::new(zip.finish().unwrap().into_inner())).unwrap();
+		let section = r#"<html xmlns="http://www.w3.org/1999/xhtml"><body><p>A letter from the publisher.</p><p><img alt="" src="images/letter.png"/></p><p><img alt="" src="images/rule.png"/></p></body></html>"#;
+		let measured = content_images(&mut archive, "OEBPS/back.xhtml", section, &HashSet::new());
+		assert_eq!(measured, HashSet::from(["images/letter.png".to_string()]));
+		let converted = convert_section(section, false, measured);
+		assert_eq!(converted.text.matches("[Image]").count(), 1, "{:?}", converted.text);
+		assert_eq!(converted.images.len(), 1);
+		assert_eq!(converted.images[0].source, "images/letter.png");
+	}
+
+	/// A romance novel sets the same 566 by 377 flourish between every scene.
+	#[test]
+	fn a_picture_placed_more_than_once_is_an_ornament_however_big() {
+		let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
+		zip.start_file("OEBPS/break.png", SimpleFileOptions::default()).unwrap();
+		zip.write_all(&png(566, 377)).unwrap();
+		let mut archive = ZipArchive::new(Cursor::new(zip.finish().unwrap().into_inner())).unwrap();
+		let chapter =
+			r#"<html><body><p>One.</p><p><img alt="" src="break.png"/></p><p>Two.</p></body></html>"#.to_string();
+		let item = ManifestItem {
+			id: "one".to_string(),
+			path: "OEBPS/one.xhtml".to_string(),
+			media_type: "application/xhtml+xml".to_string(),
+			properties: Vec::new(),
+		};
+		let other = ManifestItem {
+			id: "two".to_string(),
+			path: "OEBPS/two.xhtml".to_string(),
+			media_type: "application/xhtml+xml".to_string(),
+			properties: Vec::new(),
+		};
+		let sections = vec![Ok((&item, chapter.clone())), Ok((&other, chapter.clone()))];
+		let repeated = repeated_pictures(&sections);
+		assert_eq!(repeated, HashSet::from(["OEBPS/break.png".to_string()]));
+		assert!(content_images(&mut archive, "OEBPS/one.xhtml", &chapter, &repeated).is_empty());
+		assert_eq!(content_images(&mut archive, "OEBPS/one.xhtml", &chapter, &HashSet::new()).len(), 1);
 	}
 
 	#[test]
@@ -374,9 +489,7 @@ mod tests {
 		assert!(content_has_image_markup("<body><img src='x.jpg'/></body>"));
 		assert!(content_has_image_markup("<svg><image href='x'/></svg>"));
 		assert!(content_has_image_markup("<figure><figcaption>x</figcaption></figure>"));
-		// Case does not matter.
 		assert!(content_has_image_markup("<BODY><IMG SRC='x'/></BODY>"));
-		// A page of plain prose is not an image page.
 		assert!(!content_has_image_markup("<body><p>Just words here.</p></body>"));
 	}
 
@@ -385,7 +498,6 @@ mod tests {
 		assert!(is_binary_image("image/jpeg"));
 		assert!(is_binary_image("image/png"));
 		assert!(is_binary_image("image/gif"));
-		// SVG is real XML and may carry text, so it is not treated as binary.
 		assert!(!is_binary_image("image/svg+xml"));
 		assert!(!is_binary_image("application/xhtml+xml"));
 		assert!(!is_binary_image("text/css"));

@@ -1,15 +1,20 @@
-use std::{cell::Cell, path::Path, rc::Rc, sync::Mutex};
+use std::{
+	cell::{Cell, RefCell},
+	path::Path,
+	rc::Rc,
+	sync::Mutex,
+};
 
 use paperback_core::{
-	config::{ConfigManager, document_missing},
+	config::{ConfigManager, document_missing, filter_document_list, get_sorted_document_list},
 	parser::build_file_filter_string,
-	types::DocumentListStatus,
+	types::{DocumentListItem, DocumentListStatus},
 };
 use patois::{nt, t};
 use wx_utils::confirm;
 use wxdragon::{ffi, prelude::*, timer::Timer, window::FromWindowWithClassName};
 
-use super::DIALOG_PADDING;
+use super::dialog_padding;
 
 mod list;
 
@@ -65,6 +70,7 @@ pub fn show_all_documents_dialog(
 	// TRANSLATORS: Title of the All Documents dialog
 	let dialog_title = t("All Documents");
 	let dialog = Dialog::builder(parent, &dialog_title).build();
+	let _destroy = super::DestroyOnDrop(dialog);
 	let selected_paths: Rc<Mutex<Vec<String>>> = Rc::new(Mutex::new(Vec::new()));
 	let paths_to_close: Rc<Mutex<Vec<String>>> = Rc::new(Mutex::new(Vec::new()));
 	// TRANSLATORS: Label for the search input field in the All Documents dialog
@@ -89,10 +95,10 @@ pub fn show_all_documents_dialog(
 	status_debounce.timer.on_tick(move |_event| {
 		update_document_status_bar(widgets.list, widgets.status_bar);
 	});
+	let documents = Rc::new(RefCell::new(load_documents(config, &open_paths)));
 	populate_document_list(&DocumentListParams {
 		widgets,
-		config,
-		open_paths: open_paths.as_ref(),
+		documents: &documents.borrow(),
 		filter: "",
 		status_filter: None,
 		selection: None,
@@ -108,6 +114,7 @@ pub fn show_all_documents_dialog(
 		Rc::clone(config),
 		Rc::clone(&open_paths),
 		Rc::clone(&paths_to_close),
+		Rc::clone(&documents),
 		status_debounce.clone(),
 	);
 	widgets.remove_button.on_click({
@@ -120,6 +127,7 @@ pub fn show_all_documents_dialog(
 		search_ctrl,
 		Rc::clone(config),
 		Rc::clone(&open_paths),
+		Rc::clone(&documents),
 		status_debounce.clone(),
 	);
 	bind_all_documents_clear(
@@ -129,16 +137,11 @@ pub fn show_all_documents_dialog(
 		Rc::clone(config),
 		Rc::clone(&open_paths),
 		Rc::clone(&paths_to_close),
+		Rc::clone(&documents),
 		status_debounce.clone(),
 	);
-	bind_all_documents_search(search_ctrl, widgets, Rc::clone(config), Rc::clone(&open_paths), status_debounce.clone());
-	bind_all_documents_status_choice(
-		widgets,
-		search_ctrl,
-		Rc::clone(config),
-		Rc::clone(&open_paths),
-		status_debounce.clone(),
-	);
+	bind_all_documents_search(search_ctrl, widgets, Rc::clone(&documents), status_debounce.clone());
+	bind_all_documents_status_choice(widgets, search_ctrl, Rc::clone(&documents), status_debounce.clone());
 	bind_all_documents_keys(widgets, &open_action, &remove_action, status_debounce);
 	bind_all_documents_layout(
 		dialog,
@@ -325,6 +328,7 @@ fn make_all_documents_remove_action(
 	config: Rc<Mutex<ConfigManager>>,
 	open_paths: Rc<Vec<String>>,
 	paths_to_close: Rc<Mutex<Vec<String>>>,
+	documents: Rc<RefCell<Vec<DocumentListItem>>>,
 	status_debounce: StatusBarDebounce,
 ) -> Rc<dyn Fn()> {
 	Rc::new(move || {
@@ -367,10 +371,10 @@ fn make_all_documents_remove_action(
 		}
 		let new_selection = indices.iter().copied().max();
 		let filter = search_ctrl.get_value();
+		*documents.borrow_mut() = load_documents(&config, &open_paths);
 		populate_document_list(&DocumentListParams {
 			widgets,
-			config: &config,
-			open_paths: open_paths.as_ref(),
+			documents: &documents.borrow(),
 			filter: &filter,
 			status_filter: status_filter_from_choice(widgets.status_choice),
 			selection: new_selection,
@@ -386,6 +390,7 @@ fn bind_all_documents_clear(
 	config: Rc<Mutex<ConfigManager>>,
 	open_paths: Rc<Vec<String>>,
 	paths_to_close: Rc<Mutex<Vec<String>>>,
+	documents: Rc<RefCell<Vec<DocumentListItem>>>,
 	status_debounce: StatusBarDebounce,
 ) {
 	widgets.clear_all_button.on_click(move |_| {
@@ -395,7 +400,7 @@ fn bind_all_documents_clear(
 		if !confirm(
 			&dialog,
 			// TRANSLATORS: Confirmation prompt when clearing all documents from the list.
-			&t("Are you sure you want to remove all documents from the list? This will also remove all reading positions and bookmarks."),
+			t("Are you sure you want to remove all documents from the list? This will also remove all reading positions and bookmarks."),
 			// TRANSLATORS: Title of the confirmation dialog
 			&t("Confirm"),
 		) {
@@ -418,10 +423,10 @@ fn bind_all_documents_clear(
 			cfg.flush();
 		}
 		search_ctrl.set_value("");
+		*documents.borrow_mut() = load_documents(&config, &open_paths);
 		populate_document_list(&DocumentListParams {
 			widgets,
-			config: &config,
-			open_paths: open_paths.as_ref(),
+			documents: &documents.borrow(),
 			filter: "",
 			status_filter: status_filter_from_choice(widgets.status_choice),
 			selection: None,
@@ -433,16 +438,14 @@ fn bind_all_documents_clear(
 fn bind_all_documents_search(
 	search_ctrl: TextCtrl,
 	widgets: AllDocumentsWidgets,
-	config: Rc<Mutex<ConfigManager>>,
-	open_paths: Rc<Vec<String>>,
+	documents: Rc<RefCell<Vec<DocumentListItem>>>,
 	status_debounce: StatusBarDebounce,
 ) {
 	search_ctrl.on_text_updated(move |_event| {
 		let filter = search_ctrl.get_value();
 		populate_document_list(&DocumentListParams {
 			widgets,
-			config: &config,
-			open_paths: open_paths.as_ref(),
+			documents: &documents.borrow(),
 			filter: &filter,
 			status_filter: status_filter_from_choice(widgets.status_choice),
 			selection: None,
@@ -454,16 +457,14 @@ fn bind_all_documents_search(
 fn bind_all_documents_status_choice(
 	widgets: AllDocumentsWidgets,
 	search_ctrl: TextCtrl,
-	config: Rc<Mutex<ConfigManager>>,
-	open_paths: Rc<Vec<String>>,
+	documents: Rc<RefCell<Vec<DocumentListItem>>>,
 	status_debounce: StatusBarDebounce,
 ) {
 	widgets.status_choice.on_selection_changed(move |_event| {
 		let filter = search_ctrl.get_value();
 		populate_document_list(&DocumentListParams {
 			widgets,
-			config: &config,
-			open_paths: open_paths.as_ref(),
+			documents: &documents.borrow(),
 			filter: &filter,
 			status_filter: status_filter_from_choice(widgets.status_choice),
 			selection: None,
@@ -525,6 +526,7 @@ struct AllDocumentsLayout {
 }
 
 fn bind_all_documents_layout(dialog: Dialog, layout: AllDocumentsLayout) {
+	let padding = dialog_padding(&dialog);
 	let AllDocumentsLayout { search_label, search_ctrl, status_label, widgets, ok_button } = layout;
 	let AllDocumentsWidgets {
 		list,
@@ -541,33 +543,33 @@ fn bind_all_documents_layout(dialog: Dialog, layout: AllDocumentsLayout) {
 	});
 	let content_sizer = BoxSizer::builder(Orientation::Vertical).build();
 	let search_sizer = BoxSizer::builder(Orientation::Horizontal).build();
-	search_sizer.add(&search_label, 0, SizerFlag::AlignCenterVertical | SizerFlag::Right, DIALOG_PADDING);
-	search_sizer.add(&search_ctrl, 1, SizerFlag::AlignCenterVertical | SizerFlag::Right, DIALOG_PADDING / 2);
-	search_sizer.add(&status_label, 0, SizerFlag::AlignCenterVertical | SizerFlag::Right, DIALOG_PADDING);
+	search_sizer.add(&search_label, 0, SizerFlag::AlignCenterVertical | SizerFlag::Right, padding);
+	search_sizer.add(&search_ctrl, 1, SizerFlag::AlignCenterVertical | SizerFlag::Right, padding / 2);
+	search_sizer.add(&status_label, 0, SizerFlag::AlignCenterVertical | SizerFlag::Right, padding);
 	search_sizer.add(&status_choice, 0, SizerFlag::AlignCenterVertical, 0);
-	content_sizer.add_sizer(&search_sizer, 0, SizerFlag::Expand | SizerFlag::All, DIALOG_PADDING);
-	content_sizer.add(&list, 1, SizerFlag::Expand | SizerFlag::All, DIALOG_PADDING);
+	content_sizer.add_sizer(&search_sizer, 0, SizerFlag::Expand | SizerFlag::All, padding);
+	content_sizer.add(&list, 1, SizerFlag::Expand | SizerFlag::All, padding);
 	list.set_focus();
 	let action_sizer = BoxSizer::builder(Orientation::Horizontal).build();
-	action_sizer.add(&open_button, 0, SizerFlag::Right, DIALOG_PADDING);
-	action_sizer.add(&locate_button, 0, SizerFlag::Right, DIALOG_PADDING);
-	action_sizer.add(&remove_button, 0, SizerFlag::Right, DIALOG_PADDING);
-	action_sizer.add(&clear_all_button, 0, SizerFlag::Right, DIALOG_PADDING);
+	action_sizer.add(&open_button, 0, SizerFlag::Right, padding);
+	action_sizer.add(&locate_button, 0, SizerFlag::Right, padding);
+	action_sizer.add(&remove_button, 0, SizerFlag::Right, padding);
+	action_sizer.add(&clear_all_button, 0, SizerFlag::Right, padding);
 	content_sizer.add_sizer(
 		&action_sizer,
 		0,
 		SizerFlag::AlignLeft | SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom,
-		DIALOG_PADDING,
+		padding,
 	);
 	let ok_sizer = BoxSizer::builder(Orientation::Horizontal).build();
 	ok_sizer.add_stretch_spacer(1);
-	ok_sizer.add(&ok_button, 0, SizerFlag::All, DIALOG_PADDING);
+	ok_sizer.add(&ok_button, 0, SizerFlag::All, padding);
 	content_sizer.add_sizer(&ok_sizer, 0, SizerFlag::Expand, 0);
 	content_sizer.add(
 		&status_bar,
 		0,
 		SizerFlag::Expand | SizerFlag::Left | SizerFlag::Right | SizerFlag::Bottom,
-		DIALOG_PADDING,
+		padding,
 	);
 	dialog.set_sizer_and_fit(content_sizer, true);
 	dialog.centre();
@@ -575,8 +577,7 @@ fn bind_all_documents_layout(dialog: Dialog, layout: AllDocumentsLayout) {
 
 struct DocumentListParams<'a> {
 	widgets: AllDocumentsWidgets,
-	config: &'a Rc<Mutex<ConfigManager>>,
-	open_paths: &'a [String],
+	documents: &'a [DocumentListItem],
 	filter: &'a str,
 	status_filter: Option<DocumentListStatus>,
 	selection: Option<i32>,
@@ -584,16 +585,12 @@ struct DocumentListParams<'a> {
 }
 
 fn populate_document_list(params: &DocumentListParams<'_>) {
-	let DocumentListParams { widgets, config, open_paths, filter, status_filter, selection, status_debounce } = *params;
+	let DocumentListParams { widgets, documents, filter, status_filter, selection, status_debounce } = *params;
 	let AllDocumentsWidgets { list, open_button, locate_button, remove_button, clear_all_button, status_bar, .. } =
 		widgets;
 	status_debounce.suppress.set(true);
 	clear_document_list(list);
-	let items = {
-		let cfg = config.lock().unwrap();
-		paperback_core::config::get_sorted_document_list(&cfg, open_paths, filter, status_filter)
-	};
-	for item in items {
+	for item in filter_document_list(documents, filter, status_filter) {
 		let status = match item.status {
 			// TRANSLATORS: Status of a document that is currently open in a tab
 			DocumentListStatus::Open => t("Open"),
@@ -623,6 +620,11 @@ fn populate_document_list(params: &DocumentListParams<'_>) {
 	}
 	status_debounce.suppress.set(false);
 	update_document_status_bar(list, status_bar);
+}
+
+/// Read when the dialog opens and again only when the history changes, since a search only narrows it.
+fn load_documents(config: &Mutex<ConfigManager>, open_paths: &[String]) -> Vec<DocumentListItem> {
+	get_sorted_document_list(&config.lock().unwrap(), open_paths)
 }
 
 fn status_filter_from_choice(status_choice: Choice) -> Option<DocumentListStatus> {
@@ -691,6 +693,7 @@ fn bind_all_documents_locate(
 	search_ctrl: TextCtrl,
 	config: Rc<Mutex<ConfigManager>>,
 	open_paths: Rc<Vec<String>>,
+	documents: Rc<RefCell<Vec<DocumentListItem>>>,
 	status_debounce: StatusBarDebounce,
 ) {
 	widgets.locate_button.on_click(move |_| {
@@ -715,10 +718,10 @@ fn bind_all_documents_locate(
 		}
 		let filter = search_ctrl.get_value();
 		let selected_index = get_selected_index(widgets.list);
+		*documents.borrow_mut() = load_documents(&config, &open_paths);
 		populate_document_list(&DocumentListParams {
 			widgets,
-			config: &config,
-			open_paths: open_paths.as_ref(),
+			documents: &documents.borrow(),
 			filter: &filter,
 			status_filter: status_filter_from_choice(widgets.status_choice),
 			selection: if selected_index >= 0 { Some(selected_index) } else { None },

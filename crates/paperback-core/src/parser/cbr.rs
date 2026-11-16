@@ -1,14 +1,6 @@
-//! Comic book archives packed with RAR (`.cbr`).
-//!
-//! Only the ones that are secretly zips. RAR's decoder is RARLAB's C++, carried by
-//! `unrar_sys`, which picks the sources it compiles from the operating system doing the
-//! compiling rather than the one being compiled for. That breaks every cross build we do:
-//! Android gets the Unix set and calls `lutimes`, which bionic does not have, and iOS gets
-//! objects built against the host SDK that the linker then refuses at our deployment target.
-//! Both are changes to `unrar_sys`, not to anything here, so the reader says so instead.
-//!
-//! A `.cbr` is a zip often enough that people barely notice they have one, and those still
-//! open: [`super::cbz`] decides what a page is and how pages are ordered, for both formats.
+//! A real RAR comic is read from the `.cbz` copy [`crate::util::rar`] makes of it.
+
+use std::path::Path;
 
 use anyhow::Result;
 
@@ -16,7 +8,7 @@ use super::cbz;
 use crate::{
 	document::{Document, ParserContext},
 	parser::Parser,
-	t,
+	util::rar,
 };
 
 pub struct CbrParser;
@@ -24,41 +16,14 @@ pub struct CbrParser;
 impl Parser for CbrParser {
 	fn parse(&self, context: &ParserContext) -> Result<Document> {
 		tracing::debug!(path = %context.file_path, "parsing cbr file");
-		// A .cbr that is really a zip is common enough that people barely notice they have
-		// one, and the reader has no reason to be the first to tell them.
+		// A .cbr that is really a zip is common enough that people barely notice they have one.
 		if cbz::is_zip(&context.file_path) {
 			tracing::debug!(path = %context.file_path, "cbr file is really a zip, reading it as one");
 			return cbz::CbzParser.parse(context);
 		}
-		Err(unsupported())
+		let copy = rar::zip_copy(Path::new(&context.file_path), context.password.as_deref(), &rar::cache_root())?;
+		cbz::CbzParser.parse(&ParserContext { file_path: copy.to_string_lossy().into_owned(), ..context.clone() })
 	}
-}
-
-/// What a reader is told when the archive really is a RAR.
-fn unsupported() -> anyhow::Error {
-	// TRANSLATORS: Error shown when opening a comic book archive packed with RAR (.cbr), which Paperback cannot read
-	anyhow::anyhow!(t("Paperback cannot read RAR comic archives. Repack it as a .cbz to read it here."))
-}
-
-/// The archive's page images, in reading order.
-///
-/// Shared with [`crate::ocr`], which reopens the archive to render a page and has to number
-/// the pages exactly as this parser did.
-///
-/// # Errors
-///
-/// Always, for a RAR: see the module note.
-pub fn page_names(_file_path: &str) -> Result<Vec<String>> {
-	Err(unsupported())
-}
-
-/// One page's bytes, by the name [`page_names`] gave it.
-///
-/// # Errors
-///
-/// Always, for a RAR: see the module note.
-pub fn page_bytes(_file_path: &str, _name: &str) -> Result<Vec<u8>> {
-	Err(unsupported())
 }
 
 #[cfg(test)]
@@ -85,8 +50,6 @@ mod tests {
 		path
 	}
 
-	/// People rename these by hand, so a .cbr is a zip about as often as anyone bothers to
-	/// check. Reading it is one line, and refusing it would only puzzle the reader.
 	#[test]
 	fn a_cbr_that_is_really_a_zip_reads_as_one() {
 		let dir = TempDir::new("cbr-zip");
@@ -101,16 +64,18 @@ mod tests {
 		assert_eq!(document.buffer.markers.iter().filter(|m| m.mtype == MarkerType::PageBreak).count(), 2);
 	}
 
-	/// An actual RAR is refused, and says why rather than failing as a broken zip would.
 	#[test]
-	fn a_real_rar_is_refused_with_advice() {
+	fn a_real_rar_reads_from_its_copy() {
 		let dir = TempDir::new("cbr-rar");
-		let path = write_comic(&dir, "book.cbr", &MARKER);
-		let error = CbrParser.parse(&ParserContext::new(path)).expect_err("a RAR is not read");
-		assert!(error.to_string().contains(".cbz"), "{error}");
+		let mut builder = rars::Builder::new(rars::ArchiveVersion::Rar50);
+		for name in ["001.png", "002.png"] {
+			builder.add_bytes(name.as_bytes().to_vec(), PIXEL.to_vec(), None, None).expect("add a page");
+		}
+		let path = write_comic(&dir, "book.cbr", &builder.to_bytes().expect("build the RAR"));
+		let document = CbrParser.parse(&ParserContext::new(path)).expect("a RAR comic is read");
+		assert_eq!(document.buffer.markers.iter().filter(|marker| marker.mtype == MarkerType::PageBreak).count(), 2);
 	}
 
-	/// A zip is a zip whatever it is called, and a RAR is not one.
 	#[test]
 	fn a_zip_is_told_from_a_rar_by_what_is_in_it() {
 		let dir = TempDir::new("cbr-magic");

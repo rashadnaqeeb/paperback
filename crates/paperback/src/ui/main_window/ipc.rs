@@ -1,6 +1,3 @@
-//! Commands from a second instance of Paperback, which hands its arguments to this one over IPC
-//! rather than opening a second window.
-
 #[cfg(target_os = "windows")]
 use std::sync::atomic::{AtomicIsize, Ordering};
 
@@ -23,22 +20,20 @@ impl MainWindow {
 			web_view_dialog = v.get();
 		});
 		if let Some(parent_dialog) = web_view_dialog {
-			let dialog = MessageDialog::builder(
+			wx_utils::show_warning(
 				&parent_dialog,
 				// TRANSLATORS: Message shown when the user tries to perform an action while a help/documentation Web View window is open
-				&t("Paperback cannot perform any actions while Web View is open."),
+				t("Paperback cannot perform any actions while Web View is open."),
 				// TRANSLATORS: Title of a warning dialog
 				&t("Warning"),
-			)
-			.with_style(MessageDialogStyle::OK | MessageDialogStyle::IconWarning | MessageDialogStyle::Centre)
-			.build();
-			dialog.show_modal();
+			);
 			return;
 		}
 		match command {
 			IpcCommand::Activate => {
 				self.activate_from_ipc();
 			}
+			#[cfg(target_os = "windows")]
 			IpcCommand::ToggleVisibility => {
 				self.toggle_visibility();
 			}
@@ -51,9 +46,11 @@ impl MainWindow {
 		}
 	}
 
+	#[cfg(target_os = "windows")]
 	fn toggle_visibility(&self) {
 		let is_shown = self.frame.is_shown();
 		if is_shown && self.is_window_active() {
+			#[cfg_attr(not(target_os = "windows"), allow(unused_mut))]
 			let mut has_popup = false;
 			#[cfg(target_os = "windows")]
 			{
@@ -120,25 +117,19 @@ impl MainWindow {
 		}
 	}
 
+	#[cfg(target_os = "windows")]
 	fn is_window_active(&self) -> bool {
-		#[cfg(target_os = "windows")]
-		{
-			use windows::Win32::{
-				Foundation::HWND,
-				UI::WindowsAndMessaging::{GetForegroundWindow, GetLastActivePopup},
-			};
-			let handle = self.frame.get_handle();
-			if handle.is_null() {
-				return self.frame.has_focus();
-			}
-			let frame_hwnd = HWND(handle);
-			let foreground = unsafe { GetForegroundWindow() };
-			let active_popup = unsafe { GetLastActivePopup(frame_hwnd) };
-			foreground == frame_hwnd || foreground == active_popup
+		use windows::Win32::{
+			Foundation::HWND,
+			UI::WindowsAndMessaging::{GetForegroundWindow, GetLastActivePopup},
+		};
+		let handle = self.frame.get_handle();
+		if handle.is_null() {
+			return self.frame.has_focus();
 		}
-		#[cfg(not(target_os = "windows"))]
-		{
-			self.frame.has_focus()
-		}
+		let frame_hwnd = HWND(handle);
+		let foreground = unsafe { GetForegroundWindow() };
+		let active_popup = unsafe { GetLastActivePopup(frame_hwnd) };
+		foreground == frame_hwnd || foreground == active_popup
 	}
 }

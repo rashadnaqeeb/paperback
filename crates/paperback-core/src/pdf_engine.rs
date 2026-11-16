@@ -1,0 +1,443 @@
+//! Reads the text, structure, images, and links of a PDF, on top of hayro.
+//!
+//! Open a [`Document`], load a [`Page`] from it, and read from that: [`Page::text`] for the characters, [`Page::tags`] for the structure tree, [`Page::images`] for the images, and [`Page::annotation_links`] for the links. Everything on a page is measured in points in page space, where y grows upward.
+//!
+//! hayro interprets a page's content stream once into a device rather than answering questions one at a time, so a page is read in full when it is loaded.
+//! The text layer is a port of pdfium's own (`core/fpdftext`) rather than a fresh design: Paperback read PDFs with pdfium before this, its heuristics were measured against the characters, inferred spaces, and line breaks pdfium produces, and they only hold if those come out the same.
+
+use std::{
+	collections::{HashMap, HashSet},
+	path::Path,
+	sync::OnceLock,
+};
+
+use hayro_syntax::{
+	DecryptionError, LoadPdfError, Pdf,
+	object::{Array, Dict, MaybeRef, Name, Object, ObjectIdentifier},
+};
+
+mod bidi;
+mod fonts;
+mod links;
+mod page;
+mod tags;
+mod text;
+
+#[allow(unused_imports)]
+pub use hayro_interpret::{font::FontFlags, kurbo::Point};
+#[allow(unused_imports)]
+pub use page::{AnnotationLink, ImageId, LinkTarget, ObjectKind, Page, PageBitmap, PageCache, PageImage, PageObject};
+#[allow(unused_imports)]
+pub use tags::{Tag, TagChild, TagTree};
+#[allow(unused_imports)]
+pub use text::{CharFont, PageChar, Rect, TextMatrix, TextPage, WebLink};
+
+/// Why a document or page could not be read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Error {
+	/// Kept separate because it is the one failure the reader can do something about.
+	PasswordRequired,
+	/// The file could not be read, or is not a PDF hayro can read.
+	CouldNotOpen,
+	/// The document has no page at the index asked for.
+	PageOutOfRange,
+}
+
+impl std::fmt::Display for Error {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::PasswordRequired => write!(f, "the document is password protected"),
+			Self::CouldNotOpen => write!(f, "the document could not be opened"),
+			Self::PageOutOfRange => write!(f, "the document has no such page"),
+		}
+	}
+}
+
+impl std::error::Error for Error {}
+
+/// A document's title and the like, as its info dictionary gives them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[allow(dead_code, reason = "Paperback reads only the title and author so far")]
+pub struct Metadata {
+	pub title: Option<String>,
+	pub author: Option<String>,
+	pub subject: Option<String>,
+	pub keywords: Option<String>,
+	/// The program that made what the PDF was converted from.
+	pub creator: Option<String>,
+	/// The program that wrote the PDF.
+	pub producer: Option<String>,
+}
+
+/// An open PDF. Pages can be loaded from it on several threads at once.
+pub struct Document {
+	pdf: Pdf,
+	page_numbers: HashMap<ObjectIdentifier, usize>,
+	structure: OnceLock<Option<tags::Structure>>,
+	/// Walking the name tree again for every link made a few hundred hyperlinked pages take a minute.
+	named_destinations: OnceLock<HashMap<Vec<u8>, usize>>,
+}
+
+impl Document {
+	/// # Errors
+	///
+	/// [`Error::PasswordRequired`] when the file is encrypted and the password does not fit, and [`Error::CouldNotOpen`] for a file that cannot be read or is not readable as a PDF.
+	pub fn open(path: impl AsRef<Path>, password: Option<&str>) -> Result<Self, Error> {
+		let bytes = std::fs::read(path).map_err(|_| Error::CouldNotOpen)?;
+		Self::from_bytes(bytes, password)
+	}
+
+	/// # Errors
+	///
+	/// The same failures as [`Document::open`].
+	pub fn from_bytes(bytes: Vec<u8>, password: Option<&str>) -> Result<Self, Error> {
+		let pdf = Pdf::new_with_password(bytes, password.unwrap_or("")).map_err(|error| match error {
+			LoadPdfError::Decryption(DecryptionError::PasswordProtected) => Error::PasswordRequired,
+			_ => Error::CouldNotOpen,
+		})?;
+		let page_numbers =
+			pdf.pages().iter().enumerate().filter_map(|(index, page)| Some((page.raw().obj_id()?, index))).collect();
+		Ok(Self { pdf, page_numbers, structure: OnceLock::new(), named_destinations: OnceLock::new() })
+	}
+
+	pub fn page_count(&self) -> usize {
+		self.pdf.pages().len()
+	}
+
+	/// # Errors
+	///
+	/// [`Error::PageOutOfRange`] when there is no such page.
+	pub fn page(&self, index: usize) -> Result<Page<'_>, Error> {
+		Page::load(self, index, &PageCache::new())
+	}
+
+	/// Lets the pages one thread loads share the fonts they read.
+	#[allow(clippy::unused_self, reason = "ties the cache's lifetime to this document")]
+	pub fn page_cache(&self) -> PageCache<'_> {
+		PageCache::new()
+	}
+
+	/// # Errors
+	///
+	/// [`Error::PageOutOfRange`] when there is no such page.
+	pub fn page_with<'doc>(&'doc self, index: usize, cache: &PageCache<'doc>) -> Result<Page<'doc>, Error> {
+		Page::load(self, index, cache)
+	}
+
+	/// What the document's info dictionary says about it. A value left empty in the file comes back as `None`.
+	pub fn metadata(&self) -> Metadata {
+		let metadata = self.pdf.metadata();
+		let text = |value: &Option<Box<[u8]>>| value.as_deref().map(decode_text_string).filter(|text| !text.is_empty());
+		Metadata {
+			title: text(&metadata.title),
+			author: text(&metadata.author),
+			subject: text(&metadata.subject),
+			keywords: text(&metadata.keywords),
+			creator: text(&metadata.creator),
+			producer: text(&metadata.producer),
+		}
+	}
+
+	/// A damaged outline can point back at itself; the looping branch is cut but what was read is kept, since a partial contents list beats none.
+	pub fn outline(&self, max_depth: u32) -> Vec<OutlineEntry> {
+		let mut entries = Vec::new();
+		let Some(outlines) = self.catalog().and_then(|catalog| catalog.get::<Dict<'_>>(b"Outlines")) else {
+			return entries;
+		};
+		let mut seen = HashSet::new();
+		self.walk_outline(&outlines, 0, max_depth, &mut seen, &mut entries);
+		entries
+	}
+
+	fn walk_outline(
+		&self,
+		parent: &Dict<'_>,
+		level: u32,
+		max_depth: u32,
+		seen: &mut HashSet<ObjectIdentifier>,
+		entries: &mut Vec<OutlineEntry>,
+	) {
+		let mut next = parent.get::<Dict<'_>>(b"First");
+		while let Some(item) = next {
+			if let Some(id) = item.obj_id()
+				&& !seen.insert(id)
+			{
+				return;
+			}
+			let title = item.get::<hayro_syntax::object::String<'_>>(b"Title").map(|title| decode_text_string(&title));
+			let page = self.destination_page(&item);
+			if let Some(title) = title.filter(|title| !title.is_empty())
+				&& let Some(page) = page
+			{
+				entries.push(OutlineEntry { level, title, page });
+			}
+			if level + 1 < max_depth {
+				self.walk_outline(&item, level + 1, max_depth, seen, entries);
+			}
+			next = item.get::<Dict<'_>>(b"Next");
+		}
+	}
+
+	/// `/Dest` before a `GoTo` action's destination, the order pdfium tries them in.
+	fn destination_page(&self, item: &Dict<'_>) -> Option<usize> {
+		if let Some(destination) = item.get::<Object<'_>>(b"Dest")
+			&& let Some(page) = self.resolve_destination(destination, 0, true)
+		{
+			return Some(page);
+		}
+		let action = item.get::<Dict<'_>>(b"A")?;
+		if action.get::<Name<'_>>(b"S").as_deref() != Some(b"GoTo".as_slice()) {
+			return None;
+		}
+		self.resolve_destination(action.get::<Object<'_>>(b"D")?, 0, true)
+	}
+
+	/// `named` is off while the name tree itself is being read, so a value that is itself a name does not ask for the tree it is part of.
+	fn resolve_destination(&self, destination: Object<'_>, depth: u32, named: bool) -> Option<usize> {
+		if depth > 8 {
+			return None;
+		}
+		match destination {
+			Object::Array(array) => self.page_of_explicit_destination(&array),
+			Object::Dict(dict) => self.resolve_destination(dict.get::<Object<'_>>(b"D")?, depth + 1, named),
+			Object::Name(name) => {
+				let target = self.catalog()?.get::<Dict<'_>>(b"Dests")?.get::<Object<'_>>(name.as_ref())?;
+				self.resolve_destination(target, depth + 1, named)
+			}
+			Object::String(name) if named => self.named_destinations().get(name.as_bytes()).copied(),
+			_ => None,
+		}
+	}
+
+	fn named_destinations(&self) -> &HashMap<Vec<u8>, usize> {
+		self.named_destinations.get_or_init(|| {
+			let mut pairs = Vec::new();
+			if let Some(tree) =
+				self.catalog().and_then(|catalog| catalog.get::<Dict<'_>>(b"Names")?.get::<Dict<'_>>(b"Dests"))
+			{
+				collect_name_tree(&tree, 0, &mut pairs);
+			}
+			let mut pages = HashMap::with_capacity(pairs.len());
+			for (name, value) in pairs {
+				// The first entry for a name is the one a search of the tree finds.
+				if !pages.contains_key(&name)
+					&& let Some(page) = self.resolve_destination(value, 0, false)
+				{
+					pages.insert(name, page);
+				}
+			}
+			pages
+		})
+	}
+
+	fn page_of_explicit_destination(&self, array: &Array<'_>) -> Option<usize> {
+		match array.raw_iter().next()? {
+			MaybeRef::Ref(reference) => self.page_numbers.get(&reference.into()).copied(),
+			// A destination into another document names its page by number; this one has no such page to give.
+			MaybeRef::NotRef(_) => None,
+		}
+	}
+
+	fn catalog(&self) -> Option<Dict<'_>> {
+		let xref = self.pdf.xref();
+		xref.get::<Dict<'_>>(xref.root_id())
+	}
+
+	const fn pdf(&self) -> &Pdf {
+		&self.pdf
+	}
+
+	fn page_number(&self, id: ObjectIdentifier) -> Option<usize> {
+		self.page_numbers.get(&id).copied()
+	}
+
+	fn structure(&self) -> Option<&tags::Structure> {
+		self.structure.get_or_init(|| tags::Structure::read(self, &self.catalog()?)).as_ref()
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+/// One entry of the document's bookmarks.
+pub struct OutlineEntry {
+	/// How deeply it is nested, starting from 0.
+	pub level: u32,
+	pub title: String,
+	/// Always a real page: entries pointing nowhere are left out.
+	pub page: usize,
+}
+
+/// In the order a search of the tree meets them, own `/Names` before `/Kids`, since the first entry for a name is the one that counts.
+fn collect_name_tree<'a>(node: &Dict<'a>, depth: u32, out: &mut Vec<(Vec<u8>, Object<'a>)>) {
+	if depth > 32 {
+		return;
+	}
+	if let Some(names) = node.get::<Array<'a>>(b"Names") {
+		let mut items = names.iter::<Object<'a>>();
+		while let (Some(name), Some(value)) = (items.next(), items.next()) {
+			if let Object::String(name) = name {
+				out.push((name.as_bytes().to_vec(), value));
+			}
+		}
+	}
+	if let Some(kids) = node.get::<Array<'a>>(b"Kids") {
+		for kid in kids.iter::<Dict<'a>>() {
+			collect_name_tree(&kid, depth + 1, out);
+		}
+	}
+}
+
+fn decode_text_string(bytes: &[u8]) -> String {
+	if let Some(rest) = bytes.strip_prefix(&[0xFE, 0xFF]) {
+		let units: Vec<u16> = rest.as_chunks::<2>().0.iter().map(|&pair| u16::from_be_bytes(pair)).collect();
+		return String::from_utf16_lossy(&units);
+	}
+	if let Some(rest) = bytes.strip_prefix(&[0xFF, 0xFE]) {
+		let units: Vec<u16> = rest.as_chunks::<2>().0.iter().map(|&pair| u16::from_le_bytes(pair)).collect();
+		return String::from_utf16_lossy(&units);
+	}
+	if let Some(rest) = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]) {
+		return String::from_utf8_lossy(rest).into_owned();
+	}
+	bytes.iter().map(|&byte| pdf_doc_char(byte)).collect()
+}
+
+/// `PDFDocEncoding` agrees with Latin-1 except in 0x18-0x1F and 0x80-0x9F, where it puts the typographic marks Latin-1 leaves out.
+fn pdf_doc_char(byte: u8) -> char {
+	const LOW: [char; 8] =
+		['\u{02D8}', '\u{02C7}', '\u{02C6}', '\u{02D9}', '\u{02DD}', '\u{02DB}', '\u{02DA}', '\u{02DC}'];
+	const HIGH: [char; 32] = [
+		'\u{2022}', '\u{2020}', '\u{2021}', '\u{2026}', '\u{2014}', '\u{2013}', '\u{0192}', '\u{2044}', '\u{2039}',
+		'\u{203A}', '\u{2212}', '\u{2030}', '\u{201E}', '\u{201C}', '\u{201D}', '\u{2018}', '\u{2019}', '\u{201A}',
+		'\u{2122}', '\u{FB01}', '\u{FB02}', '\u{0141}', '\u{0152}', '\u{0160}', '\u{0178}', '\u{017D}', '\u{0131}',
+		'\u{0142}', '\u{0153}', '\u{0161}', '\u{017E}', '\u{FFFD}',
+	];
+	match byte {
+		0x18..=0x1F => LOW[usize::from(byte - 0x18)],
+		0x80..=0x9F => HIGH[usize::from(byte - 0x80)],
+		0xA0 => '\u{20AC}',
+		_ => char::from(byte),
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use std::fmt::Write as _;
+
+	use super::{Document, decode_text_string};
+
+	fn pdf_with_content(content: &str) -> Vec<u8> {
+		pdf_with_font(content, &["<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >>".to_string()])
+	}
+
+	/// The font's first object is `5 0`, and the rest follow it.
+	fn pdf_with_font(content: &str, font: &[String]) -> Vec<u8> {
+		let mut objects = vec![
+			"<< /Type /Catalog /Pages 2 0 R >>".to_string(),
+			"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
+			"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>".to_string(),
+			format!("<< /Length {} >>\nstream\n{content}\nendstream", content.len()),
+		];
+		objects.extend_from_slice(font);
+		let mut pdf = String::from("%PDF-1.4\n");
+		let mut offsets = Vec::new();
+		for (index, object) in objects.iter().enumerate() {
+			offsets.push(pdf.len());
+			let _ = writeln!(pdf, "{} 0 obj\n{object}\nendobj", index + 1);
+		}
+		let xref = pdf.len();
+		let size = objects.len() + 1;
+		let _ = writeln!(pdf, "xref\n0 {size}\n0000000000 65535 f ");
+		for offset in offsets {
+			let _ = writeln!(pdf, "{offset:010} 00000 n ");
+		}
+		let _ = writeln!(pdf, "trailer\n<< /Size {size} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF");
+		pdf.into_bytes()
+	}
+
+	/// A page squeezed by `Tz` once lost its doubled letters as fake bold and read "Gren" (the NBER working papers).
+	#[test]
+	fn horizontal_scaling_keeps_doubled_letters_and_spaces() {
+		let content = "BT /F1 100 Tf 10 Tz 1 0 0 1 72 700 Tm (Green 4332) Tj ET";
+		let document = Document::from_bytes(pdf_with_content(content), None).unwrap();
+		let page = document.page(0).unwrap();
+		let text = page.text();
+		assert_eq!(text.text(0..text.char_count()).trim(), "Green 4332");
+	}
+
+	/// A PDF that draws its whole text on every page and shifts it read back once per page (pdf.js issue 1721).
+	#[test]
+	fn text_off_the_page_is_not_read() {
+		let content = "BT /F1 12 Tf 1 0 0 1 72 700 Tm (kept) Tj 1 0 0 1 72 -500 Tm (below) Tj 1 0 0 1 72 900 Tm (above) Tj 1 0 0 1 -400 700 Tm (left) Tj 1 0 0 1 700 700 Tm (right) Tj 1 0 0 1 600 650 Tm (edge) Tj ET";
+		let document = Document::from_bytes(pdf_with_content(content), None).unwrap();
+		let page = document.page(0).unwrap();
+		let text = page.text();
+		let read = text.text(0..text.char_count());
+		assert_eq!(read.split_whitespace().collect::<Vec<_>>(), ["kept", "edge"]);
+	}
+
+	/// Its Unicode values sit in `cidrange`s, and it read as the raw codes (pdf.js issue 9367).
+	#[test]
+	fn a_to_unicode_map_written_with_cid_ranges_is_read() {
+		let map = "/CIDInit /ProcSet findresource begin begincmap 1 begincodespacerange <0000> <FFFF> endcodespacerange 1 begincidrange <0003> <0004> 72 endcidrange endcmap end";
+		let font = [
+			"<< /Type /Font /Subtype /Type0 /BaseFont /Tahoma /Encoding /Identity-H /DescendantFonts [6 0 R] /ToUnicode 7 0 R >>".to_string(),
+			"<< /Type /Font /Subtype /CIDFontType2 /BaseFont /Tahoma /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /DW 500 >>".to_string(),
+			format!("<< /Length {} >>\nstream\n{map}\nendstream", map.len()),
+		];
+		let document =
+			Document::from_bytes(pdf_with_font("BT /F1 12 Tf 72 700 Td <00030004> Tj ET", &font), None).unwrap();
+		let page = document.page(0).unwrap();
+		let text = page.text();
+		assert_eq!(text.text(0..text.char_count()).trim(), "HI");
+	}
+
+	/// A negative size with a flipping matrix read as "f o n t" (pdf.js issue 1049).
+	#[test]
+	fn a_negative_font_size_does_not_space_out_kerned_letters() {
+		let content = "BT /F1 -12 Tf -1 0 0 -1 72 700 Tm [(f) -20 (o) -20 (n) -20 (t)] TJ ET";
+		let document = Document::from_bytes(pdf_with_content(content), None).unwrap();
+		let page = document.page(0).unwrap();
+		let text = page.text();
+		assert_eq!(text.text(0..text.char_count()).trim(), "font");
+	}
+
+	/// The IRS's Russian glossary lost every letter it drew on its own, and read "не аконных".
+	#[test]
+	fn a_lone_glyph_at_a_negative_font_size_is_read() {
+		let content = "BT /F1 -12 Tf -1 0 0 -1 72 700 Tm (ne) Tj (z) Tj (a) Tj ET";
+		let document = Document::from_bytes(pdf_with_content(content), None).unwrap();
+		let page = document.page(0).unwrap();
+		let text = page.text();
+		assert_eq!(text.text(0..text.char_count()).trim(), "neza");
+	}
+
+	/// Narrow columns made the page look vertical, and every digit drawn on its own started a new line (a USGS table).
+	#[test]
+	fn table_columns_of_single_digits_stay_on_their_baselines() {
+		let mut content = String::from("BT /F1 12 Tf ");
+		for row in 0..50 {
+			let y = 720 - row * 10;
+			let _ = write!(
+				content,
+				"1 0 0 1 72 {y} Tm (4) Tj 1 0 0 1 78 {y} Tm (1) Tj 1 0 0 1 500 {y} Tm (4) Tj 1 0 0 1 506 {y} Tm (1) Tj "
+			);
+		}
+		content.push_str("ET");
+		let document = Document::from_bytes(pdf_with_content(&content), None).unwrap();
+		let page = document.page(0).unwrap();
+		let text = page.text();
+		let read = text.text(0..text.char_count());
+		assert_eq!(read.split_whitespace().collect::<Vec<_>>(), vec!["41"; 100]);
+	}
+
+	#[test]
+	fn a_text_string_with_a_byte_order_mark_is_utf16() {
+		assert_eq!(decode_text_string(&[0xFE, 0xFF, 0x00, 0x48, 0x00, 0x69]), "Hi");
+	}
+
+	#[test]
+	fn pdf_doc_encoding_has_its_own_quotation_marks() {
+		assert_eq!(decode_text_string(&[0x8D, b'Q', 0x8E]), "\u{201C}Q\u{201D}");
+	}
+}

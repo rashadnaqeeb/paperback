@@ -4,13 +4,11 @@ use anyhow::Result;
 
 use crate::t;
 
-/// Fields pulled out of a MOBI file's PalmDOC/MOBI header (record 0) that the rest of parsing
-/// needs. `rec0` is kept as an owned copy (record 0 is at most a few KB) so this struct does not
-/// borrow the file's raw bytes.
+/// `rec0` is an owned copy, at most a few KB, so this does not borrow the file's raw bytes.
 pub(super) struct MobiHeader {
 	pub rec0: Vec<u8>,
 	pub record_offsets: Vec<usize>,
-	pub mobi_header_offset: usize,
+	pub header_offset: usize,
 	pub header_length: usize,
 	pub text_encoding: u32,
 	pub compression: u16,
@@ -20,11 +18,13 @@ pub(super) struct MobiHeader {
 	pub fdst_html_end: Option<usize>,
 	pub document_title: String,
 	pub is_kf8: bool,
+	/// Plain text rather than HTML.
+	pub is_palmdoc: bool,
 }
 
 impl MobiHeader {
 	pub fn mobi_header(&self) -> &[u8] {
-		&self.rec0[self.mobi_header_offset..]
+		&self.rec0[self.header_offset..]
 	}
 }
 
@@ -61,8 +61,12 @@ pub(super) fn parse_header(data: &[u8], title_bytes: &[u8]) -> Result<MobiHeader
 	}
 	let compression = u16::from_be_bytes([rec0[0], rec0[1]]);
 	tracing::debug!(compression, "detected mobi compression mode");
+	// PalmDOC, which Mobipocket grew out of, stops after record 0's first 16 bytes: no MOBI header follows, and its text is plain rather than HTML.
+	if data.get(60..68) == Some(b"TEXtREAd".as_slice()) && rec0.get(16..20) != Some(b"MOBI".as_slice()) {
+		return palmdoc_header(rec0, record_offsets, compression, title_bytes);
+	}
 	let mobi_header_offset = 16;
-	if mobi_header_offset + 8 > rec0.len() {
+	if mobi_header_offset + 16 > rec0.len() {
 		tracing::warn!("mobi record 0 is missing the mobi header");
 		// TRANSLATORS: Error shown when a MOBI file is missing its MOBI header
 		anyhow::bail!(t("No MOBI header"));
@@ -84,22 +88,23 @@ pub(super) fn parse_header(data: &[u8], title_bytes: &[u8]) -> Result<MobiHeader
 		rec0[mobi_header_offset + 14],
 		rec0[mobi_header_offset + 15],
 	]);
-	let mut name_offset = 0usize;
-	let mut name_length = 0usize;
-	if header_length >= 76 && mobi_header_offset + 76 <= rec0.len() {
-		name_offset = u32::from_be_bytes([
+	let (name_offset, name_length) = if header_length >= 76 && mobi_header_offset + 76 <= rec0.len() {
+		let name_offset = u32::from_be_bytes([
 			rec0[mobi_header_offset + 68],
 			rec0[mobi_header_offset + 69],
 			rec0[mobi_header_offset + 70],
 			rec0[mobi_header_offset + 71],
 		]) as usize;
-		name_length = u32::from_be_bytes([
+		let name_length = u32::from_be_bytes([
 			rec0[mobi_header_offset + 72],
 			rec0[mobi_header_offset + 73],
 			rec0[mobi_header_offset + 74],
 			rec0[mobi_header_offset + 75],
 		]) as usize;
-	}
+		(name_offset, name_length)
+	} else {
+		(0, 0)
+	};
 	let first_content_record = 1;
 	let mut last_content_record = num_records.saturating_sub(1);
 	if rec0.len() >= 10 {
@@ -122,13 +127,11 @@ pub(super) fn parse_header(data: &[u8], title_bytes: &[u8]) -> Result<MobiHeader
 	};
 	document_title = document_title.replace('\0', "").trim().replace('_', " ");
 	let mut extra_data_flags = 0u32;
-	// The trailing-data flags live at absolute record-0 offset 0xF2 (242), a fixed 2-byte
-	// field regardless of MOBI version; that's 226 bytes into the mobi header, which starts
-	// at record-0 offset 16.
+	// The trailing-data flags are a fixed 2-byte field at record-0 offset 0xF2 in every MOBI version, 226 bytes into the MOBI header, which starts at offset 16.
 	if rec0.len() >= mobi_header_offset + 228 {
 		let mobi_header = &rec0[mobi_header_offset..];
 		extra_data_flags = u32::from(u16::from_be_bytes([mobi_header[226], mobi_header[227]]));
-		if extra_data_flags == 0xFFFFFFFF {
+		if extra_data_flags == 0xFFFF_FFFF {
 			extra_data_flags = 0;
 		}
 	}
@@ -137,7 +140,7 @@ pub(super) fn parse_header(data: &[u8], title_bytes: &[u8]) -> Result<MobiHeader
 		let mobi_header = &rec0[mobi_header_offset..];
 		let fdst_idx =
 			u32::from_be_bytes([mobi_header[176], mobi_header[177], mobi_header[178], mobi_header[179]]) as usize;
-		if fdst_idx != 0xFFFFFFFF && fdst_idx < num_records {
+		if fdst_idx != 0xFFFF_FFFF && fdst_idx < num_records {
 			let start = record_offsets[fdst_idx];
 			let end = if fdst_idx + 1 < num_records { record_offsets[fdst_idx + 1] } else { data.len() };
 			if start < end && end <= data.len() {
@@ -152,7 +155,7 @@ pub(super) fn parse_header(data: &[u8], title_bytes: &[u8]) -> Result<MobiHeader
 			} else {
 				tracing::debug!("fdst record offset is out of range, skipping html end truncation");
 			}
-		} else if fdst_idx != 0xFFFFFFFF {
+		} else if fdst_idx != 0xFFFF_FFFF {
 			tracing::debug!(fdst_idx, num_records, "fdst index is out of range, skipping html end truncation");
 		}
 	}
@@ -169,7 +172,7 @@ pub(super) fn parse_header(data: &[u8], title_bytes: &[u8]) -> Result<MobiHeader
 	Ok(MobiHeader {
 		rec0,
 		record_offsets,
-		mobi_header_offset,
+		header_offset: mobi_header_offset,
 		header_length,
 		text_encoding,
 		compression,
@@ -179,17 +182,47 @@ pub(super) fn parse_header(data: &[u8], title_bytes: &[u8]) -> Result<MobiHeader
 		fdst_html_end,
 		document_title,
 		is_kf8,
+		is_palmdoc: false,
 	})
 }
 
-/// Reads the EXTH metadata block (if present) following the MOBI header, returning the raw
-/// record map plus any author/title overrides it carries.
+fn palmdoc_header(
+	rec0: Vec<u8>,
+	record_offsets: Vec<usize>,
+	compression: u16,
+	title_bytes: &[u8],
+) -> Result<MobiHeader> {
+	let text_record_count = usize::from(u16::from_be_bytes([rec0[8], rec0[9]]));
+	if text_record_count == 0 || text_record_count >= record_offsets.len() {
+		tracing::warn!(text_record_count, records = record_offsets.len(), "palmdoc text record count is invalid");
+		anyhow::bail!(t("Invalid content record range"));
+	}
+	let document_title = String::from_utf8_lossy(title_bytes).replace('\0', "").trim().replace('_', " ");
+	// Whatever follows the 16 bytes in some of these files isn't a MOBI header, so none is offered to the readers that look in one.
+	let header_offset = rec0.len();
+	Ok(MobiHeader {
+		rec0,
+		record_offsets,
+		header_offset,
+		header_length: 0,
+		text_encoding: 1252,
+		compression,
+		first_content_record: 1,
+		last_content_record: text_record_count,
+		extra_data_flags: 0,
+		fdst_html_end: None,
+		document_title,
+		is_kf8: false,
+		is_palmdoc: true,
+	})
+}
+
 pub(super) fn parse_exth(header: &MobiHeader) -> (HashMap<u32, Vec<u8>>, Option<String>, Option<String>) {
 	let mut exth_map = HashMap::new();
 	let mut author = None;
 	let mut title = None;
 	let rec0 = &header.rec0;
-	let exth_offset = header.mobi_header_offset + header.header_length;
+	let exth_offset = header.header_offset + header.header_length;
 	if exth_offset + 12 <= rec0.len() && &rec0[exth_offset..exth_offset + 4] == b"EXTH" {
 		let exth_num_records = u32::from_be_bytes([
 			rec0[exth_offset + 8],
